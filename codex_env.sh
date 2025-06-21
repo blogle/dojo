@@ -44,11 +44,17 @@ pnpm --filter ./frontend install
 cargo fetch --manifest-path ./backend/Cargo.toml
 
 echo ">>> 5a. Cypress binary"
-# Ensure Cypress is listed (adds it if missing) and download its binary
-if ! pnpm --filter ./frontend list cypress --depth -1 >/dev/null 2>&1; then
-  pnpm --filter ./frontend add -D cypress
+pushd frontend >/dev/null
+
+# 1.  Add Cypress if it's missing from devDependencies
+if ! pnpm exec -- cypress --version >/dev/null 2>&1; then
+  pnpm add --save-dev cypress
 fi
-pnpm --filter ./frontend exec cypress verify
+
+# 2.  Download / verify the Cypress Electron bundle
+pnpm exec cypress verify
+
+popd >/dev/null
 
 echo ">>> 6. Database migrations"
 export DATABASE_URL="postgres://dojo:dojo@localhost/dojo_dev"
