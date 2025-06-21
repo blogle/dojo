@@ -43,19 +43,6 @@ pnpm --filter ./frontend install
 # Rust deps (backend) ───────────────────────────────────────────────────────────
 cargo fetch --manifest-path ./backend/Cargo.toml
 
-echo ">>> 5a. Cypress binary"
-pushd frontend >/dev/null
-
-# 1.  Add Cypress if it's missing from devDependencies
-if ! pnpm exec -- cypress --version >/dev/null 2>&1; then
-  pnpm add --save-dev cypress
-fi
-
-# 2.  Download / verify the Cypress Electron bundle
-pnpm exec cypress verify
-
-popd >/dev/null
-
 echo ">>> 6. Database migrations"
 export DATABASE_URL="postgres://dojo:dojo@localhost/dojo_dev"
 # (run `sqlx migrate run` or equivalent here when the migrations directory exists)
