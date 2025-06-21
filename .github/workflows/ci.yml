@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: dojo
+          POSTGRES_PASSWORD: dojo
+          POSTGRES_DB: dojo_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      DATABASE_URL: postgres://dojo:dojo@localhost:5432/dojo_dev
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features rustls,postgres
+      - run: pnpm --filter ./frontend install
+      - run: cargo fetch --manifest-path ./backend/Cargo.toml
+      - run: sqlx migrate run --source backend/migrations
+      - run: cargo fmt -- --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test --all
+      - run: pnpm lint
+      - run: pnpm type-check
+      - run: pnpm test
+      - run: pnpm build --dry-run
+      - run: pnpm cypress run
