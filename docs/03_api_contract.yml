@@ -1,0 +1,392 @@
+openapi: 3.1.0
+info:
+  title: Dojo Budgeting API
+  version: 0.1.0
+  description: |
+    REST + WebSocket contract that fulfils functional stories in `01_requirements.md`.
+    All endpoints are **household‑scoped**.  Clients authenticate with a JWT
+    containing `household_id` & `user_id` claims.
+
+servers:
+  - url: https://api.dojo.finance/v1
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        group_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/CategoryType' }
+        monthly_amount: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$" }
+        goal_amount: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$", nullable: true }
+        balance: { type: string, pattern: "^[-+]?\\d{1,12}\\.\\d{2}$" }
+        is_archived: { type: boolean }
+        created_at: { type: string, format: date-time }
+    CategoryType:
+      type: string
+      enum: [group, standard, non_reportable, credit_payment]
+    Account:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/AccountType' }
+        balance: { type: string, pattern: "^[-+]?\\d{1,12}\\.\\d{2}$" }
+        is_archived: { type: boolean }
+    AccountType:
+      type: string
+      enum: [asset, credit]
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        payee: { type: string }
+        memo: { type: string }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid, nullable: true }
+        inflow: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$" }
+        outflow: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$" }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+        source: { $ref: '#/components/schemas/TransactionSource' }
+    TransactionStatus:
+      type: string
+      enum: [pending, settled]
+    TransactionSource:
+      type: string
+      enum: [manual, plaid, system]
+    CategoryTransfer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        date: { type: string, format: date }
+        from_category_id: { type: string, format: uuid }
+        to_category_id: { type: string, format: uuid }
+        amount: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$" }
+    Reconciliation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        account_id: { type: string, format: uuid }
+        statement_balance: { type: string, pattern: "^[-+]?\\d{1,12}\\.\\d{2}$" }
+        reconciled_at: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      properties:
+        available_to_budget: { type: string, pattern: "^[-+]?\\d{1,12}\\.\\d{2}$" }
+        accounts: 
+          type: array
+          items: { $ref: '#/components/schemas/Account' }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        alerts:
+          type: array
+          items: { type: string }
+
+paths:
+  /auth/register:
+    post:
+      summary: Register new user & household (setup flow)
+      operationId: registerUser
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, household_name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                household_name: { type: string }
+      responses:
+        '201':
+          description: User and household created
+        '409':
+          description: Email already in use
+
+  /auth/login:
+    post:
+      summary: Issue JWT for existing user
+      operationId: loginUser
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+
+  /categories:
+    get:
+      summary: List categories (US-01, US-02, US-03)
+      operationId: listCategories
+      tags: [Categories]
+      parameters:
+        - in: query
+          name: archived
+          schema: { type: boolean }
+        - in: query
+          name: as_of
+          schema: { type: string, format: date-time }
+          description: Time-travel view (see temporal tables)
+      responses:
+        '200':
+          description: JSON array
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
+    post:
+      summary: Create category (US-01)
+      operationId: createCategory
+      tags: [Categories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Category' } ]
+      responses:
+        '201': { description: Created }
+
+  /categories/{id}:
+    patch:
+      summary: Update or archive category (US-02, US-03)
+      operationId: updateCategory
+      tags: [Categories]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Category' } ]
+      responses:
+        '200': { description: Updated }
+
+  /accounts:
+    get:
+      summary: List accounts (US-04)
+      operationId: listAccounts
+      tags: [Accounts]
+      parameters:
+        - in: query
+          name: as_of
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Account' }
+    post:
+      summary: Create account (US-04)
+      operationId: createAccount
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Account' } ]
+      responses:
+        '201': { description: Created }
+
+  /accounts/{id}:
+    patch:
+      summary: Update or archive account
+      operationId: updateAccount
+      tags: [Accounts]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Account' } ]
+      responses:
+        '200': { description: Updated }
+
+  /transactions:
+    get:
+      summary: List transactions (US-05, US-06, US-07)
+      operationId: listTransactions
+      tags: [Transactions]
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/TransactionStatus' }
+        - in: query
+          name: as_of
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+    post:
+      summary: Create manual transaction (US-05)
+      operationId: createTransaction
+      tags: [Transactions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Transaction' } ]
+      responses:
+        '201': { description: Created }
+
+  /transactions/import:
+    post:
+      summary: Upsert transactions from Plaid webhook (US-06)
+      operationId: importTransactions
+      tags: [Transactions]
+      security: [] # handled via webhook secret header
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202': { description: Accepted }
+
+  /category-transfers:
+    post:
+      summary: Transfer money between envelopes (US-09)
+      operationId: createCategoryTransfer
+      tags: [CategoryTransfers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/CategoryTransfer' } ]
+      responses:
+        '201': { description: Created }
+
+  /account-transfers:
+    post:
+      summary: Transfer between accounts (US-08)
+      operationId: createAccountTransfer
+      tags: [AccountTransfers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_account_id,to_account_id,amount,date]
+              properties:
+                from_account_id: { type: string, format: uuid }
+                to_account_id: { type: string, format: uuid }
+                amount: { type: string, pattern: "^\\d{1,12}\\.\\d{2}$" }
+                date: { type: string, format: date }
+                memo: { type: string }
+      responses:
+        '201': { description: Created }
+
+  /reconciliations:
+    post:
+      summary: Record reconciliation point (US-10)
+      operationId: createReconciliation
+      tags: [Reconciliations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [ { $ref: '#/components/schemas/Reconciliation' } ]
+      responses:
+        '201': { description: Created }
+
+  /dashboard:
+    get:
+      summary: Retrieve dashboard summary (US-11)
+      operationId: getDashboard
+      tags: [Reports]
+      parameters:
+        - in: query
+          name: as_of
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+
+  /reports/spending:
+    get:
+      summary: Spending report (US-12)
+      operationId: getSpendingReport
+      tags: [Reports]
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: group_id
+          schema: { type: string, format: uuid, nullable: true }
+      responses:
+        '200': { description: OK }
+
+  /ws:
+    get:
+      summary: WebSocket endpoint for real‑time events (US-13)
+      operationId: wsBudgetEvents
+      tags: [Realtime]
+      x-specification: |
+        Connect with `Sec-WebSocket-Protocol: bearer,<JWT>`.
+        Server pushes JSON messages:
+        ```json
+        { "type": "transaction.created", "payload": { ... } }
+        
+
