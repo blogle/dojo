@@ -7,11 +7,23 @@ fn category_and_account_balance() {
     let account_id = Uuid::new_v4();
     let cat_id = Uuid::new_v4();
 
-    let mut budget = Budget::default();
-    budget.system_available_category_id = available_id;
-    budget.accounts.push(Account { id: account_id, name: "Checking".into(), starting_balance: 100.0 });
-    budget.categories.push(Category { id: available_id, name: "Available".into() });
-    budget.categories.push(Category { id: cat_id, name: "Groceries".into() });
+    let mut budget = Budget {
+        system_available_category_id: available_id,
+        ..Default::default()
+    };
+    budget.accounts.push(Account {
+        id: account_id,
+        name: "Checking".into(),
+        starting_balance: 100.0,
+    });
+    budget.categories.push(Category {
+        id: available_id,
+        name: "Available".into(),
+    });
+    budget.categories.push(Category {
+        id: cat_id,
+        name: "Groceries".into(),
+    });
 
     budget.transactions.push(Transaction {
         id: Uuid::new_v4(),

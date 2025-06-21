@@ -73,7 +73,11 @@ impl Default for Budget {
 impl Budget {
     pub fn category_balance(&self, cat: Uuid) -> f64 {
         let mut balance = 0.0;
-        for tx in self.transactions.iter().filter(|t| t.category_id == Some(cat)) {
+        for tx in self
+            .transactions
+            .iter()
+            .filter(|t| t.category_id == Some(cat))
+        {
             balance += tx.inflow - tx.outflow;
         }
         for tr in &self.category_transfers {
@@ -91,6 +95,7 @@ impl Budget {
         self.category_balance(self.system_available_category_id)
     }
 
+    #[allow(dead_code)]
     pub fn account_balance(&self, acc: Uuid) -> f64 {
         let starting = self
             .accounts

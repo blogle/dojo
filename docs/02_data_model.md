@@ -19,6 +19,7 @@ erDiagram
     households ||--o{ plaid_items : "links"
 ```
 
+
 ---
 
 ## 2 Postgres base tables
