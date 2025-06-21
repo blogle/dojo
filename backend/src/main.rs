@@ -1,12 +1,20 @@
 use axum::{routing::{get, post}, Router, Extension, Json};
 use std::{sync::{Arc, Mutex}};
+use uuid::Uuid;
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use serde::Serialize;
 
 mod domain;
 use domain::{
     Account, AccountTransfer, Budget, Category, CategoryTransfer, Transaction,
 };
+
+#[derive(Serialize)]
+struct Dashboard {
+    available_to_budget: String,
+}
 
 #[tokio::main]
 async fn main() {
@@ -15,7 +23,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let state = Arc::new(Mutex::new(Budget::default()));
+    let mut budget = Budget::default();
+    budget.system_available_category_id = Uuid::new_v4();
+    let state = Arc::new(Mutex::new(budget));
 
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
@@ -29,6 +39,8 @@ async fn main() {
         .route("/category-transfers", get(list_category_transfers))
         .route("/account-transfers", post(create_account_transfer))
         .route("/account-transfers", get(list_account_transfers))
+        .route("/dashboard", get(get_dashboard))
+        .route("/available", get(get_available))
         .layer(Extension(state));
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -105,4 +117,20 @@ async fn list_account_transfers(
 ) -> Json<Vec<AccountTransfer>> {
     let budget = state.lock().unwrap();
     Json(budget.account_transfers.clone())
+}
+
+async fn get_dashboard(
+    Extension(state): Extension<Arc<Mutex<Budget>>>,
+) -> Json<Dashboard> {
+    let budget = state.lock().unwrap();
+    Json(Dashboard {
+        available_to_budget: format!("{:.2}", budget.available_to_budget()),
+    })
+}
+
+async fn get_available(
+    Extension(state): Extension<Arc<Mutex<Budget>>>,
+) -> Json<f64> {
+    let budget = state.lock().unwrap();
+    Json(budget.available_to_budget())
 }

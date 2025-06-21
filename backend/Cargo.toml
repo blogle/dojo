@@ -3,6 +3,10 @@ name = "dojo-backend"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "dojo_backend"
+path = "src/lib.rs"
+
 [dependencies]
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
