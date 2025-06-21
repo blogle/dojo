@@ -1,4 +1,4 @@
-use dojo_backend::domain::{Account, Budget, Category, CategoryTransfer, Transaction};
+use crate::domain::{Account, Budget, Category, CategoryTransfer, Transaction};
 use uuid::Uuid;
 
 #[test]

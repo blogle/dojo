@@ -1,0 +1,39 @@
+# docker-compose.override.yml  ← dev & CI convenience
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev-runtime         # ⟵ debug DAG with Bacon
+    # Hot-reload + incremental build caches
+    volumes:
+      - ./backend:/app:cached
+      - sccache:/sccache
+      - cargo-registry:/cargo/registry
+      - cargo-git:/cargo/git
+      - target-debug:/app/backend/target
+    environment:
+      RUST_LOG: debug
+      DATABASE_URL: postgres://dojo:dojo@db/dojo_dev
+    tty: true                     # pretty Bacon UI
+
+  # Optional: frontend HMR (Vite @ port 5173)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-builder
+    command: pnpm run dev
+    working_dir: /web
+    volumes:
+      - ./frontend:/web:cached
+      - pnpm-store:/pnpm/store
+    ports:
+      - "5173:5173"
+
+volumes:
+  sccache:
+  cargo-registry:
+  cargo-git:
+  target-debug:
+  pnpm-store:
