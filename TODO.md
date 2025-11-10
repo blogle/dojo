@@ -1,0 +1,8 @@
+- **Title:** Research Off-the-Shelf DuckDB Migration Tool
+- **Priority:** P2
+- **Effort:** Small
+- **Trigger:** Discussion during MVP planning for the auditable ledger revealed the risk of maintaining a custom migration script.
+- **Why defer:** The custom script is sufficient for the MVP, and building the core feature is the current priority.
+- **Proposed next step:** Dedicate a short timebox to survey the ecosystem for existing Python-based DuckDB migration tools.
+- **Acceptance Criteria:** A decision document or update to `ARCHITECTURE.md` recommending a tool or confirming that a custom script remains the best option.
+- **Links:** `docs/plans/auditable-ledger-net-worth.md`

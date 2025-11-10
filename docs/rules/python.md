@@ -1,6 +1,6 @@
 # Python Best Practices & Style Guide (Codebase-Wide)
 
-This guide emphasizes maintainability, clarity, correctness, and determinism over cleverness. 
+This guide emphasizes maintainability, clarity, correctness, and determinism over cleverness.
 
 
 ## Naming & Organization
@@ -28,7 +28,7 @@ Examples of structure:
 
 We are at v0; breaking changes are allowed. Every breaking change must:
 
-1. Add a bullet under **CHANGELOG.md › Unreleased › Breaking Changes** with a one-line migration note.  
+1. Add a bullet under **CHANGELOG.md › Unreleased › Breaking Changes** with a one-line migration note.
 2. Apply the `breaking-change` label on the PR.
 
 Feature flags are **read once at the edge** (config load) and **passed inward**; do not sprinkle flags across modules or read the same flag in multiple places.
@@ -147,8 +147,8 @@ Measure first, optimize second; do not micro-optimize without evidence.
 
 **Light performance rubric**
 
-1. Identify candidate hot paths with simple timers (`time.perf_counter()` in a focused micro-bench description).  
-2. Consider memory behavior when copying vs mutating.  
+1. Identify candidate hot paths with simple timers (`time.perf_counter()` in a focused micro-bench description).
+2. Consider memory behavior when copying vs mutating.
 3. Only drop to Python loops or cython/numba after profiling shows a bottleneck.
 
 
@@ -332,15 +332,15 @@ This sequencing preserves review clarity and minimizes risk.
 
 ## Prohibitions (Hard-Fail in CI)
 
-- Never modify `sys.path`.  
-- No dynamic imports, no nested imports, no `try/except` imports.  
-- No `from __future__ import annotations`.  
+- Never modify `sys.path`.
+- No dynamic imports, no nested imports, no `try/except` imports.
+- No `from __future__ import annotations`.
 - No `getattr` or `setattr`.
-- No `print` in library code.  
-- No `except:` (bare) or catching exceptions that cannot be handled locally.  
-- No hidden globals or mutable default arguments.  
-- No premature optimization (unjustified micro-tweaks).  
-- No references to ephemeral or non-tracked files; prefer the `git ls-files` allowlist.  
+- No `print` in library code.
+- No `except:` (bare) or catching exceptions that cannot be handled locally.
+- No hidden globals or mutable default arguments.
+- No premature optimization (unjustified micro-tweaks).
+- No references to ephemeral or non-tracked files; prefer the `git ls-files` allowlist.
 - No mixed refactor + feature in the same commit.
 
 
@@ -350,3 +350,35 @@ This sequencing preserves review clarity and minimizes risk.
 Prefer domain-responsibility naming, keep changes minimal, write pure typed functions with clear return annotations, validate inputs explicitly, handle exceptions where they can be resolved, choose `match/case` for stateful branching, favor vectorization and functional composition, and keep the system deterministic via a single seed at process start. Comments explain **why**. CI automates hygiene so reviews focus on behavior and design.
 
 
+## Application Structure & Dependency Management
+
+To balance framework-idiomatic patterns with our principle of explicit dependency management, we will adhere to the following structure for FastAPI applications.
+
+-   **Application Factory Pattern**: The application object **must** be created and configured within a factory function (e.g., `create_app()`) located in a central module like `dojo.core.app`. This factory is the designated **`build_container`** for our system.
+-   **Explicit Service Instantiation**: All application-level ("singleton") services (e.g., `TransactionEntryService`) **must** be instantiated within this `create_app` factory.
+-   **State-Based Injection**: These instantiated services **must** be attached to the `app.state` object. This makes dependencies explicit at startup.
+-   **Request-Scoped Dependencies**: For request-level resources (like a database connection), use a standard FastAPI dependency (`Depends`) that yields the resource. For application-level services, dependencies **must** access them from the request's state (e.g., `request.app.state.transaction_service`).
+
+This pattern ensures that all major components are constructed and wired together in one auditable location, upholding the "Simple by Design" and "Transparent ⇒ Trustworthy" values.
+
+**Example — App Factory and Dependency Access**
+
+```python
+# In dojo.core.app
+from fastapi import FastAPI, Request
+from dojo.budgeting.services import TransactionEntryService
+from dojo.core.config import Settings
+
+def create_app(settings: Settings) -> FastAPI:
+    app = FastAPI()
+
+    # Instantiate and attach services to the state
+    app.state.transaction_service = TransactionEntryService()
+
+    # ... register routers ...
+    return app
+
+# In a router/dependency
+async def get_transaction_service(request: Request) -> TransactionEntryService:
+    return request.app.state.transaction_service
+```
