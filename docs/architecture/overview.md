@@ -61,13 +61,17 @@ This is the core analytical engine. It is responsible for loading historical spe
 
 This module acts as the investment advisory layer. It consumes the optimal portfolio model generated offline by the evaluation framework, calculates the corresponding target allocation for the actual holdings, and generates tax-efficient rebalancing guidance. This guidance prioritizes trading in tax-advantaged accounts and identifying opportunities for tax-loss harvesting.
 
+### `/backtesting`
+
+This module contains the quantitative evaluation harness, referred to as the `BacktestEngine`. It is responsible for the reproducible and statistically rigorous assessment of investment strategies against historical and synthetically augmented market data.
+
 ## Quantitative Modeling and Evaluation Frameworks
 
 Complex quantitative analysis, model training, and rigorous validation are strictly decoupled from the live application to maintain performance and responsiveness. The focus of this framework is on robust statistical and financial models, including mean-variance optimization (MVO), factor models, and various robust optimization techniques, in addition to time-series and statistical models for forecasting and data imputation.
 
 ### The Modeling Harness
 
-A separate, dedicated environment, referred to as the Modeling Harness, is used for all intensive quantitative and statistical tasks. This is an offline set of Python scripts and packages that is never deployed as part of the live application. The harness’s primary goal is to investigate, validate, and select the optimal approaches for capital allocation, estimating portfolio return moments, and performing data augmentation, such as backfill imputation.
+A separate, dedicated environment, referred to as the Modeling Harness, is used for all intensive quantitative and statistical tasks. This is an offline set of Python scripts and packages that is never deployed as part of the live application. The harness’s primary goal is to investigate, validate, and select the optimal approaches for capital allocation, estimating portfolio return moments, and performing data augmentation, such as backfill imputation. The architecture of this framework is detailed in the [Portfolio Evaluation and Backtesting Framework Architecture](./portfolio_backtesting.md) document.
 
 The harness defines Standardized Evaluation Suites for all categories of model validation, including portfolio optimization, forecasting model validation, and data backfill imputation. It utilizes rigorous methodologies, such as purged embargoed cross-validation, to ensure the integrity and robustness of all derived models before they are promoted for use in the live application.
 
