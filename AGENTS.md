@@ -158,6 +158,7 @@ Backlog of deferred or off-scope items.
 ## Rules
 The following documents comprise the rules that any code in this repository MUST adhere to.
 - [*Cheatsheet:*](./docs/rules/cheatsheet.md) For any task, ALWAYS consults this document for general guidelines. Consult specialized rules files as needed.
+- [*Engineering Guide:*](./docs/rules/engineering_guide.md) Covers mandatory standards, patterns, and principles for developing the application's backend logic.
 - [*Financial Math:*](./docs/rules/fin_math.md) Covers best practices around financial maths, ensuring correctness, numerical stability, etc.
 - [*Python:*](./docs/rules/python.md) Covers architectural patterns, code and style preferences that must be adhered to for performance, consistency and correctness.
 - [*SQL:*](./docs/rules/sql.md) Covers sql and duckdb patterns that must be adhered to.

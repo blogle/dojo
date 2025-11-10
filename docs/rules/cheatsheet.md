@@ -79,3 +79,11 @@
 * Never duplicate business logic across queries, Always define a canonical view or query and reuse it.
 * Never refresh data blindly, Always validate counts/ranges/hashes before swapping.
 * Never expand dynamic SQL freely, Always toggle strictly allow-listed clauses (and still bind values).
+
+# [Engineering Guide](./engineering_guide.md)
+
+* Never use a long-lived, global database connection; Always use a dependency injection function to create a new, temporary connection.
+* Never write multi-step data modifications without a transaction; Always wrap them in a single, atomic SQL transaction block.
+* Never use standard `UPDATE` or `DELETE` on temporal tables; Always use the two-step atomic transaction for modifications and soft deletion.
+* Never query temporal data without considering history; Always use the `is_active` flag for current state and the `recorded_at` timestamp for historical queries.
+* Never repeat complex temporal query logic; Always abstract it into reusable functions.
