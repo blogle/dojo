@@ -44,8 +44,7 @@ You operate by the values and principles outlined in our charter:
 - Get explicit permission before implementing backward compatibility.
 - Page modules must not hold globals or singletons. Dependencies are explicitly threaded via `register(app, ctx)`.
 - `build_container(cfg)` is the only sanctioned location for calling `.from_defaults()` on any service.
-- Install and authorize `direnv` (`direnv allow` at the repo root) so every repo entry automatically evaluates the `flake.nix`, launches the `nix develop` shell for system dependencies, and hands off to the `uv`-managed Python environment for package dependencies.
-- Run `make run`, `make test`, `make lint`, and `make check` from that environment; the Makefile calls `uv run` so every developer exercises identical entrypoints.
+- **Maintain the Changelog**: For any user-facing change, feature, or fix, add a corresponding entry to `CHANGELOG.md` under the `[Unreleased]` section, following the Keep a Changelog format.
 - Before review or merge, verify adherence to this document.
 
 ## Decision Collaboration
@@ -153,6 +152,27 @@ Backlog of deferred or off-scope items.
 
 ### Explain Modals
 **ALWAYS:** Treat explain-modal content as a standalone reference (think Wikipedia entry). Provide a high-level overview, focused drilldowns for each UI panel, interpretation guidance, code/pseudocode or math where helpful, and end with citations/links. Future explain modals must follow this structure without exception.
+
+
+## Development Environment & Command Execution
+
+This project uses `nix` and `direnv` to ensure a consistent and reproducible development environment. All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) **must** be invoked within this environment.
+
+To ensure compliance, all commands must be prefixed with `direnv exec .`.
+
+**Correct Usage:**
+```bash
+direnv exec . pytest
+direnv exec . ruff check .
+```
+
+**Incorrect Usage:**
+```bash
+pytest
+ruff check .
+```
+
+This rule is critical to prevent errors caused by using incorrect tool versions or missing dependencies.
 
 
 ## Rules
