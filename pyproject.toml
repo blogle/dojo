@@ -1,0 +1,26 @@
+[project]
+name = "dojo"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "dash",
+  "duckdb",
+  "plotly",
+  "numpy",
+  "pandas",
+  "pyyaml",
+  "scipy",
+  "yfinance",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pyright",
+]
+
+[tool.uv]
+preview = true
+
+[tool.uv.extra-build-dependencies]
+"multitasking" = ["setuptools"]
