@@ -182,7 +182,7 @@ Only `core` may depend on DuckDB adapters and shared config. Domain modules may 
 
 - **Unit tests**: `tests/unit/budgeting` (service contract), `tests/unit/core` (net worth aggregation).
 - **Property tests**: `tests/property/budgeting` (temporal invariants) and `tests/property/core` (net worth equation).
-- **E2E**: Playwright spec checked in (`tests/e2e/transaction_flow.spec.ts`) but blocked on environment install (see TODO). Manual browser verification stands in.
+- **E2E**: Cypress spec (`cypress/e2e/transaction_flow.cy.js`) runs via `direnv exec . npx cypress run --e2e --browser <browser> [--headed]`, seeding `data/e2e-ledger.duckdb` and exercising the SPA transaction flow end to end.
 
 ## Glossary
 

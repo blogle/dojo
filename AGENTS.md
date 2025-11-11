@@ -158,9 +158,15 @@ Backlog of deferred or off-scope items.
 
 This project uses `nix` and `direnv` to ensure a consistent and reproducible development environment. All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) **must** be invoked within this environment.
 
-To ensure compliance, all commands must be prefixed with `direnv exec .`.
+All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) should be run within this environment. If `direnv` is not enabled or active, commands must be prefixed with `direnv exec .`.
 
-**Correct Usage:**
+**Correct Usage (within direnv environment):**
+```bash
+pytest
+ruff check .
+```
+
+**Correct Usage (if direnv not enabled):**
 ```bash
 direnv exec . pytest
 direnv exec . ruff check .
@@ -168,8 +174,8 @@ direnv exec . ruff check .
 
 **Incorrect Usage:**
 ```bash
-pytest
-ruff check .
+pytest # if direnv not enabled
+ruff check . # if direnv not enabled
 ```
 
 This rule is critical to prevent errors caused by using incorrect tool versions or missing dependencies.

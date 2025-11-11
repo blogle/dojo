@@ -28,7 +28,6 @@ dev = [
   "pyright",
   "hypothesis",
   "pytest-asyncio",
-  "pytest-playwright",
 ]
 
 [tool.setuptools.packages.find]

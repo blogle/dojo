@@ -36,13 +36,13 @@ The development shell installs Python, DuckDB, uv, and other pinned tooling.
 ### 2. Apply migrations (creates `data/ledger.duckdb`)
 
 ```bash
-direnv exec . uv run python -m dojo.core.migrate
+python -m dojo.core.migrate
 ```
 
 ### 3. Run the API + SPA locally
 
 ```bash
-direnv exec . uv run uvicorn dojo.core.app:app --reload
+uvicorn dojo.core.app:app --reload
 # open http://127.0.0.1:8000/ in your browser
 ```
 
@@ -51,9 +51,11 @@ The landing page now behaves like a lightweight spreadsheet: the first row is an
 ### 4. Execute the automated tests
 
 ```bash
-direnv exec . pytest
-# Playwright E2E is temporarily deferred; see TODO.md for the follow-up task.
+pytest
+npx cypress run --e2e --browser <browser> [--headed]
 ```
+
+The Cypress run spins up a dedicated DuckDB database (`data/e2e-ledger.duckdb`) and launches the FastAPI server automatically via `cypress.config.cjs`, so no additional setup is required.
 
 ## Status
 
@@ -98,15 +100,21 @@ This project manages system dependencies via Nix and Python dependencies via `uv
 
 ### Manual Environment Activation
 
-If you do not use `direnv`, you can manually activate the environment for any command using `direnv exec`:
+If you do not enable `direnv`, you can manually activate the environment for any command using `direnv exec`:
 
 ```bash
 direnv exec . <your-command>
 ```
 
+or manually invoke the flake to build the dev environment:
+
+```bash
+nix develop
+```
+
 ### Configuration
 
-- **`DOJO_DB_PATH`**: Override the DuckDB ledger location (defaults to `data/ledger.duckdb`). Set this before running migrations or starting the API, e.g. `DOJO_DB_PATH=/tmp/ledger.duckdb direnv exec . uv run python -m dojo.core.migrate`.
+- **`DOJO_DB_PATH`**: Override the DuckDB ledger location (defaults to `data/ledger.duckdb`). Set this before running migrations or starting the API, e.g. `DOJO_DB_PATH=/tmp/ledger.duckdb python -m dojo.core.migrate`.
 - **`dojo_` prefixed env vars**: All settings inherited from `dojo.core.config.Settings` can be supplied via environment variables (e.g., `DOJO_DB_PATH`).
 - **Secrets**: The MVP stores only local household data and does not require external credentials yet. Do not commit secrets; once services require them, document the process in this section.
 
@@ -120,7 +128,7 @@ The MVP focuses on the FastAPI + SPA surface; there is no standalone CLI today. 
 
 ```bash
 # Insert a transaction via the API
-direnv exec . uv run python - <<'PY'
+python - <<'PY'
 import requests
 payload = {
     "transaction_date": "2025-11-11",
@@ -138,11 +146,10 @@ For detailed architectural background see [docs/architecture/overview.md](./docs
 
 - **Logging**: The FastAPI app logs to STDOUT; DuckDB connections log open/close events via `dojo.core.db`.
 - **Troubleshooting**:
-    - **Problem**: `direnv exec . uv run ...` fails because `pyright` cannot download. **Solution**: Ensure network access is available or pre-populate the `.uv-cache`; rerun `direnv reload` afterward.
-    - **Problem**: Playwright install fails under Nix. **Solution**: Tracked in TODO (`Enable Playwright Browsers Under Nix Sandbox`). Manual browser verification is the temporary workaround.
+    - **Problem**: `npx cypress run --e2e --browser <browser> [--headed]` stalls because the test server never becomes healthy. **Solution**: Check the inline server logs printed by Cypress, ensure no other process is using `data/e2e-ledger.duckdb`, delete the file if needed, and rerun so `tests.e2e.prepare_db` can recreate it.
     - **Problem**: DuckDB file not found. **Solution**: Run the migration command (Step 2) or set `DOJO_DB_PATH`.
 - **Performance Tips**: Use in-memory DuckDB (`:memory:`) for tests/experiments to avoid disk I/O when iterating on SQL.
-- **Updating**: After pulling new changes, run `direnv exec . uv sync --extra dev` to refresh dependencies.
+- **Updating**: After pulling new changes, run `uv sync --extra dev` to refresh dependencies.
 - **Uninstalling**: Remove the repo directory; DuckDB data lives under `data/`.
 
 ## Contributing
@@ -151,13 +158,13 @@ We welcome contributions! Please follow these guidelines.
 
 - **Run Tests**:
   ```bash
-  direnv exec . pytest
-  # Playwright suite pending environment fix (see TODO entry).
+  pytest
+  npx cypress run --e2e --browser <browser> [--headed]
   ```
 - **Style Rules**: We rely on Ruff for lint+format and Pyright for type checking.
   ```bash
-  direnv exec . ruff check .
-  direnv exec . pyright
+  ruff check .
+  pyright
   ```
 - **Branch/PR Guidelines**: See [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Issue Templates**: Use the provided templates for bug reports and feature requests.

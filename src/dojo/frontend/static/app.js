@@ -145,6 +145,8 @@ const init = async () => {
     return;
   }
 
+  form.setAttribute("novalidate", "novalidate");
+
   const errorEls = [...document.querySelectorAll("[data-error-for]")].reduce((acc, el) => {
     acc[el.dataset.errorFor] = el;
     return acc;

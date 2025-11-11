@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
+    
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -33,7 +33,7 @@
       overlay = workspace.mkPyprojectOverlay {
         sourcePreference = "wheel";
       };
-
+        
       editableOverlay = workspace.mkEditablePyprojectOverlay {
         root = "$REPO_ROOT";
       };
@@ -67,23 +67,20 @@
         {
           default = pkgs.mkShell {
             buildInputs = with pkgs; [
-              python312
-              uv
-              ruff
+              cypress
               duckdb
-              playwright-driver
-              stdenv.cc.cc.lib
-              zlib
+              nodejs
+              python312
+              ruff
+              uv
             ];
 
-            shellHook = ''
-              unset PYTHONPATH
+            shellHook = with pkgs; ''
               export UV_PYTHON_DOWNLOADS=never
               export UV_CACHE_DIR="$PWD/.uv-cache"
-              export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH"
-              export PYTHONPATH="$PWD/src:$PYTHONPATH"
-              export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
-              export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+              export LD_LIBRARY_PATH=${lib.makeLibraryPath [ stdenv.cc.cc.lib zlib ]}:$LD_LIBRARY_PATH
+              export CYPRESS_INSTALL_BINARY=0
+              export CYPRESS_RUN_BINARY=${pkgs.cypress}/bin/Cypress
 
               if [ ! -f .venv/bin/activate ] || [ ''${DOJO_FORCE_UV_SYNC:-0} = 1 ]; then
                 mkdir -p .uv-cache
@@ -95,10 +92,10 @@
 
           builder = pkgs.mkShell {
             packages = with pkgs; [
-              virtualenv
-              uv
-              ruff
               duckdb
+              ruff
+              uv
+              virtualenv
             ];
             env = {
               UV_NO_SYNC = "1";
