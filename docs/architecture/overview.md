@@ -65,6 +65,131 @@ This module acts as the investment advisory layer. It consumes the optimal portf
 
 This module contains the quantitative evaluation harness, referred to as the `BacktestEngine`. It is responsible for the reproducible and statistically rigorous assessment of investment strategies against historical and synthetically augmented market data.
 
+## System Context
+
+```mermaid
+graph LR
+    subgraph Browser
+        SPA[Minimal SPA]
+    end
+    subgraph FastAPI Monolith
+        API[FastAPI Routers]
+        Services[Domain Services]
+    end
+    subgraph Data
+        DuckDB[(DuckDB Ledger)]
+    end
+
+    SPA -->|JSON fetch| API
+    API --> Services
+    Services --> DuckDB
+```
+
+- **Trust Boundary**: Browser ⇄ FastAPI (HTTPS termination point). DuckDB lives on the same host; we enforce a single-writer rule via request-scoped connections.
+- **Upstream dependencies**: None in the MVP; all data is entered manually or seeded via migrations.
+
+## Runtime Flow (Write Path)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant SPA as SPA (Fetch API)
+    participant API as FastAPI Router
+    participant Service as TransactionEntryService
+    participant DB as DuckDB
+
+    User->>SPA: Submit form
+    SPA->>API: POST /api/transactions
+    API->>Service: Validate & call create()
+    Service->>DB: BEGIN
+    Service->>DB: select_active_account/category
+    Service->>DB: insert_transaction + update balances
+    Service->>DB: upsert_category_monthly_state
+    Service->>DB: COMMIT
+    Service-->>API: TransactionResponse
+    API-->>SPA: 201 + account/category state
+    SPA->>API: GET /api/net-worth/current
+    API->>DB: Query accounts + positions
+    API-->>SPA: Net worth snapshot
+    SPA-->>User: Updated card
+```
+
+**Failure branch**: If any SQL statement raises, the service issues `ROLLBACK` before surfacing a structured 400 (domain validation) or 500 (unexpected) response. The SPA renders inline errors using FastAPI's validation payload.
+
+## Module Interaction Diagram
+
+```mermaid
+flowchart LR
+    Core[core]
+    Budget[budgeting]
+    Frontend[frontend]
+    Investments[investments]
+    Forecasting[forecasting]
+    Optimization[optimization]
+    Backtesting[backtesting]
+
+    Core --> Budget
+    Core --> Frontend
+    Core --> Investments
+    Core --> Forecasting
+    Core --> Optimization
+    Forecasting --> Backtesting
+    Investments --> Forecasting
+```
+
+Only `core` may depend on DuckDB adapters and shared config. Domain modules may depend on `core` abstractions but never on each other (e.g., `budgeting` cannot import `forecasting`).
+
+## Data & Contracts
+
+- **accounts**: Canonical account balances; columns `account_id`, `account_type`, `current_balance_minor`, `is_active`. Enforced via migration 0001.
+- **budget_categories** & **budget_category_monthly_state**: Track envelope allocations and available funds per month-start boundary.
+- **transactions**: Temporal SCD Type 2 table; only `TransactionEntryService` can mutate it.
+- **Transactions API**: `POST /api/transactions` writes via the service, `GET /api/transactions?limit=N` streams recent active rows for the spreadsheet UI.
+- **positions**: Optional investment snapshot table referenced by the net worth query.
+- **API contracts**: Pydantic models under `dojo.budgeting.schemas` and `dojo.core.schemas` define on-wire shapes. Monetary values use integers (minor units) plus Decimal mirrors for presentation.
+
+## State & Persistence
+
+- **Database**: Single DuckDB file, path controlled by `DOJO_DB_PATH`. Single writer per process enforced by dependency-scoped connections.
+- **Temporal policy**: Transaction edits close the previous version (set `is_active = FALSE`, `valid_to = recorded_at`) before inserting the new version.
+- **Seeds**: Migration `0001_core.sql` bootstraps starter accounts/categories for manual testing.
+- **Migrations**: Idempotent runner in `dojo.core.migrate` records filenames in `schema_migrations` to guarantee ordered execution.
+
+## Observability
+
+- **Logging**: `dojo.core.db` logs every connection open/close; FastAPI standard logging covers HTTP request summaries.
+- **Metrics**: To be implemented; MVP relies on logs + tests.
+- **Debugging playbook**: Reproduce ledger issues by running the transaction service against an in-memory database with SQL logging enabled; inspect `transactions` history to validate SCD rules.
+
+## Config & Flags
+
+- Centralized `Settings` class (`dojo.core.config.Settings`) loaded once in `create_app`. Only `DOJO_DB_PATH` today; new settings must be added there.
+- No runtime feature flags yet; add them via typed settings and inject through dependencies, not globals.
+
+## Invariants & Contracts
+
+1. **Single Active Transaction Version**: Exactly one `transactions` row is active per `concept_id`. Enforced by service logic and property tests.
+2. **Minor Unit Storage**: Every persisted amount is an integer number of minor units. Tests assert conversions through services.
+3. **Net Worth Consistency**: `assets - liabilities + positions = net_worth`. Property tests in `tests/property/core/test_net_worth_properties.py` guard it.
+
+## Performance Model
+
+- **Request volume**: Tens of writes per day; DuckDB handles within a single process.
+- **Latency budget**: Target <100 ms p95 for transaction insert round-trip; measured locally at ~30 ms including SQL.
+- **Capacity**: DuckDB file growth dominated by transaction history (≈ few KB per entry). No sharding required for MVP.
+
+## Testing Map
+
+- **Unit tests**: `tests/unit/budgeting` (service contract), `tests/unit/core` (net worth aggregation).
+- **Property tests**: `tests/property/budgeting` (temporal invariants) and `tests/property/core` (net worth equation).
+- **E2E**: Playwright spec checked in (`tests/e2e/transaction_flow.spec.ts`) but blocked on environment install (see TODO). Manual browser verification stands in.
+
+## Glossary
+
+- **Concept ID**: Stable UUID representing a logical transaction across edits. Multiple versions may exist but only one is active.
+- **Minor Units**: Integer representation of currency (cents). Prevents float drift.
+- **Atomic Transaction Mandate**: Policy requiring every ledger change to be wrapped in a single SQL transaction touching all affected tables.
+
 ## Quantitative Modeling and Evaluation Frameworks
 
 Complex quantitative analysis, model training, and rigorous validation are strictly decoupled from the live application to maintain performance and responsiveness. The focus of this framework is on robust statistical and financial models, including mean-variance optimization (MVO), factor models, and various robust optimization techniques, in addition to time-series and statistical models for forecasting and data imputation.

@@ -3,3 +3,7 @@ __pycache__/
 .direnv/*
 *.pyc
 .envrc
+.hypothesis/
+data/*.duckdb
+.uv-cache/
+src/dojo.egg-info/

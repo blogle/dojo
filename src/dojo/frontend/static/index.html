@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Dojo Ledger</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Dojo — Auditable Ledger</h1>
+        <p>Keyboard-friendly spreadsheet for capturing and reviewing transactions.</p>
+      </header>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Net Worth</h2>
+          <p class="net-worth" id="net-worth-value">$0.00</p>
+          <p id="net-worth-updated" class="muted"></p>
+        </article>
+
+        <article class="card ledger-card">
+          <div class="ledger-header">
+            <h2>Ledger</h2>
+            <p class="muted">Tab across cells, press Enter to submit, scroll to review earlier entries.</p>
+          </div>
+          <div class="table-wrapper">
+            <form id="transaction-form">
+              <table class="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Account</th>
+                    <th>Category</th>
+                    <th>Amount (USD)</th>
+                    <th>Flow</th>
+                    <th>Memo</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="input-row">
+                  <tr>
+                    <td>
+                      <input type="date" name="transaction_date" required />
+                      <span class="field-error" data-error-for="transaction_date"></span>
+                    </td>
+                    <td>
+                      <select name="account_id" required></select>
+                      <span class="field-error" data-error-for="account_id"></span>
+                    </td>
+                    <td>
+                      <select name="category_id" required></select>
+                      <span class="field-error" data-error-for="category_id"></span>
+                    </td>
+                    <td>
+                      <input type="number" name="amount" step="0.01" required />
+                      <span class="field-error" data-error-for="amount_minor"></span>
+                    </td>
+                    <td>
+                      <select name="flow_direction">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input type="text" name="memo" placeholder="Optional note" />
+                      <span class="field-error" data-error-for="memo"></span>
+                    </td>
+                    <td class="submit-cell">
+                      <button type="submit">Add</button>
+                    </td>
+                  </tr>
+                </tbody>
+                <tbody id="transactions-body"></tbody>
+              </table>
+            </form>
+          </div>
+          <p id="submission-status" class="muted"></p>
+        </article>
+      </section>
+    </main>
+
+    <template id="option-template">
+      <option></option>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

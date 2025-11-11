@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial `README.md` and project documentation structure.
+- Auditable ledger MVP: FastAPI monolith with DuckDB migrations, temporal transaction service, net worth API, and SPA wired to `/api/transactions` & `/api/net-worth/current`.
+- Unit + property tests covering transaction invariants and net worth aggregation.
+- Developer workflow docs (README updates, architecture diagrams) plus TODO entry for Playwright enablement.
 
 ### Changed
 

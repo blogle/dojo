@@ -71,6 +71,7 @@
               uv
               ruff
               duckdb
+              playwright-driver
               stdenv.cc.cc.lib
               zlib
             ];
@@ -78,9 +79,16 @@
             shellHook = ''
               unset PYTHONPATH
               export UV_PYTHON_DOWNLOADS=never
+              export UV_CACHE_DIR="$PWD/.uv-cache"
               export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH"
+              export PYTHONPATH="$PWD/src:$PYTHONPATH"
+              export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+              export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-              uv sync --extra dev
+              if [ ! -f .venv/bin/activate ] || [ ''${DOJO_FORCE_UV_SYNC:-0} = 1 ]; then
+                mkdir -p .uv-cache
+                uv sync --extra dev
+              fi
               . .venv/bin/activate
             '';
           };
@@ -100,6 +108,7 @@
             shellHook = ''
               unset PYTHONPATH
               export REPO_ROOT=$(git rev-parse --show-toplevel)
+              export PYTHONPATH="$REPO_ROOT/src:$PYTHONPATH"
             '';
           };
         }

@@ -21,32 +21,38 @@ Dojo is a self-hosted personal finance application for a household, designed to 
 
 ## Quick Start
 
-This section provides the fastest path to getting the project up and running.
+This section provides the fastest path to exercising the Auditable Ledger MVP.
 
-### Installation
-
-The single command to get started, assuming you have `nix` and `direnv` installed and configured:
+### 1. Bootstrap the environment
 
 ```bash
-# This will automatically set up the environment when you enter the directory
+git clone <repository-url>
 cd dojo
+direnv allow .
 ```
 
-### Example
+The development shell installs Python, DuckDB, uv, and other pinned tooling.
 
-Here is a minimal example of how to use the project.
+### 2. Apply migrations (creates `data/ledger.duckdb`)
 
 ```bash
-# Example command
-direnv exec . your_command --with --args
+direnv exec . uv run python -m dojo.core.migrate
 ```
 
-**Expected Output:**
+### 3. Run the API + SPA locally
 
-*(A screenshot, GIF, or text block showing the expected result)*
-
+```bash
+direnv exec . uv run uvicorn dojo.core.app:app --reload
+# open http://127.0.0.1:8000/ in your browser
 ```
-Success! The command completed as expected.
+
+The landing page now behaves like a lightweight spreadsheet: the first row is an input line, arrow/tab keys move across cells, Enter submits, and the table below scrolls to show prior transactions.
+
+### 4. Execute the automated tests
+
+```bash
+direnv exec . pytest
+# Playwright E2E is temporarily deferred; see TODO.md for the follow-up task.
 ```
 
 ## Status
@@ -100,8 +106,9 @@ direnv exec . <your-command>
 
 ### Configuration
 
-- **Environment Variables**: [List of ENV_VARS and their purpose]
-- **Secrets Handling**: Secrets are managed via [SECRET_MANAGEMENT_TOOL/PROCESS]. Do not commit secrets to the repository. See `/.env.example` for required variables.
+- **`DOJO_DB_PATH`**: Override the DuckDB ledger location (defaults to `data/ledger.duckdb`). Set this before running migrations or starting the API, e.g. `DOJO_DB_PATH=/tmp/ledger.duckdb direnv exec . uv run python -m dojo.core.migrate`.
+- **`dojo_` prefixed env vars**: All settings inherited from `dojo.core.config.Settings` can be supplied via environment variables (e.g., `DOJO_DB_PATH`).
+- **Secrets**: The MVP stores only local household data and does not require external credentials yet. Do not commit secrets; once services require them, document the process in this section.
 
 ## Usage
 
@@ -109,38 +116,34 @@ direnv exec . <your-command>
 
 ### CLI
 
+The MVP focuses on the FastAPI + SPA surface; there is no standalone CLI today. All interactions happen via HTTP:
+
 ```bash
-# Example CLI command
-direnv exec . dojo-cli --action "perform-task" --output "result.json"
+# Insert a transaction via the API
+direnv exec . uv run python - <<'PY'
+import requests
+payload = {
+    "transaction_date": "2025-11-11",
+    "account_id": "house_checking",
+    "category_id": "groceries",
+    "amount_minor": -1234,
+}
+print(requests.post("http://127.0.0.1:8000/api/transactions", json=payload, timeout=10).json())
+PY
 ```
 
-### API
-
-```python
-# Example API usage
-from dojo import api
-
-result = api.do_something(param="value")
-print(result)
-```
-
-For more detailed information, see the [fuller docs](./docs/README.md).
+For detailed architectural background see [docs/architecture/overview.md](./docs/architecture/overview.md).
 
 ## Operations
 
-- **Logging**: Logs are sent to [STDOUT/FILE/LOGGING_SERVICE].
+- **Logging**: The FastAPI app logs to STDOUT; DuckDB connections log open/close events via `dojo.core.db`.
 - **Troubleshooting**:
-    - **Problem**: `direnv` is not activating.
-    - **Solution**: Ensure `direnv` is installed and hooked into your shell. Run `direnv allow .`.
-    - **Problem**: Python dependencies are out of sync.
-    - **Solution**: Run `uv sync`.
-- **Performance Tips**: [Tips for optimal performance]
-- **Updating**: To update the project, pull the latest changes and re-sync the environment.
-    ```bash
-    git pull origin main
-    uv sync
-    ```
-- **Uninstalling**: To remove the project and its environment, simply remove the project directory.
+    - **Problem**: `direnv exec . uv run ...` fails because `pyright` cannot download. **Solution**: Ensure network access is available or pre-populate the `.uv-cache`; rerun `direnv reload` afterward.
+    - **Problem**: Playwright install fails under Nix. **Solution**: Tracked in TODO (`Enable Playwright Browsers Under Nix Sandbox`). Manual browser verification is the temporary workaround.
+    - **Problem**: DuckDB file not found. **Solution**: Run the migration command (Step 2) or set `DOJO_DB_PATH`.
+- **Performance Tips**: Use in-memory DuckDB (`:memory:`) for tests/experiments to avoid disk I/O when iterating on SQL.
+- **Updating**: After pulling new changes, run `direnv exec . uv sync --extra dev` to refresh dependencies.
+- **Uninstalling**: Remove the repo directory; DuckDB data lives under `data/`.
 
 ## Contributing
 
@@ -149,14 +152,11 @@ We welcome contributions! Please follow these guidelines.
 - **Run Tests**:
   ```bash
   direnv exec . pytest
+  # Playwright suite pending environment fix (see TODO entry).
   ```
-- **Style Rules**: We use Ruff (linting), Black (formatting), and Pyright (type-checking).
+- **Style Rules**: We rely on Ruff for lint+format and Pyright for type checking.
   ```bash
-  # Check for linting and formatting issues
   direnv exec . ruff check .
-  direnv exec . black --check .
-  
-  # Run type-checking
   direnv exec . pyright
   ```
 - **Branch/PR Guidelines**: See [CONTRIBUTING.md](./CONTRIBUTING.md).

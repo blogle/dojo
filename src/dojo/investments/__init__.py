@@ -1,0 +1,1 @@
+"""Investments domain placeholder."""

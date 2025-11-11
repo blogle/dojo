@@ -1,15 +1,24 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dojo"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "dash",
   "duckdb",
-  "plotly",
+  "dash",
+  "fastapi",
+  "httpx",
   "numpy",
   "pandas",
+  "plotly",
+  "pydantic",
+  "pydantic-settings",
   "pyyaml",
   "scipy",
+  "uvicorn[standard]",
   "yfinance",
 ]
 
@@ -17,7 +26,16 @@ dependencies = [
 dev = [
   "pytest",
   "pyright",
+  "hypothesis",
+  "pytest-asyncio",
+  "pytest-playwright",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"dojo" = ["sql/**/*.sql", "frontend/static/**/*"]
 
 [tool.uv]
 preview = true
