@@ -13,7 +13,13 @@
         <p>Keyboard-friendly spreadsheet for capturing and reviewing transactions.</p>
       </header>
 
-      <section class="grid">
+      <nav class="app-nav" role="tablist" aria-label="Primary">
+        <button type="button" class="nav-button active" data-view-button="ledger">Ledger</button>
+        <button type="button" class="nav-button" data-view-button="accounts">Accounts</button>
+        <button type="button" class="nav-button" data-view-button="budgets">Budgets</button>
+      </nav>
+
+      <section class="grid" data-view-panel="ledger">
         <article class="card">
           <h2>Net Worth</h2>
           <p class="net-worth" id="net-worth-value">$0.00</p>
@@ -78,6 +84,113 @@
           </div>
           <p id="submission-status" class="muted"></p>
         </article>
+      </section>
+
+      <section class="card manage-card" data-view-panel="accounts" hidden>
+        <div class="manage-header">
+          <div>
+            <h2>Accounts</h2>
+            <p class="muted">Set up every asset and liability before budgeting or transactions.</p>
+          </div>
+          <p id="account-status" class="status-text"></p>
+        </div>
+        <form id="account-form" class="stack-form" novalidate>
+          <div class="form-grid">
+            <label>
+              Account ID
+              <input type="text" name="account_id" required pattern="[a-z0-9_]+" />
+            </label>
+            <label>
+              Name
+              <input type="text" name="name" required />
+            </label>
+            <label>
+              Account Type
+              <select name="account_type">
+                <option value="asset">Asset</option>
+                <option value="liability">Liability</option>
+              </select>
+            </label>
+            <label>
+              Currency
+              <input type="text" name="currency" value="USD" maxlength="3" />
+            </label>
+            <label>
+              Balance (USD)
+              <input type="number" name="current_balance" step="0.01" value="0" />
+            </label>
+            <label>
+              Opened On
+              <input type="date" name="opened_on" />
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_active" checked /> Active
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" data-account-submit>Add Account</button>
+            <button type="button" data-account-cancel hidden>Cancel</button>
+          </div>
+        </form>
+        <div class="table-wrapper">
+          <table class="admin-table" id="accounts-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Balance</th>
+                <th>Currency</th>
+                <th>Active</th>
+                <th>Opened</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="accounts-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card manage-card" data-view-panel="budgets" hidden>
+        <div class="manage-header">
+          <div>
+            <h2>Budgets</h2>
+            <p class="muted">Define the categories available to the ledger and monthly plan.</p>
+          </div>
+          <p id="category-status" class="status-text"></p>
+        </div>
+        <form id="category-form" class="stack-form" novalidate>
+          <div class="form-grid">
+            <label>
+              Category ID
+              <input type="text" name="category_id" required pattern="[a-z0-9_]+" />
+            </label>
+            <label>
+              Name
+              <input type="text" name="name" required />
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_active" checked /> Active
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" data-category-submit>Add Category</button>
+            <button type="button" data-category-cancel hidden>Cancel</button>
+          </div>
+        </form>
+        <div class="table-wrapper">
+          <table class="admin-table" id="categories-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Active</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="categories-table-body"></tbody>
+          </table>
+        </div>
       </section>
     </main>
 

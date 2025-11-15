@@ -8,9 +8,23 @@ from uuid import UUID, uuid4
 
 import duckdb
 
-from dojo.budgeting.errors import InvalidTransaction, UnknownAccount, UnknownCategory
+from dojo.budgeting.errors import (
+    AccountAlreadyExists,
+    AccountNotFound,
+    CategoryAlreadyExists,
+    CategoryNotFound,
+    InvalidTransaction,
+    UnknownAccount,
+    UnknownCategory,
+)
 from dojo.budgeting.schemas import (
+    AccountCreateRequest,
+    AccountDetail,
     AccountState,
+    AccountUpdateRequest,
+    BudgetCategoryCreateRequest,
+    BudgetCategoryDetail,
+    BudgetCategoryUpdateRequest,
     CategoryState,
     NewTransactionRequest,
     TransactionListItem,
@@ -164,4 +178,185 @@ class TransactionEntryService:
             category_id=row[0],
             name=row[1],
             available_minor=int(row[2]),
+        )
+
+
+class AccountAdminService:
+    """Manage CRUD flows for accounts exposed to the SPA."""
+
+    def list_accounts(self, conn: duckdb.DuckDBPyConnection) -> list[AccountDetail]:
+        sql = load_sql("select_accounts_admin.sql")
+        rows = conn.execute(sql).fetchall()
+        return [self._row_to_account(row) for row in rows]
+
+    def create_account(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        payload: AccountCreateRequest,
+    ) -> AccountDetail:
+        if self._fetch_account_optional(conn, payload.account_id) is not None:
+            raise AccountAlreadyExists(f"Account `{payload.account_id}` already exists.")
+
+        currency = payload.currency.upper()
+        sql = load_sql("insert_account.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(
+                sql,
+                [
+                    payload.account_id,
+                    payload.name,
+                    payload.account_type,
+                    payload.current_balance_minor,
+                    currency,
+                    payload.is_active,
+                    payload.opened_on,
+                ],
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        return self._require_account(conn, payload.account_id)
+
+    def update_account(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        account_id: str,
+        payload: AccountUpdateRequest,
+    ) -> AccountDetail:
+        self._require_account(conn, account_id)
+        currency = payload.currency.upper()
+        sql = load_sql("update_account.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(
+                sql,
+                [
+                    payload.name,
+                    payload.account_type,
+                    payload.current_balance_minor,
+                    currency,
+                    payload.opened_on,
+                    payload.is_active,
+                    account_id,
+                ],
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        return self._require_account(conn, account_id)
+
+    def deactivate_account(self, conn: duckdb.DuckDBPyConnection, account_id: str) -> None:
+        self._require_account(conn, account_id)
+        sql = load_sql("deactivate_account.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql, [account_id])
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+    def _require_account(self, conn: duckdb.DuckDBPyConnection, account_id: str) -> AccountDetail:
+        row = self._fetch_account_optional(conn, account_id)
+        if row is None:
+            raise AccountNotFound(f"Account `{account_id}` was not found.")
+        return self._row_to_account(row)
+
+    def _fetch_account_optional(
+        self, conn: duckdb.DuckDBPyConnection, account_id: str
+    ) -> Tuple[Any, ...] | None:
+        sql = load_sql("select_account_detail.sql")
+        return conn.execute(sql, [account_id]).fetchone()
+
+    def _row_to_account(self, row: Tuple[Any, ...]) -> AccountDetail:
+        return AccountDetail(
+            account_id=row[0],
+            name=row[1],
+            account_type=row[2],
+            current_balance_minor=int(row[3]),
+            currency=row[4],
+            is_active=bool(row[5]),
+            opened_on=row[6],
+            created_at=row[7],
+            updated_at=row[8],
+        )
+
+
+class BudgetCategoryAdminService:
+    """CRUD surface for budget categories."""
+
+    def list_categories(self, conn: duckdb.DuckDBPyConnection) -> list[BudgetCategoryDetail]:
+        sql = load_sql("select_budget_categories_admin.sql")
+        rows = conn.execute(sql).fetchall()
+        return [self._row_to_category(row) for row in rows]
+
+    def create_category(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        payload: BudgetCategoryCreateRequest,
+    ) -> BudgetCategoryDetail:
+        if self._fetch_category_optional(conn, payload.category_id) is not None:
+            raise CategoryAlreadyExists(f"Category `{payload.category_id}` already exists.")
+        sql = load_sql("insert_budget_category.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql, [payload.category_id, payload.name, payload.is_active])
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        return self._require_category(conn, payload.category_id)
+
+    def update_category(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        category_id: str,
+        payload: BudgetCategoryUpdateRequest,
+    ) -> BudgetCategoryDetail:
+        self._require_category(conn, category_id)
+        sql = load_sql("update_budget_category.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql, [payload.name, payload.is_active, category_id])
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        return self._require_category(conn, category_id)
+
+    def deactivate_category(self, conn: duckdb.DuckDBPyConnection, category_id: str) -> None:
+        self._require_category(conn, category_id)
+        sql = load_sql("deactivate_budget_category.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql, [category_id])
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+    def _require_category(
+        self, conn: duckdb.DuckDBPyConnection, category_id: str
+    ) -> BudgetCategoryDetail:
+        row = self._fetch_category_optional(conn, category_id)
+        if row is None:
+            raise CategoryNotFound(f"Category `{category_id}` was not found.")
+        return self._row_to_category(row)
+
+    def _fetch_category_optional(
+        self, conn: duckdb.DuckDBPyConnection, category_id: str
+    ) -> Tuple[Any, ...] | None:
+        sql = load_sql("select_budget_category_detail.sql")
+        return conn.execute(sql, [category_id]).fetchone()
+
+    def _row_to_category(self, row: Tuple[Any, ...]) -> BudgetCategoryDetail:
+        return BudgetCategoryDetail(
+            category_id=row[0],
+            name=row[1],
+            is_active=bool(row[2]),
+            created_at=row[3],
+            updated_at=row[4],
         )

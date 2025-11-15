@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+current_plan=$1
+while true; do
+    codex --search exec --sandbox workspace-write "Continue progress on the plan in $1"
+    break
+done

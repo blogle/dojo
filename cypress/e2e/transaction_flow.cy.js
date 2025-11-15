@@ -36,7 +36,7 @@ describe("Transaction Flow", () => {
 
   it("shows validation errors for missing amount", () => {
     cy.get('input[name="amount"]').clear();
-    cy.get('button[type="submit"]').click();
+    cy.get('#transaction-form button[type="submit"]').click();
     cy.get('[data-error-for="amount_minor"]').should("have.text", "Enter a numeric amount.");
   });
 
@@ -51,7 +51,7 @@ describe("Transaction Flow", () => {
       cy.get('input[name="amount"]').clear().type(amountDollars.toFixed(2));
       cy.get('select[name="flow_direction"]').select("expense");
       cy.get('input[name="memo"]').clear().type("Cypress test");
-      cy.get('button[type="submit"]').click();
+      cy.get('#transaction-form button[type="submit"]').click();
 
       cy.get("#submission-status", { timeout: 10000 }).should("have.text", "Transaction recorded.");
 

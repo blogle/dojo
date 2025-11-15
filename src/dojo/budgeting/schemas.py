@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -74,3 +74,60 @@ class NetWorthDelta(BaseModel):
 
     net_worth_minor: int
     net_worth_decimal: Decimal
+
+
+SLUG_PATTERN = r"^[a-z0-9_]+$"
+
+
+class AccountCommand(BaseModel):
+    """Shared fields for account create/update operations."""
+
+    name: str = Field(min_length=1, max_length=120)
+    account_type: Literal["asset", "liability"]
+    current_balance_minor: int = Field(description="Current balance in minor units.")
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    opened_on: Optional[date] = Field(default=None, description="Optional account open date.")
+    is_active: bool = Field(default=True, description="Marks whether the account can be used for new transactions.")
+
+
+class AccountCreateRequest(AccountCommand):
+    """Payload for creating a new account."""
+
+    account_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the account.")
+
+
+class AccountUpdateRequest(AccountCommand):
+    """Payload for editing an existing account."""
+
+
+class AccountDetail(AccountCommand):
+    """Serialized account data for the admin UI."""
+
+    account_id: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class BudgetCategoryCommand(BaseModel):
+    """Shared fields for budget category mutations."""
+
+    name: str = Field(min_length=1, max_length=120)
+    is_active: bool = Field(default=True)
+
+
+class BudgetCategoryCreateRequest(BudgetCategoryCommand):
+    """Payload for creating a budget category."""
+
+    category_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the category.")
+
+
+class BudgetCategoryUpdateRequest(BudgetCategoryCommand):
+    """Payload for editing a budget category."""
+
+
+class BudgetCategoryDetail(BudgetCategoryCommand):
+    """Serialized budget category data for the admin UI."""
+
+    category_id: str
+    created_at: datetime
+    updated_at: datetime

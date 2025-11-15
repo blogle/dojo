@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from dojo.budgeting.routers import router as budgeting_router
-from dojo.budgeting.services import TransactionEntryService
+from dojo.budgeting.services import AccountAdminService, BudgetCategoryAdminService, TransactionEntryService
 from dojo.core.config import Settings, get_settings
 from dojo.core.routers import router as core_router
 
@@ -25,6 +25,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Application-scoped services
     app.state.transaction_service = TransactionEntryService()
+    app.state.account_admin_service = AccountAdminService()
+    app.state.budget_category_admin_service = BudgetCategoryAdminService()
 
     app.include_router(core_router)
     app.include_router(budgeting_router)
