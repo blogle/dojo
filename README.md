@@ -31,7 +31,7 @@ cd dojo
 direnv allow .
 ```
 
-The development shell installs Python, DuckDB, uv, and other pinned tooling.
+The development shell installs Python, DuckDB, uv, and other pinned tooling. If you do not use `direnv`, run `nix develop` from the repo root before the commands below and run them directly inside that shell.
 
 ### 2. Apply migrations (creates `data/ledger.duckdb`)
 
@@ -100,13 +100,7 @@ This project manages system dependencies via Nix and Python dependencies via `uv
 
 ### Manual Environment Activation
 
-If you do not enable `direnv`, you can manually activate the environment for any command using `direnv exec`:
-
-```bash
-direnv exec . <your-command>
-```
-
-or manually invoke the flake to build the dev environment:
+If you do not enable `direnv`, start a shell with `nix develop` from the repository root and run commands directly inside that shell.
 
 ```bash
 nix develop

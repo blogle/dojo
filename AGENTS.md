@@ -156,26 +156,22 @@ Backlog of deferred or off-scope items.
 
 ## Development Environment & Command Execution
 
-This project uses `nix` and `direnv` to ensure a consistent and reproducible development environment. All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) **must** be invoked within this environment.
+This project uses `nix` and `direnv` to ensure a consistent and reproducible development environment. All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) **must** run inside the activated environment.
 
-All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) should be run within this environment. If `direnv` is not enabled or active, commands must be prefixed with `direnv exec .`.
+If you use `direnv`, allow it at the repo root and run commands normally (no wrappers). If you opt out of `direnv`, start a shell with `nix develop` from the repository root, then run commands directly inside that shell.
 
-**Correct Usage (within direnv environment):**
+**Correct Usage (activated environment):**
 ```bash
 pytest
 ruff check .
 ```
 
-**Correct Usage (if direnv not enabled):**
+**Activating without direnv:**
 ```bash
-direnv exec . pytest
-direnv exec . ruff check .
-```
-
-**Incorrect Usage:**
-```bash
-pytest # if direnv not enabled
-ruff check . # if direnv not enabled
+nix develop
+# then run commands directly
+pytest
+ruff check .
 ```
 
 This rule is critical to prevent errors caused by using incorrect tool versions or missing dependencies.

@@ -4,20 +4,20 @@ This ExecPlan is a living document maintained under `.agent/PLANS.md`. Update ev
 
 ## Purpose / Big Picture
 
-Playwright-based SPA tests cannot run inside the current Nix + sandbox environment because the browser installers attempt to execute dynamically linked binaries that violate the sandbox, blocking automation of the ledger UI. The Nix flake now ships `nodejs` and the prebuilt `cypress` Electron runner, so we will port the existing Playwright spec to Cypress. Success means contributors can run `direnv exec . npx cypress run --e2e --browser <browser> [--headed]` to exercise the full transaction flow (validation errors plus net-worth delta) against the FastAPI server backed by the seeded DuckDB file, with the server lifecycle handled automatically by the Cypress runner.
+Playwright-based SPA tests cannot run inside the current Nix + sandbox environment because the browser installers attempt to execute dynamically linked binaries that violate the sandbox, blocking automation of the ledger UI. The Nix flake now ships `nodejs` and the prebuilt `cypress` Electron runner, so we will port the existing Playwright spec to Cypress. Success means contributors can run `npx cypress run --e2e --browser <browser> [--headed]` to exercise the full transaction flow (validation errors plus net-worth delta) against the FastAPI server backed by the seeded DuckDB file, with the server lifecycle handled automatically by the Cypress runner.
 
 ## Progress
 
 - [x] (2025-11-11T16:40Z) Captured the migration scope, constraints, and acceptance tests in this ExecPlan.
 - [x] (2025-11-11T17:10Z) Implemented `cypress.config.cjs`, ported the transaction flow spec, and removed the Playwright harness.
 - [x] (2025-11-11T17:25Z) Updated README, CHANGELOG, TODO, architecture docs, and the original MVP ExecPlan to describe the Cypress workflow.
-- [ ] Record passing runs for `direnv exec . pytest` and `direnv exec . npx cypress run --e2e --browser <browser> [--headed]`, then capture outcomes.
+- [ ] Record passing runs for `pytest` and `npx cypress run --e2e --browser <browser> [--headed]`, then capture outcomes.
 
 ## Surprises & Discoveries
 
 - Observation: `playwright.config.ts` starts the FastAPI server by chaining `tests.e2e.prepare_db` and `uvicorn` behind `bash -lc`. We must replicate this behavior so the Cypress suite touches the same database file (`data/e2e-ledger.duckdb`) and honors `DOJO_DB_PATH`.
 - Observation: The SPA selectors used by the existing spec (`select[name="account_id"]`, `[data-error-for="amount_minor"]`, `#submission-status`, etc.) live in `src/dojo/frontend/static/index.html` and `app.js`; retaining them keeps the spec stable no matter which runner we use.
-- Observation: The flake sets `CYPRESS_INSTALL_BINARY=0` and `CYPRESS_RUN_BINARY=${pkgs.cypress}/bin/Cypress`, so we should depend on the packaged binary and avoid `npm install` entirely. All commands must continue to be wrapped in `direnv exec . ...` per `AGENTS.md`.
+- Observation: The flake sets `CYPRESS_INSTALL_BINARY=0` and `CYPRESS_RUN_BINARY=${pkgs.cypress}/bin/Cypress`, so we should depend on the packaged binary and avoid `npm install` entirely. Run commands directly inside an activated dev shell (via `direnv` or `nix develop`).
 - Observation (2025-11-11): Launching the packaged Electron runner inside this sandbox currently crashes with `FATAL:sandbox_host_linux.cc(41) Check failed: . shutdown: Operation not permitted (1)` even when `--no-sandbox`/`--disable-setuid-sandbox` flags are injected. We need follow-up debugging to determine whether Chromium requires kernel-level user namespaces or whether a non-Electron browser (e.g., Chromium via `xvfb-run`) is necessary.
 
 ## Decision Log
@@ -45,7 +45,7 @@ Playwright-based SPA tests cannot run inside the current Nix + sandbox environme
        - Implement `stopServer()` that sends `SIGTERM` and waits for exit (force `SIGKILL` after a grace period).
        - In `setupNodeEvents`, register `on("before:run", async () => { await startServer(); })` and `on("after:run", async () => { await stopServer(); })`, plus `process.on("exit", ...)`/`SIGINT` guards to kill the child.
        - Configure `e2e: { baseUrl: "http://127.0.0.1:8765", specPattern: "cypress/e2e/**/*.cy.js", supportFile: false, video: false, defaultCommandTimeout: 10000 }`.
-3. Ensure the config mentions that all commands must be run via `direnv exec . npx cypress run --e2e --browser <browser> [--headed]`. Document any env vars (e.g., `DOJO_DB_PATH`, `CYPRESS_RUN_BINARY`) inline as comments.
+3. Ensure the config mentions that all commands must be run via `npx cypress run --e2e --browser <browser> [--headed]`. Document any env vars (e.g., `DOJO_DB_PATH`, `CYPRESS_RUN_BINARY`) inline as comments.
 
 ### Milestone 2 — Port the transaction flow spec to Cypress
 
@@ -61,16 +61,16 @@ Playwright-based SPA tests cannot run inside the current Nix + sandbox environme
 
 ### Milestone 3 — Documentation, changelog, and verification
 
-1. Update README Quick Start step 4, Operations troubleshooting, and Contributing sections to describe running Cypress instead of deferring Playwright. Include the exact command (`direnv exec . npx cypress run --e2e --browser <browser> [--headed]`) and mention `direnv exec . cypress open` for local debugging if helpful.
+1. Update README Quick Start step 4, Operations troubleshooting, and Contributing sections to describe running Cypress instead of deferring Playwright. Include the exact command (`npx cypress run --e2e --browser <browser> [--headed]`) and mention `cypress open` for local debugging if helpful.
 2. Update `docs/architecture/overview.md` testing map (and any other references) to state that Cypress e2e coverage is checked in and runnable.
 3. Remove the Playwright TODO entry from `TODO.md` (it is no longer relevant) and mention the resolved state in `CHANGELOG.md` `[Unreleased] -> Added` (e.g., “Cypress e2e suite exercises the SPA transaction flow”).
 4. Amend `docs/plans/auditable-ledger-net-worth.md` progress + references so it acknowledges Cypress as the runnable e2e suite instead of Playwright.
-5. Run `direnv exec . pytest` covering existing Python suites, then execute `direnv exec . npx cypress run --e2e --browser <browser> [--headed]`. Capture their passing status in the eventual commit description and this plan’s `Outcomes`.
+5. Run `pytest` covering existing Python suites, then execute `npx cypress run --e2e --browser <browser> [--headed]`. Capture their passing status in the eventual commit description and this plan’s `Outcomes`.
 
 ## Validation and Acceptance
 
-- `direnv exec . pytest` passes (unit + property suites intact).
-- `direnv exec . npx cypress run --e2e --browser <browser> [--headed]` boots the FastAPI server automatically, seeds the DuckDB e2e database, and reports both Cypress specs green with no flake.
+- `pytest` passes (unit + property suites intact).
+- `npx cypress run --e2e --browser <browser> [--headed]` boots the FastAPI server automatically, seeds the DuckDB e2e database, and reports both Cypress specs green with no flake.
 - The README Quick Start includes Cypress instructions, and no docs mention Playwright as a pending task.
 
 ## Idempotence and Recovery
