@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
 - Repositioned the dashboard stats into a single no-wrap card row, right-justified the navigation links, and removed the redundant pre-content copy so the ledger cards sit immediately below the hero metrics.
 - Rebuilt the Accounts view into an Assets & Liabilities workspace with grouped cards, navigation filters, stats, and a guided add-account modal for new holdings.
+- Updated architecture domain docs for Assets & Liabilities, Budgeting & Transactions, Net Worth, and Overview to formalize cash-only Ready to Assign, off-budget Accessible Assets, ledger-driven loan balances, and the unified net worth formula (ledger + positions + tangibles).
 
 ### Deprecated
 

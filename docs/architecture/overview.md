@@ -141,11 +141,12 @@ Only `core` may depend on DuckDB adapters and shared config. Domain modules may 
 
 ## Data & Contracts
 
-- **accounts**: Canonical account balances; columns `account_id`, `account_type`, `current_balance_minor`, `is_active`. Enforced via migration 0001.
-- **budget_categories** & **budget_category_monthly_state**: Track envelope allocations and available funds per month-start boundary.
-- **transactions**: Temporal SCD Type 2 table; only `TransactionEntryService` can mutate it.
+- **accounts**: Canonical account balances; columns `account_id`, `name`, `account_type` (`asset` or `liability`), `current_balance_minor`, `currency`, `is_active`. Enforced via migration 0001. Account “classes” (cash, credit card, investment, loan, etc.) are modeled at the application layer and in per-class configuration tables described in the Assets & Liabilities document.
+- **budget_categories** & **budget_category_monthly_state**: Track envelope allocations and available funds per month-start boundary, including liability payment envelopes (for example, `Payment: {Account}`) and generic debt categories.
+- **transactions**: Temporal SCD Type 2 table; only `TransactionEntryService` can mutate it. Opening balances are recorded as explicit transactions using a dedicated “Opening Balance” category and a synthetic counterparty account.
 - **Transactions API**: `POST /api/transactions` writes via the service, `GET /api/transactions?limit=N` streams recent active rows for the spreadsheet UI.
-- **positions**: Optional investment snapshot table referenced by the net worth query.
+- **positions**: Optional investment snapshot table referenced by the net worth query; captures per-account holdings and current market value.
+- **tangibles** (planned): SCD-2 valuation table for user-maintained fair values of physical assets; once present, net worth will incorporate its `current_fair_value` column as described in the Assets & Liabilities and Net Worth documents.
 - **API contracts**: Pydantic models under `dojo.budgeting.schemas` and `dojo.core.schemas` define on-wire shapes. Monetary values use integers (minor units) plus Decimal mirrors for presentation.
 
 ## State & Persistence
@@ -170,7 +171,7 @@ Only `core` may depend on DuckDB adapters and shared config. Domain modules may 
 
 1. **Single Active Transaction Version**: Exactly one `transactions` row is active per `concept_id`. Enforced by service logic and property tests.
 2. **Minor Unit Storage**: Every persisted amount is an integer number of minor units. Tests assert conversions through services.
-3. **Net Worth Consistency**: `assets - liabilities + positions = net_worth`. Property tests in `tests/property/core/test_net_worth_properties.py` guard it.
+3. **Net Worth Consistency**: `ledger_assets - ledger_liabilities + positions + tangible_values = net_worth`. Property tests in `tests/property/core/test_net_worth_properties.py` guard the implemented subset (currently ledger accounts and positions); tangibles will be added when their table is introduced.
 
 ## Performance Model
 
