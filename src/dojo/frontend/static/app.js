@@ -5,32 +5,27 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 });
 
 const selectors = {
-  form: "#transaction-form",
-  netWorthValue: "#net-worth-value",
-  netWorthUpdated: "#net-worth-updated",
-  status: "#submission-status",
+  todayDate: "#today-date",
+  lastReconcileDate: "#last-reconcile-date",
+  monthSpend: "#month-spend",
   transactionsBody: "#transactions-body",
-  navButtons: "[data-view-button]",
-  viewPanels: "[data-view-panel]",
-  accountForm: "#account-form",
-  accountStatus: "#account-status",
-  accountsTableBody: "#accounts-table-body",
-  categoryForm: "#category-form",
-  categoryStatus: "#category-status",
-  categoriesTableBody: "#categories-table-body",
+  assetsTotal: "#assets-total",
+  liabilitiesTotal: "#liabilities-total",
+  netWorth: "#net-worth",
+  accountGroups: "#account-groups",
+  addAccountButton: "[data-add-account-button]",
+  accountModal: "#account-modal",
+  modalClose: "[data-close-modal]",
+  accountSectionLink: "[data-account-section]",
 };
 
 const state = {
-  referenceLoaded: false,
   transactions: [],
-  accounts: [],
-  categories: [],
-  accountEditingId: null,
-  categoryEditingId: null,
-  activeView: "ledger",
+  accountFilter: "all",
 };
 
-const parseJSONBody = async (response) => {
+const fetchJSON = async (url, options) => {
+  const response = await fetch(url, options);
   if (response.status === 204) {
     return null;
   }
@@ -39,604 +34,380 @@ const parseJSONBody = async (response) => {
     return null;
   }
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    if (!response.ok) {
+      const error = new Error(data?.detail ?? "Request failed");
+      error.status = response.status;
+      error.payload = data;
+      throw error;
+    }
+    return data;
   } catch (error) {
-    return null;
+    console.error("Failed to parse JSON:", text);
+    throw new Error("Server returned non-JSON response");
   }
-};
-
-const fetchJSON = async (url, options) => {
-  const response = await fetch(url, options);
-  const data = await parseJSONBody(response);
-  if (!response.ok) {
-    const error = new Error(data?.detail ?? "Request failed");
-    error.status = response.status;
-    error.payload = data;
-    throw error;
-  }
-  return data;
 };
 
 const formatAmount = (minor) => currencyFormatter.format(minor / 100);
 
-const dollarsToMinor = (value) => {
-  if (value === null || value === "") {
-    return 0;
-  }
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-  return Math.round(parsed * 100);
-};
-
-const minorToInputValue = (minor) => (minor / 100).toFixed(2);
-
-const normalizeSlug = (value) => (value ?? "").trim().toLowerCase();
-
-const setStatus = (statusEl, message, isError = false) => {
-  if (!statusEl) {
-    return;
-  }
-  statusEl.textContent = message ?? "";
-  statusEl.style.color = isError ? "#b91c1c" : "";
-};
-
-const clearErrors = (errorEls) => {
-  Object.values(errorEls).forEach((el) => {
-    el.textContent = "";
-  });
+const getTransactionStatus = (transactionDate) => {
+  const today = new Date();
+  const txDate = new Date(transactionDate);
+  const diffTime = Math.abs(today - txDate);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 3 ? "Settled" : "Pending";
 };
 
 const renderTransactions = (bodyEl, transactions) => {
   bodyEl.innerHTML = "";
-  if (!transactions.length) {
+  if (!Array.isArray(transactions) || !transactions.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 7;
+    cell.colSpan = 6;
     cell.className = "muted";
-    cell.textContent = "No transactions yet. Add one above.";
+    cell.style.textAlign = "center";
+    cell.textContent = "No transactions found.";
     row.appendChild(cell);
     bodyEl.appendChild(row);
     return;
   }
 
   transactions.forEach((tx) => {
+    if (!tx) return; // Skip if transaction is null or undefined
     const row = document.createElement("tr");
-    const amountClass = tx.amount_minor < 0 ? "amount-negative" : "amount-positive";
+    const status = getTransactionStatus(tx.transaction_date);
+    const statusClass = status === "Settled" ? "status-settled" : "status-pending";
+
     row.innerHTML = `
-      <td>${tx.transaction_date}</td>
-      <td>${tx.account_name}</td>
-      <td>${tx.category_name}</td>
-      <td class="${amountClass}">${formatAmount(tx.amount_minor)}</td>
-      <td>${tx.amount_minor < 0 ? "Expense" : "Income"}</td>
-      <td>${tx.memo ?? "—"}</td>
-      <td>${new Date(tx.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+      <td>${tx.transaction_date || "N/A"}</td>
+      <td>${tx.account_name || "N/A"}</td>
+      <td>${tx.category_name || "N/A"}</td>
+      <td>${tx.memo || "—"}</td>
+      <td class="${statusClass}">${status}</td>
+      <td class="amount-cell">${formatAmount(tx.amount_minor || 0)}</td>
     `;
     bodyEl.appendChild(row);
   });
 };
 
-const populateSelect = (selectEl, items, valueKey, labelKey) => {
-  selectEl.innerHTML = "";
-  items.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item[valueKey];
-    option.textContent = item[labelKey];
-    selectEl.appendChild(option);
-  });
+const computeCurrentMonthSpend = (transactions) => {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  return transactions.reduce((total, tx) => {
+    if (!tx || !tx.transaction_date) return total;
+    const txDate = new Date(`${tx.transaction_date}T00:00:00`);
+    if (
+      txDate.getMonth() === currentMonth &&
+      txDate.getFullYear() === currentYear &&
+      tx.amount_minor < 0
+    ) {
+      return total + Math.abs(tx.amount_minor);
+    }
+    return total;
+  }, 0);
 };
 
-const refreshReferenceData = async (form, statusEl = null) => {
-  const data = await fetchJSON("/api/reference-data");
-  populateSelect(form.querySelector('select[name="account_id"]'), data.accounts, "account_id", "name");
-  populateSelect(form.querySelector('select[name="category_id"]'), data.categories, "category_id", "name");
-  state.referenceLoaded = true;
-  setStatus(statusEl, "");
+const updateHeaderStats = () => {
+  const todayEl = document.querySelector(selectors.todayDate);
+  if (todayEl) {
+    todayEl.textContent = new Date().toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  const spendEl = document.querySelector(selectors.monthSpend);
+  if (spendEl) {
+    spendEl.textContent = formatAmount(computeCurrentMonthSpend(state.transactions));
+  }
+
+  // Mock "Last Reconcile Date"
+  const reconcileEl = document.querySelector(selectors.lastReconcileDate);
+  if (reconcileEl) {
+    const today = new Date();
+    today.setDate(today.getDate() - 1); // Yesterday
+    reconcileEl.textContent = today.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
 };
 
 const refreshTransactions = async (bodyEl) => {
   const data = await fetchJSON("/api/transactions?limit=100");
-  state.transactions = data;
+  // Sort by date descending
+  state.transactions = (data || []).sort((a, b) => {
+    const dateA = a.transaction_date ? new Date(a.transaction_date) : 0;
+    const dateB = b.transaction_date ? new Date(b.transaction_date) : 0;
+    return dateB - dateA;
+  });
   renderTransactions(bodyEl, state.transactions);
+  updateHeaderStats();
 };
 
-const refreshNetWorth = async (valueEl, timestampEl) => {
-  const snapshot = await fetchJSON("/api/net-worth/current");
-  valueEl.textContent = formatAmount(snapshot.net_worth_minor);
-  timestampEl.textContent = `Updated ${new Date().toLocaleString()}`;
+const accountGroupsData = [
+  {
+    id: "cash",
+    title: "Cash & Checking",
+    type: "asset",
+    description: "Everyday banking and liquid cash.",
+    accounts: [
+      { name: "Main Checking", institution: "Northwind Bank", balance_minor: 542_000 },
+      { name: "Backup Savings", institution: "Tidal Savings", balance_minor: 128_450 },
+    ],
+  },
+  {
+    id: "short-term",
+    title: "Accessible Assets",
+    type: "asset",
+    description: "Short-term deposits and cash equivalents.",
+    accounts: [
+      {
+        name: "Money Market",
+        institution: "Atlas Capital",
+        balance_minor: 89_320,
+      },
+      {
+        name: "High Yield CD",
+        institution: "Brightline Credit",
+        balance_minor: 41_200,
+      },
+    ],
+  },
+  {
+    id: "investment",
+    title: "Investments",
+    type: "asset",
+    description: "Brokerage, retirement accounts, and other holdings.",
+    accounts: [
+      {
+        name: "Core Brokerage",
+        institution: "Northwind Investments",
+        balance_minor: 185_670,
+      },
+      {
+        name: "IRA",
+        institution: "Northwind Investments",
+        balance_minor: 139_890,
+      },
+    ],
+  },
+  {
+    id: "borrowing",
+    title: "Credit & Borrowing",
+    type: "liability",
+    description: "Lines of credit, cards, and short-term loans.",
+    accounts: [
+      {
+        name: "Visa Rewards",
+        institution: "Orbital Credit Union",
+        balance_minor: 8_240,
+      },
+      {
+        name: "Business Card",
+        institution: "Axis Trust",
+        balance_minor: 15_750,
+      },
+    ],
+  },
+  {
+    id: "long-term",
+    title: "Long-Term Borrowing",
+    type: "liability",
+    description: "Mortgages, student loans, and other long-duration debt.",
+    accounts: [
+      {
+        name: "Mortgage",
+        institution: "Atlas Home Loans",
+        balance_minor: 355_420,
+      },
+      {
+        name: "Student Loan",
+        institution: "Lumen Education",
+        balance_minor: 23_750,
+      },
+    ],
+  },
+];
+
+const formatAccountBalance = (minor, type) => {
+  const value = type === "liability" ? -Math.abs(minor) : minor;
+  return formatAmount(value);
 };
 
-const disableForm = (form, disabled) => {
-  [...form.elements].forEach((el) => {
-    if (el.tagName === "BUTTON" || el.tagName === "INPUT" || el.tagName === "SELECT") {
-      el.disabled = disabled;
-    }
-  });
+const getFilteredGroups = () => {
+  if (state.accountFilter === "all") {
+    return accountGroupsData;
+  }
+  return accountGroupsData.filter((group) => group.type === state.accountFilter);
 };
 
-const handleValidationErrors = (errorEls, error) => {
-  if (error.status === 422 && Array.isArray(error.payload?.detail)) {
-    const validationErrors = {};
-    error.payload.detail.forEach((detail) => {
-      if (Array.isArray(detail.loc) && detail.loc[0] === "body") {
-        validationErrors[detail.loc[1]] = detail.msg;
+const renderAccountGroups = () => {
+  const container = document.querySelector(selectors.accountGroups);
+  if (!container) {
+    return;
+  }
+
+  const groups = getFilteredGroups();
+  container.innerHTML = groups
+    .map(
+      (group) => `
+        <article class="account-group">
+          <header class="account-group__header">
+            <div>
+              <p class="account-group__title">${group.title}</p>
+              <p class="muted">${group.description}</p>
+            </div>
+            <span class="muted">${group.accounts.length} account${group.accounts.length === 1 ? "" : "s"}</span>
+          </header>
+          <div class="account-cards">
+            ${group.accounts
+              .map(
+                (account) => `
+                  <div class="account-card">
+                    <div class="account-card__header">
+                      <span class="account-card__name">${account.name}</span>
+                      <span class="account-card__balance">${formatAccountBalance(
+                        account.balance_minor,
+                        group.type
+                      )}</span>
+                    </div>
+                    <div class="account-card__meta">
+                      <span>${account.institution}</span>
+                      <span>${group.type === "asset" ? "Asset" : "Liability"}</span>
+                    </div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+};
+
+const updateAccountStats = () => {
+  const assetsEl = document.querySelector(selectors.assetsTotal);
+  const liabilitiesEl = document.querySelector(selectors.liabilitiesTotal);
+  const netWorthEl = document.querySelector(selectors.netWorth);
+  if (!assetsEl || !liabilitiesEl || !netWorthEl) {
+    return;
+  }
+
+  const totals = accountGroupsData.reduce(
+    (acc, group) => {
+      const sum = group.accounts.reduce((grp, account) => grp + account.balance_minor, 0);
+      if (group.type === "asset") {
+        acc.assets += sum;
+      } else {
+        acc.liabilities += sum;
       }
-    });
-    Object.entries(validationErrors).forEach(([field, message]) => {
-      if (errorEls[field]) {
-        errorEls[field].textContent = message;
-      }
-    });
-    return true;
-  }
-  return false;
+      return acc;
+    },
+    { assets: 0, liabilities: 0 }
+  );
+
+  const netWorth = totals.assets - totals.liabilities;
+  assetsEl.textContent = formatAmount(totals.assets);
+  liabilitiesEl.textContent = formatAmount(-totals.liabilities);
+  netWorthEl.textContent = formatAmount(netWorth);
 };
 
-const focusFirstInput = (form) => {
-  const first = form.querySelector('input[name="transaction_date"]');
-  if (first) {
-    first.focus();
-  }
-};
-
-const showView = (viewName) => {
-  state.activeView = viewName;
-  document.querySelectorAll(selectors.viewPanels).forEach((panel) => {
-    panel.hidden = panel.dataset.viewPanel !== viewName;
-  });
-  document.querySelectorAll(selectors.navButtons).forEach((button) => {
-    button.classList.toggle("active", button.dataset.viewButton === viewName);
-  });
-};
-
-const initNavigation = () => {
-  document.querySelectorAll(selectors.navButtons).forEach((button) => {
-    button.addEventListener("click", () => {
-      showView(button.dataset.viewButton);
-    });
-  });
-  showView(state.activeView);
-};
-
-const renderAccountsTable = (bodyEl, accounts) => {
-  bodyEl.innerHTML = "";
-  if (!accounts.length) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 8;
-    cell.className = "muted";
-    cell.textContent = "No accounts yet.";
-    row.appendChild(cell);
-    bodyEl.appendChild(row);
+const accountModalElement = document.querySelector(selectors.accountModal);
+const toggleAccountModal = (show) => {
+  if (!accountModalElement) {
     return;
   }
-  accounts.forEach((account) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${account.account_id}</td>
-      <td>${account.name}</td>
-      <td>${account.account_type}</td>
-      <td>${formatAmount(account.current_balance_minor)}</td>
-      <td>${account.currency}</td>
-      <td>${account.is_active ? "Yes" : "No"}</td>
-      <td>${account.opened_on ?? "—"}</td>
-      <td>
-        <button type="button" class="link-button" data-account-edit="${account.account_id}">Edit</button>
-        <button type="button" class="link-button" data-account-remove="${account.account_id}" ${account.is_active ? "" : "disabled"}>
-          Remove
-        </button>
-      </td>
-    `;
-    bodyEl.appendChild(row);
-  });
-};
-
-const refreshAccountsAdmin = async (bodyEl) => {
-  const accounts = await fetchJSON("/api/accounts");
-  state.accounts = accounts;
-  renderAccountsTable(bodyEl, accounts);
-};
-
-const resetAccountForm = (form) => {
-  state.accountEditingId = null;
-  form.reset();
-  form.querySelector('input[name="account_id"]').disabled = false;
-  form.querySelector('input[name="currency"]').value = "USD";
-  form.querySelector('input[name="current_balance"]').value = "0";
-  form.querySelector('input[name="is_active"]').checked = true;
-  form.querySelector('[data-account-submit]').textContent = "Add Account";
-  form.querySelector('[data-account-cancel]').hidden = true;
-};
-
-const populateAccountForm = (form, account) => {
-  state.accountEditingId = account.account_id;
-  const idInput = form.querySelector('input[name="account_id"]');
-  idInput.value = account.account_id;
-  idInput.disabled = true;
-  form.querySelector('input[name="name"]').value = account.name;
-  form.querySelector('select[name="account_type"]').value = account.account_type;
-  form.querySelector('input[name="currency"]').value = account.currency;
-  form.querySelector('input[name="current_balance"]').value = minorToInputValue(account.current_balance_minor);
-  form.querySelector('input[name="opened_on"]').value = account.opened_on ?? "";
-  form.querySelector('input[name="is_active"]').checked = account.is_active;
-  form.querySelector('[data-account-submit]').textContent = "Save Changes";
-  form.querySelector('[data-account-cancel]').hidden = false;
-};
-
-const initAccountsPanel = ({ refreshReference }) => {
-  const form = document.querySelector(selectors.accountForm);
-  const statusEl = document.querySelector(selectors.accountStatus);
-  const tableBody = document.querySelector(selectors.accountsTableBody);
-
-  if (!form || !statusEl || !tableBody) {
-    return { refresh: async () => {} };
-  }
-
-  const cancelBtn = form.querySelector('[data-account-cancel]');
-  cancelBtn.addEventListener("click", () => {
-    resetAccountForm(form);
-    setStatus(statusEl, "");
-  });
-
-  tableBody.addEventListener("click", (event) => {
-    const editBtn = event.target.closest("[data-account-edit]");
-    if (editBtn) {
-      const account = state.accounts.find((acc) => acc.account_id === editBtn.dataset.accountEdit);
-      if (account) {
-        populateAccountForm(form, account);
-        setStatus(statusEl, `Editing ${account.account_id}`);
-      }
-      return;
-    }
-    const removeBtn = event.target.closest("[data-account-remove]");
-    if (removeBtn) {
-      handleAccountRemove(removeBtn.dataset.accountRemove, form, statusEl, tableBody, refreshReference);
-    }
-  });
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    handleAccountSubmit(form, statusEl, tableBody, refreshReference);
-  });
-
-  const refresh = async () => {
-    try {
-      await refreshAccountsAdmin(tableBody);
-    } catch (error) {
-      console.error(error);
-      setStatus(statusEl, "Unable to load accounts.", true);
-    }
-  };
-
-  return { refresh };
-};
-
-const handleAccountSubmit = async (form, statusEl, tableBody, refreshReference) => {
-  setStatus(statusEl, "");
-  const formData = new FormData(form);
-  const balanceMinor = dollarsToMinor(formData.get("current_balance"));
-  if (balanceMinor === null) {
-    setStatus(statusEl, "Enter a numeric balance.", true);
-    return;
-  }
-  const accountId = normalizeSlug(formData.get("account_id"));
-  if (!state.accountEditingId && !accountId) {
-    setStatus(statusEl, "Account ID is required.", true);
-    return;
-  }
-  const name = (formData.get("name") ?? "").trim();
-  const accountType = formData.get("account_type") ?? "asset";
-  const currency = ((formData.get("currency") ?? "USD").toString().trim() || "USD").toUpperCase();
-  const openedRaw = formData.get("opened_on");
-  const payload = {
-    name,
-    account_type: accountType,
-    currency,
-    current_balance_minor: balanceMinor,
-    opened_on: openedRaw ? openedRaw : null,
-    is_active: form.querySelector('input[name="is_active"]').checked,
-  };
-  const isEditing = Boolean(state.accountEditingId);
-  const endpoint = isEditing ? `/api/accounts/${state.accountEditingId}` : "/api/accounts";
-  const body = JSON.stringify(isEditing ? payload : { ...payload, account_id: accountId });
-  disableForm(form, true);
-  try {
-    await fetchJSON(endpoint, {
-      method: isEditing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    setStatus(statusEl, isEditing ? "Account updated." : "Account created.");
-    resetAccountForm(form);
-    await refreshAccountsAdmin(tableBody);
-    if (typeof refreshReference === "function") {
-      await refreshReference();
-    }
-  } catch (error) {
-    console.error(error);
-    setStatus(statusEl, error.message, true);
-  } finally {
-    disableForm(form, false);
-  }
-};
-
-const handleAccountRemove = async (accountId, form, statusEl, tableBody, refreshReference) => {
-  if (!accountId) {
-    return;
-  }
-  try {
-    await fetchJSON(`/api/accounts/${accountId}`, { method: "DELETE" });
-    if (state.accountEditingId === accountId) {
-      resetAccountForm(form);
-    }
-    await refreshAccountsAdmin(tableBody);
-    if (typeof refreshReference === "function") {
-      await refreshReference();
-    }
-    setStatus(statusEl, `Account ${accountId} removed.`);
-  } catch (error) {
-    console.error(error);
-    setStatus(statusEl, error.message, true);
-  }
-};
-
-const renderCategoriesTable = (bodyEl, categories) => {
-  bodyEl.innerHTML = "";
-  if (!categories.length) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 4;
-    cell.className = "muted";
-    cell.textContent = "No budget categories yet.";
-    row.appendChild(cell);
-    bodyEl.appendChild(row);
-    return;
-  }
-  categories.forEach((category) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${category.category_id}</td>
-      <td>${category.name}</td>
-      <td>${category.is_active ? "Yes" : "No"}</td>
-      <td>
-        <button type="button" class="link-button" data-category-edit="${category.category_id}">Edit</button>
-        <button type="button" class="link-button" data-category-remove="${category.category_id}" ${category.is_active ? "" : "disabled"}>
-          Remove
-        </button>
-      </td>
-    `;
-    bodyEl.appendChild(row);
-  });
-};
-
-const refreshCategoriesAdmin = async (bodyEl) => {
-  const categories = await fetchJSON("/api/budget-categories");
-  state.categories = categories;
-  renderCategoriesTable(bodyEl, categories);
-};
-
-const resetCategoryForm = (form) => {
-  state.categoryEditingId = null;
-  form.reset();
-  form.querySelector('input[name="category_id"]').disabled = false;
-  form.querySelector('input[name="is_active"]').checked = true;
-  form.querySelector('[data-category-submit]').textContent = "Add Category";
-  form.querySelector('[data-category-cancel]').hidden = true;
-};
-
-const populateCategoryForm = (form, category) => {
-  state.categoryEditingId = category.category_id;
-  const idInput = form.querySelector('input[name="category_id"]');
-  idInput.value = category.category_id;
-  idInput.disabled = true;
-  form.querySelector('input[name="name"]').value = category.name;
-  form.querySelector('input[name="is_active"]').checked = category.is_active;
-  form.querySelector('[data-category-submit]').textContent = "Save Changes";
-  form.querySelector('[data-category-cancel]').hidden = false;
-};
-
-const initCategoriesPanel = ({ refreshReference }) => {
-  const form = document.querySelector(selectors.categoryForm);
-  const statusEl = document.querySelector(selectors.categoryStatus);
-  const tableBody = document.querySelector(selectors.categoriesTableBody);
-
-  if (!form || !statusEl || !tableBody) {
-    return { refresh: async () => {} };
-  }
-
-  const cancelBtn = form.querySelector('[data-category-cancel]');
-  cancelBtn.addEventListener("click", () => {
-    resetCategoryForm(form);
-    setStatus(statusEl, "");
-  });
-
-  tableBody.addEventListener("click", (event) => {
-    const editBtn = event.target.closest("[data-category-edit]");
-    if (editBtn) {
-      const category = state.categories.find((cat) => cat.category_id === editBtn.dataset.categoryEdit);
-      if (category) {
-        populateCategoryForm(form, category);
-        setStatus(statusEl, `Editing ${category.category_id}`);
-      }
-      return;
-    }
-    const removeBtn = event.target.closest("[data-category-remove]");
-    if (removeBtn) {
-      handleCategoryRemove(removeBtn.dataset.categoryRemove, form, statusEl, tableBody, refreshReference);
-    }
-  });
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    handleCategorySubmit(form, statusEl, tableBody, refreshReference);
-  });
-
-  const refresh = async () => {
-    try {
-      await refreshCategoriesAdmin(tableBody);
-    } catch (error) {
-      console.error(error);
-      setStatus(statusEl, "Unable to load categories.", true);
-    }
-  };
-
-  return { refresh };
-};
-
-const handleCategorySubmit = async (form, statusEl, tableBody, refreshReference) => {
-  setStatus(statusEl, "");
-  const formData = new FormData(form);
-  const categoryId = normalizeSlug(formData.get("category_id"));
-  if (!state.categoryEditingId && !categoryId) {
-    setStatus(statusEl, "Category ID is required.", true);
-    return;
-  }
-  const name = (formData.get("name") ?? "").trim();
-  const payload = {
-    name,
-    is_active: form.querySelector('input[name="is_active"]').checked,
-  };
-  const isEditing = Boolean(state.categoryEditingId);
-  const endpoint = isEditing ? `/api/budget-categories/${state.categoryEditingId}` : "/api/budget-categories";
-  const body = JSON.stringify(isEditing ? payload : { ...payload, category_id: categoryId });
-  disableForm(form, true);
-  try {
-    await fetchJSON(endpoint, {
-      method: isEditing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    setStatus(statusEl, isEditing ? "Category updated." : "Category created.");
-    resetCategoryForm(form);
-    await refreshCategoriesAdmin(tableBody);
-    if (typeof refreshReference === "function") {
-      await refreshReference();
-    }
-  } catch (error) {
-    console.error(error);
-    setStatus(statusEl, error.message, true);
-  } finally {
-    disableForm(form, false);
-  }
-};
-
-const handleCategoryRemove = async (categoryId, form, statusEl, tableBody, refreshReference) => {
-  if (!categoryId) {
-    return;
-  }
-  try {
-    await fetchJSON(`/api/budget-categories/${categoryId}`, { method: "DELETE" });
-    if (state.categoryEditingId === categoryId) {
-      resetCategoryForm(form);
-    }
-    await refreshCategoriesAdmin(tableBody);
-    if (typeof refreshReference === "function") {
-      await refreshReference();
-    }
-    setStatus(statusEl, `Category ${categoryId} removed.`);
-  } catch (error) {
-    console.error(error);
-    setStatus(statusEl, error.message, true);
-  }
+  accountModalElement.classList.toggle("is-visible", show);
+  accountModalElement.setAttribute("aria-hidden", show ? "false" : "true");
 };
 
 const init = async () => {
-  const form = document.querySelector(selectors.form);
-  const netWorthValueEl = document.querySelector(selectors.netWorthValue);
-  const netWorthUpdatedEl = document.querySelector(selectors.netWorthUpdated);
-  const statusEl = document.querySelector(selectors.status);
   const transactionsBody = document.querySelector(selectors.transactionsBody);
-
-  if (!form || !netWorthValueEl || !netWorthUpdatedEl || !statusEl || !transactionsBody) {
+  if (!transactionsBody) {
+    console.error("Fatal: Transaction table body not found.");
     return;
   }
 
-  form.setAttribute("novalidate", "novalidate");
-  const errorEls = [...document.querySelectorAll("[data-error-for]")].reduce((acc, el) => {
-    acc[el.dataset.errorFor] = el;
-    return acc;
-  }, {});
+  const pageNodes = document.querySelectorAll(".page");
+  const routeLinks = document.querySelectorAll("[data-route-link]");
+  const activateRoute = (route) => {
+    const normalizedRoute = route && document.querySelector(`[data-route="${route}"]`) ? route : "transactions";
+    pageNodes.forEach((page) => {
+      page.classList.toggle("active", page.dataset.route === normalizedRoute);
+    });
+    routeLinks.forEach((link) => {
+      link.classList.toggle("active", link.dataset.routeLink === normalizedRoute);
+    });
+  };
 
-  focusFirstInput(form);
-  initNavigation();
+  const handleHashChange = () => {
+    const rawRoute = window.location.hash.replace("#/", "");
+    activateRoute(rawRoute);
+  };
 
-  const refreshReference = () => refreshReferenceData(form, null);
-  const accountsPanel = initAccountsPanel({ refreshReference });
-  const categoriesPanel = initCategoriesPanel({ refreshReference });
+  window.addEventListener("hashchange", handleHashChange);
+  handleHashChange();
+
+  updateHeaderStats();
 
   try {
-    disableForm(form, true);
-    await Promise.all([
-      refreshReferenceData(form, statusEl),
-      refreshTransactions(transactionsBody),
-      refreshNetWorth(netWorthValueEl, netWorthUpdatedEl),
-      accountsPanel.refresh(),
-      categoriesPanel.refresh(),
-    ]);
+    await refreshTransactions(transactionsBody);
   } catch (error) {
     console.error(error);
-    setStatus(statusEl, "Unable to load initial data.", true);
-  } finally {
-    disableForm(form, false);
+    const bodyEl = document.querySelector(selectors.transactionsBody);
+    bodyEl.innerHTML = `
+      <tr>
+        <td colspan="6" class="muted" style="text-align: center; color: var(--danger);">
+          Error: Could not load transaction data.
+        </td>
+      </tr>
+    `;
   }
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    setStatus(statusEl, "");
-    clearErrors(errorEls);
+  const sectionLinks = document.querySelectorAll(selectors.accountSectionLink);
+  const updateSectionActive = (active) => {
+    sectionLinks.forEach((link) => {
+      const section = link.getAttribute("data-account-section");
+      link.classList.toggle("is-active", section === active);
+    });
+  };
 
-    if (!state.referenceLoaded) {
-      setStatus(statusEl, "Reference data not ready yet.", true);
-      return;
-    }
+  updateSectionActive(state.accountFilter);
 
-    const formData = new FormData(form);
-    const amountFloat = parseFloat(formData.get("amount"));
-    if (Number.isNaN(amountFloat)) {
-      errorEls.amount_minor.textContent = "Enter a numeric amount.";
-      return;
-    }
-
-    let amountMinor = Math.round(amountFloat * 100);
-    if (formData.get("flow_direction") === "expense") {
-      amountMinor *= -1;
-    }
-
-    const payload = {
-      transaction_date: formData.get("transaction_date"),
-      account_id: formData.get("account_id"),
-      category_id: formData.get("category_id"),
-      amount_minor: amountMinor,
-      memo: formData.get("memo") || null,
-    };
-
-    disableForm(form, true);
-    try {
-      await fetchJSON("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      form.reset();
-      focusFirstInput(form);
-      setStatus(statusEl, "Transaction recorded.");
-      await Promise.all([
-        refreshTransactions(transactionsBody),
-        refreshNetWorth(netWorthValueEl, netWorthUpdatedEl),
-        refreshReferenceData(form, null),
-      ]);
-    } catch (error) {
-      const handled = handleValidationErrors(errorEls, error);
-      if (!handled) {
-        setStatus(statusEl, error.message, true);
-      } else {
-        setStatus(statusEl, "Fix the highlighted errors.", true);
-      }
-    } finally {
-      disableForm(form, false);
-    }
+  sectionLinks.forEach((link) => {
+    link.addEventListener("click", () => {
+      const section = link.getAttribute("data-account-section");
+      state.accountFilter = section;
+      updateSectionActive(section);
+      renderAccountGroups();
+    });
   });
+
+  const addAccountBtn = document.querySelector(selectors.addAccountButton);
+  if (addAccountBtn) {
+    addAccountBtn.addEventListener("click", () => toggleAccountModal(true));
+  }
+
+  const modalClose = document.querySelector(selectors.modalClose);
+  if (modalClose) {
+    modalClose.addEventListener("click", () => toggleAccountModal(false));
+  }
+
+  if (accountModalElement) {
+    accountModalElement.addEventListener("click", (event) => {
+      if (event.target === accountModalElement) {
+        toggleAccountModal(false);
+      }
+    });
+  }
+
+  renderAccountGroups();
+  updateAccountStats();
 };
 
 document.addEventListener("DOMContentLoaded", init);
