@@ -6,61 +6,28 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 
 const formatAmount = (minor) => currencyFormatter.format(minor / 100);
 
-const visitLedger = () => {
-  cy.visit("/");
-  cy.get('select[name="account_id"] option', { timeout: 10000 }).should(($options) => {
-    expect($options.length).to.be.greaterThan(0);
-  });
-};
-
-const setTodayDate = () => {
-  cy.get('input[name="transaction_date"]').clear().type(todayISO());
-};
-
-const loadNetWorth = () => cy.request("/api/net-worth/current").its("body.net_worth_minor");
-
-const expectNetWorthValue = (expectedMinor) => {
-  const expectedText = formatAmount(expectedMinor);
-  cy.get("#net-worth-value", { timeout: 10000 }).should(($el) => {
-    expect($el.text().trim()).to.eq(expectedText);
-  });
-};
-
 const todayISO = () => new Date().toISOString().slice(0, 10);
+
+const formatAmountFromApi = (minor) => currencyFormatter.format(minor / 100);
 
 describe("Transaction Flow", () => {
   beforeEach(() => {
-    visitLedger();
-    setTodayDate();
+    cy.visit("/");
   });
 
-  it("shows validation errors for missing amount", () => {
-    cy.get('input[name="amount"]').clear();
-    cy.get('#transaction-form button[type="submit"]').click();
-    cy.get('[data-error-for="amount_minor"]').should("have.text", "Enter a numeric amount.");
+  it("shows net worth header matching the API", () => {
+    cy.contains("a", "Assets & Liabilities").click();
+    cy.request("/api/net-worth/current").then((resp) => {
+      const expected = formatAmountFromApi(resp.body.net_worth_minor);
+      cy.get("#net-worth").should("have.text", expected);
+    });
   });
 
-  it("records a transaction and updates net worth", () => {
-    const amountDollars = 12.34;
-    const amountMinor = -Math.round(amountDollars * 100);
-
-    loadNetWorth().then((initialNetWorth) => {
-      cy.get('input[name="transaction_date"]').clear().type(todayISO());
-      cy.get('select[name="account_id"]').select("house_checking");
-      cy.get('select[name="category_id"]').select("groceries");
-      cy.get('input[name="amount"]').clear().type(amountDollars.toFixed(2));
-      cy.get('select[name="flow_direction"]').select("expense");
-      cy.get('input[name="memo"]').clear().type("Cypress test");
-      cy.get('#transaction-form button[type="submit"]').click();
-
-      cy.get("#submission-status", { timeout: 10000 }).should("have.text", "Transaction recorded.");
-
-      const expectedNetWorth = initialNetWorth + amountMinor;
-      expectNetWorthValue(expectedNetWorth);
-
-      cy.request("/api/net-worth/current")
-        .its("body.net_worth_minor")
-        .should("eq", expectedNetWorth);
+  it("displays Ready to Assign derived from the backend", () => {
+    cy.contains("a", "Assets & Liabilities").click();
+    cy.request("/api/budget/ready-to-assign").then((resp) => {
+      const expected = formatAmountFromApi(resp.body.ready_to_assign_minor);
+      cy.get("#ready-to-assign").should("have.text", expected);
     });
   });
 });

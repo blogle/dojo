@@ -39,8 +39,15 @@ def test_net_worth_matches_manual_computation(
     positions: list[int],
 ) -> None:
     with ledger_connection() as conn:
-        conn.execute("DELETE FROM accounts")
         conn.execute("DELETE FROM positions")
+        conn.execute("DELETE FROM tangible_assets")
+        conn.execute("DELETE FROM cash_account_details")
+        conn.execute("DELETE FROM credit_account_details")
+        conn.execute("DELETE FROM accessible_asset_details")
+        conn.execute("DELETE FROM investment_account_details")
+        conn.execute("DELETE FROM loan_account_details")
+        conn.execute("DELETE FROM tangible_asset_details")
+        conn.execute("DELETE FROM accounts")
 
         for idx, value in enumerate(assets):
             conn.execute(

@@ -96,6 +96,11 @@
               <span id="net-worth" class="stat-value">—</span>
               <span class="muted small-note">Assets minus liabilities.</span>
             </div>
+            <div class="stat-card">
+              <span class="stat-label">Ready to Assign</span>
+              <span id="ready-to-assign" class="stat-value">—</span>
+              <span class="muted small-note">Unallocated cash available to budget.</span>
+            </div>
           </div>
 
           <div class="account-groups" id="account-groups">
@@ -105,45 +110,65 @@
       </main>
     </div>
 
-    <div class="modal-overlay" id="account-modal" aria-hidden="true">
-      <div class="modal">
+    <div class="modal-overlay" id="account-modal" aria-hidden="true" data-view="add">
+      <div class="modal" data-view="add">
         <header class="modal-header">
           <div>
-            <p class="stat-label">Add account</p>
-            <h2>Follow the guided steps</h2>
+            <p class="stat-label" data-modal-label>Add account</p>
+            <h2 data-modal-title>Follow the guided steps</h2>
+            <p class="muted small-note" data-modal-subtitle>Digitally capture the new account.</p>
           </div>
           <button class="modal-close" type="button" aria-label="Close modal" data-close-modal>×</button>
         </header>
-        <ol class="modal-steps">
-          <li><strong>Step 1:</strong> Choose the account type (checking, credit, investment, etc.).</li>
-          <li><strong>Step 2:</strong> Enter the institution name and the account nickname.</li>
-          <li><strong>Step 3:</strong> Record the current balance and reconcile with statements.</li>
-        </ol>
-        <form class="modal-form">
-          <label>
-            Account type
-            <select name="type">
-              <option value="checking">Checking</option>
-              <option value="credit">Credit Card</option>
-              <option value="brokerage">Brokerage</option>
-              <option value="loan">Loan / Mortgage</option>
-              <option value="asset">Other Asset</option>
-            </select>
-          </label>
-          <label>
-            Account name
-            <input name="name" type="text" placeholder="e.g. Main Checking" />
-          </label>
-          <label>
-            Balance
-            <input name="balance" type="number" placeholder="0.00" />
-          </label>
-          <label>
-            Notes
-            <textarea name="notes" rows="3" placeholder="Optional context (e.g. interest rate, minimum payment)"></textarea>
-          </label>
-          <button type="button" class="primary">Review &amp; create</button>
-        </form>
+        <div class="modal-body">
+          <section class="modal-detail" data-modal-section="detail">
+            <div class="modal-detail__balance" data-modal-balance>—</div>
+            <ul class="modal-detail__metadata" data-modal-metadata></ul>
+            <div class="role-legend">
+              <span class="role-legend__item">
+                <span class="role-icon" data-role="on_budget" aria-hidden="true"></span>
+                <span>On-budget</span>
+              </span>
+              <span class="role-legend__item">
+                <span class="role-icon" data-role="tracking" aria-hidden="true"></span>
+                <span>Tracking</span>
+              </span>
+            </div>
+          </section>
+          <section class="modal-add" data-modal-section="add">
+            <p class="muted small-note" data-modal-type-hint>Checking · On-budget</p>
+            <ol class="modal-steps">
+              <li><strong>Step 1:</strong> Choose the account type (checking, credit, investment, etc.).</li>
+              <li><strong>Step 2:</strong> Enter the institution name and the account nickname.</li>
+              <li><strong>Step 3:</strong> Record the current balance and reconcile with statements.</li>
+            </ol>
+            <form class="modal-form">
+              <label>
+                Account type
+                <select name="type">
+                  <option value="checking">Checking</option>
+                  <option value="credit">Credit Card</option>
+                  <option value="brokerage">Brokerage</option>
+                  <option value="loan">Loan / Mortgage</option>
+                  <option value="asset">Other Asset</option>
+                </select>
+              </label>
+              <label>
+                Account name
+                <input name="name" type="text" placeholder="e.g. Main Checking" />
+              </label>
+              <label>
+                Balance
+                <input name="balance" type="number" placeholder="0.00" />
+              </label>
+              <label>
+                Notes
+                <textarea name="notes" rows="3" placeholder="Optional context (e.g. interest rate, minimum payment)"></textarea>
+              </label>
+              <button type="button" class="primary" data-add-account-submit>Review &amp; create</button>
+            </form>
+          </section>
+        </div>
       </div>
     </div>
 

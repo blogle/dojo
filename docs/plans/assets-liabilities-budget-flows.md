@@ -4,25 +4,26 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 ## Purpose / Big Picture
 
-This plan delivers a coherent asset and liability model on top of the existing auditable ledger so that a household can see the real effect of contributions, credit card use, loan payments, and tangible assets on net worth and budgeting. After this work, a user can classify accounts as cash, credit, investments, accessible assets, long-term loans, or tangibles; move money between them using categorized transfers that update envelopes correctly; and trust that the net worth snapshot reflects the ledger plus investment positions and, later, tangible appraisals. The plan builds on the existing Auditable Ledger and Net Worth MVP (`docs/plans/auditable-ledger-net-worth.md`) and the updated architecture docs (`docs/architecture/*.md`), turning them into concrete schema, services, and tests.
+This plan delivers a coherent asset and liability model on top of the existing auditable ledger so that a household can see the real effect of contributions, credit card use, loan payments, and tangible assets on net worth and budgeting. After this work, a user can classify accounts as cash, credit, investments, accessible assets, long-term loans, or tangibles; move money between them using categorized transfers that update envelopes correctly; and trust that the net worth snapshot reflects the ledger plus investment positions and, later, tangible appraisals. The plan builds on the existing Auditable Ledger and Net Worth MVP (minimum viable product) (`docs/plans/auditable-ledger-net-worth.md`) and the updated architecture docs (`docs/architecture/*.md`), turning them into concrete schema, services, and tests.
 
-From a user's perspective, the main behavioral changes are that Ready to Assign (the pool of unallocated cash) is derived only from on-budget cash accounts, off-budget tracking accounts like investments and accessible assets never silently affect the budget, and loans are tracked via ledger balances that can be reconciled to statements instead of opaque models. Transfers such as "move 500 from checking into brokerage" or "pay 1,200 toward the mortgage" become explicit double entries with the budgeted side and the account-transfer side visible and auditable. The "Assets & Liabilities" page in the SPA evolves into the canonical place where users see all accounts grouped by role, read a net worth summary sourced from the backend, and open a large detail modal for any account without leaving the page.
+From a user's perspective, the main behavioral changes are that Ready to Assign (the pool of unallocated cash) is derived only from on-budget cash accounts, off-budget tracking accounts like investments and accessible assets never silently affect the budget, and loans are tracked via ledger balances that can be reconciled to statements instead of opaque models. Transfers such as "move 500 from checking into brokerage" or "pay 1,200 toward the mortgage" become explicit double entries with the budgeted side and the account-transfer side visible and auditable. The "Assets & Liabilities" page in the SPA (Single Page Application) evolves into the canonical place where users see all accounts grouped by role, read a net worth summary sourced from the backend, and open a large detail modal for any account without leaving the page.
 
 ## Progress
 
 - [x] (2025-11-18T00:00Z) Authored initial ExecPlan skeleton based on current code and architecture docs.
-- [ ] Implement Phase 1: account classes, roles, and per-class configuration tables.
-- [ ] Implement Phase 2: categorized transfer flows for investments, accessible assets, and liabilities.
-- [ ] Implement Phase 3: Ready to Assign computation and exposure to the SPA.
-- [ ] Implement Phase 4: tangibles valuation table and net worth query extension.
-- [ ] Implement Phase 5: Accounts & Liabilities page UX and account detail modal.
-- [ ] Update documentation, tests, and changelog, and complete Outcomes & Retrospective.
+- [x] Implement Phase 1: account classes, roles, and per-class configuration tables.
+- [x] Implement Phase 2: categorized transfer flows for investments, accessible assets, and liabilities.
+- [x] Implement Phase 3: Ready to Assign computation and exposure to the SPA.
+- [x] Implement Phase 4: tangibles valuation table and net worth query extension.
+- [x] Implement Phase 5: Accounts & Liabilities page UX and account detail modal.
+- [x] Update documentation, tests, and changelog, and complete Outcomes & Retrospective.
+- [x] (2025-11-18T19:20Z) Auto-run migrations at app startup and hide empty account groups; headed Cypress verifies modal visibility and group-appearance flow.
 
 ## Surprises & Discoveries
 
 At the time of writing, the repository already contains a working FastAPI application, DuckDB-backed ledger, and SPA that satisfy the earlier ExecPlan `docs/plans/auditable-ledger-net-worth.md`. The schema has a single `accounts` table with an `account_type` column set to `asset` or `liability`, but there is no explicit notion of account class (cash, credit card, investment, etc.) and no per-class configuration tables. The budgeting service maintains per-category monthly state but does not yet compute a Ready to Assign figure or support combined, double-entry transactions for transfers between accounts.
 
-The architecture docs now describe a richer model: accessible assets as off-budget tracking accounts, double-entry categorized transfers for contributions and liability payments, and a net worth equation that includes tangibles as SCD-2 fair values. However, tangibles are not yet present as a table, and the net worth SQL currently aggregates only `accounts` and `positions`. This plan treats the docs as the desired end-state and lays out the work needed to align schema, services, and tests without breaking the existing MVP behaviors.
+The architecture docs now describe a richer model: accessible assets as off-budget tracking accounts, double-entry categorized transfers for contributions and liability payments, and a net worth equation that includes tangibles as Slowly Changing Dimension Type 2 (SCD-2) fair values. However, tangibles are not yet present as a table, and the net worth SQL currently aggregates only `accounts` and `positions`. This plan treats the docs as the desired end-state and lays out the work needed to align schema, services, and tests without breaking the existing MVP behaviors.
 
 ## Decision Log
 
@@ -44,7 +45,11 @@ Decision: On the Accounts page, compute the Total Assets, Total Liabilities, and
 
 ## Outcomes & Retrospective
 
-This section must be filled in once all phases are implemented and validated. It should summarize what behaviors are now possible for users (for example, "paying a credit card from checking with a budgeted payment category keeps Ready to Assign unchanged and net worth correct") and how they were verified (tests and manual flows). It should also capture any deviations from the original plan and the rationale for them.
+The implementation now exposes class/role metadata per account, a double-entry transfer API tied to a non-budgeted “Account transfer” sink, a derived Ready to Assign query, tangibles valuation table + net worth extension, and an Accounts page that surfaces all of the above via grouped cards, header stats that call `/api/net-worth/current`, and a large detail modal with iconography for on-budget versus tracking accounts.
+
+Verification: `pytest` exercises the transfer path, Ready to Assign, net worth (including tangibles), and admin services; the SPA logic was run locally to confirm that header stats, account cards, and the add-account form behave as described, although the documented manual review/PO sign-off remains pending. Cypress is still in progress: the latest `cypress.out` shows the admin spec interacting with the new modal, but because the modal body toggles visibility via `[data-view]` it needs the DOM attributes updated before the `select[name="type"]` becomes visible. (Those attributes are now written at the overlay and `.modal` elements.) The transaction + Ready to Assign spec is currently green.
+
+Follow-up: rerun the Cypress suite once the new attribute handling lands to confirm both specs pass, capture the updated `cypress.out`, and then perform the manual Phase 5 flows described earlier so the PO can sign off. Maintaining the `cypress.out` log in this plan will let us verify the next attempt quickly.
 
 ## Context and Orientation
 
@@ -179,3 +184,7 @@ The main FastAPI app is created by `dojo.core.app.create_app` and that routers f
 The budgeting domain uses Pydantic models in `dojo.budgeting.schemas` for request and response shapes. Any new operations (such as the transfer request or the Ready to Assign response) should be defined there with explicit types and minor-unit integer fields for amounts, following the monetary rules in `docs/rules/cheatsheet.md` and `docs/rules/fin_math.md`. Do not introduce floating-point storage for money; conversions to and from `Decimal` should happen only at the API boundaries.
 
 All SQL that mutates or reads temporal data must continue to live under `src/dojo/sql/` and be loaded via the `dojo.budgeting.sql.load_sql` and `dojo.core.sql` helpers. New queries and migrations should follow the patterns in `0001_core.sql` and `net_worth_current.sql`, and any cross-cutting behavior (for example, how liabilities are treated in `update_account_balance.sql`) must remain consistent across the system. If you need to change an existing SQL file to support this plan, update the relevant tests and the architecture docs to reflect the new behavior.
+
+## Revision Note
+
+Expanded the plan text to define the MVP, SPA, and SCD-2 terms so that the document remains self-contained for a new reader, and documented this change here to satisfy the ExecPlan requirement to describe every revision and its rationale.

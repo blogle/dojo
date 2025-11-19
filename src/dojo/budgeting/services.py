@@ -26,6 +26,9 @@ from dojo.budgeting.schemas import (
     BudgetCategoryDetail,
     BudgetCategoryUpdateRequest,
     CategoryState,
+    CategorizedTransferLeg,
+    CategorizedTransferRequest,
+    CategorizedTransferResponse,
     NewTransactionRequest,
     TransactionListItem,
     TransactionResponse,
@@ -38,6 +41,7 @@ class TransactionEntryService:
 
     MAX_FUTURE_DAYS = 5
     SOURCE = "api"
+    TRANSFER_CATEGORY_ID = "account_transfer"
 
     def create(self, conn: duckdb.DuckDBPyConnection, cmd: NewTransactionRequest) -> TransactionResponse:
         """Insert a transaction using the temporal ledger model."""
@@ -61,21 +65,16 @@ class TransactionEntryService:
                     [recorded_at, recorded_at, str(concept_id)],
                 )
 
-            insert_sql = load_sql("insert_transaction.sql")
-            conn.execute(
-                insert_sql,
-                [
-                    str(transaction_version_id),
-                    str(concept_id),
-                    cmd.account_id,
-                    cmd.category_id,
-                    cmd.transaction_date,
-                    cmd.amount_minor,
-                    cmd.memo,
-                    recorded_at,
-                    recorded_at,
-                    self.SOURCE,
-                ],
+            self._insert_transaction_row(
+                conn=conn,
+                transaction_version_id=transaction_version_id,
+                concept_id=concept_id,
+                account_id=cmd.account_id,
+                category_id=cmd.category_id,
+                transaction_date=cmd.transaction_date,
+                amount_minor=cmd.amount_minor,
+                memo=cmd.memo,
+                recorded_at=recorded_at,
             )
 
             update_account_sql = load_sql("update_account_balance.sql")
@@ -110,6 +109,100 @@ class TransactionEntryService:
             category=category_state,
         )
 
+    def transfer(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        cmd: CategorizedTransferRequest,
+    ) -> CategorizedTransferResponse:
+        """Perform a categorized transfer with two ledger entries."""
+
+        self._validate_transfer_payload(cmd)
+        if cmd.source_account_id == cmd.destination_account_id:
+            raise InvalidTransaction("Source and destination accounts must differ.")
+        concept_id = cmd.concept_id or uuid4()
+        recorded_at = datetime.now(timezone.utc)
+        month_start = cmd.transaction_date.replace(day=1)
+        source_amount = -cmd.amount_minor
+        destination_amount = cmd.amount_minor
+
+        conn.execute("BEGIN")
+        try:
+            source_row = self._fetch_account(conn, cmd.source_account_id)
+            destination_row = self._fetch_account(conn, cmd.destination_account_id)
+            category_row = self._fetch_category(conn, cmd.category_id)
+
+            budget_leg_id = uuid4()
+            transfer_leg_id = uuid4()
+
+            self._insert_transaction_row(
+                conn=conn,
+                transaction_version_id=budget_leg_id,
+                concept_id=concept_id,
+                account_id=cmd.source_account_id,
+                category_id=cmd.category_id,
+                transaction_date=cmd.transaction_date,
+                amount_minor=source_amount,
+                memo=cmd.memo,
+                recorded_at=recorded_at,
+            )
+            update_account_sql = load_sql("update_account_balance.sql")
+            conn.execute(
+                update_account_sql,
+                [source_amount, source_amount, cmd.source_account_id],
+            )
+
+            self._insert_transaction_row(
+                conn=conn,
+                transaction_version_id=transfer_leg_id,
+                concept_id=concept_id,
+                account_id=cmd.destination_account_id,
+                category_id=self.TRANSFER_CATEGORY_ID,
+                transaction_date=cmd.transaction_date,
+                amount_minor=destination_amount,
+                memo=cmd.memo,
+                recorded_at=recorded_at,
+            )
+            conn.execute(
+                update_account_sql,
+                [destination_amount, destination_amount, cmd.destination_account_id],
+            )
+
+            upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
+            activity_delta = -source_amount
+            conn.execute(
+                upsert_category_sql,
+                [cmd.category_id, month_start, activity_delta, activity_delta],
+            )
+
+            source_state = self._account_state_from_row(self._fetch_account(conn, cmd.source_account_id))
+            destination_state = self._account_state_from_row(self._fetch_account(conn, cmd.destination_account_id))
+            category_state = self._fetch_category_month_state(conn, cmd.category_id, month_start)
+
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+        return CategorizedTransferResponse(
+            concept_id=concept_id,
+            budget_leg=CategorizedTransferLeg(
+                transaction_version_id=budget_leg_id,
+                account=source_state,
+            ),
+            transfer_leg=CategorizedTransferLeg(
+                transaction_version_id=transfer_leg_id,
+                account=destination_state,
+            ),
+            category=category_state,
+        )
+
+    def ready_to_assign(self, conn: duckdb.DuckDBPyConnection, month_start: date) -> int:
+        sql = load_sql("select_ready_to_assign.sql")
+        row = conn.execute(sql, [month_start]).fetchone()
+        if row is None:
+            return 0
+        return int(row[0])
+
     def list_recent(
         self,
         conn: duckdb.DuckDBPyConnection,
@@ -142,10 +235,46 @@ class TransactionEntryService:
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
             )
 
+    def _validate_transfer_payload(self, cmd: CategorizedTransferRequest) -> None:
+        future_delta = (cmd.transaction_date - date.today()).days
+        if future_delta > self.MAX_FUTURE_DAYS:
+            raise InvalidTransaction(
+                f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
+            )
+
+    def _insert_transaction_row(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        transaction_version_id: UUID,
+        concept_id: UUID,
+        account_id: str,
+        category_id: str,
+        transaction_date: date,
+        amount_minor: int,
+        memo: Optional[str],
+        recorded_at: datetime,
+    ) -> None:
+        insert_sql = load_sql("insert_transaction.sql")
+        conn.execute(
+            insert_sql,
+            [
+                str(transaction_version_id),
+                str(concept_id),
+                account_id,
+                category_id,
+                transaction_date,
+                amount_minor,
+                memo,
+                recorded_at,
+                recorded_at,
+                self.SOURCE,
+            ],
+        )
+
     def _fetch_account(self, conn: duckdb.DuckDBPyConnection, account_id: str) -> Tuple[Any, ...]:
         sql = load_sql("select_active_account.sql")
         row = conn.execute(sql, [account_id]).fetchone()
-        if row is None or not row[5]:
+        if row is None or not row[7]:
             raise UnknownAccount(f"Account `{account_id}` is not active.")
         return row
 
@@ -153,7 +282,10 @@ class TransactionEntryService:
         return AccountState(
             account_id=row[0],
             name=row[1],
-            current_balance_minor=int(row[3]),
+            account_type=row[2],
+            account_class=row[3],
+            account_role=row[4],
+            current_balance_minor=int(row[5]),
         )
 
     def _fetch_category(self, conn: duckdb.DuckDBPyConnection, category_id: str) -> Tuple[Any, ...]:
@@ -173,11 +305,17 @@ class TransactionEntryService:
         row = conn.execute(sql, [month_start, category_id]).fetchone()
         if row is None:
             # Should not happen because category existence validated.
-            return CategoryState(category_id=category_id, name="Unknown", available_minor=0)
+            return CategoryState(
+                category_id=category_id,
+                name="Unknown",
+                available_minor=0,
+                activity_minor=0,
+            )
         return CategoryState(
             category_id=row[0],
             name=row[1],
             available_minor=int(row[2]),
+            activity_minor=int(row[3]),
         )
 
 
@@ -207,6 +345,8 @@ class AccountAdminService:
                     payload.account_id,
                     payload.name,
                     payload.account_type,
+                    payload.account_class,
+                    payload.account_role,
                     payload.current_balance_minor,
                     currency,
                     payload.is_active,
@@ -235,6 +375,8 @@ class AccountAdminService:
                 [
                     payload.name,
                     payload.account_type,
+                    payload.account_class,
+                    payload.account_role,
                     payload.current_balance_minor,
                     currency,
                     payload.opened_on,
@@ -276,12 +418,14 @@ class AccountAdminService:
             account_id=row[0],
             name=row[1],
             account_type=row[2],
-            current_balance_minor=int(row[3]),
-            currency=row[4],
-            is_active=bool(row[5]),
-            opened_on=row[6],
-            created_at=row[7],
-            updated_at=row[8],
+            account_class=row[3],
+            account_role=row[4],
+            current_balance_minor=int(row[5]),
+            currency=row[6],
+            is_active=bool(row[7]),
+            opened_on=row[8],
+            created_at=row[9],
+            updated_at=row[10],
         )
 
 

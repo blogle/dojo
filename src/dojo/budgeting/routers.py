@@ -1,5 +1,7 @@
 """Budgeting API routers."""
 
+from datetime import date
+from decimal import Decimal
 from typing import Type, TypeVar
 
 import duckdb
@@ -21,7 +23,10 @@ from dojo.budgeting.schemas import (
     BudgetCategoryDetail,
     BudgetCategoryUpdateRequest,
     CategoryState,
+    CategorizedTransferRequest,
+    CategorizedTransferResponse,
     NewTransactionRequest,
+    ReadyToAssignResponse,
     ReferenceDataResponse,
     TransactionListItem,
     TransactionResponse,
@@ -110,17 +115,48 @@ def get_reference_data(conn: duckdb.DuckDBPyConnection = Depends(connection_dep)
     account_rows = conn.execute(accounts_sql).fetchall()
     category_rows = conn.execute(categories_sql).fetchall()
     accounts = [
-        AccountState(account_id=row[0], name=row[1], current_balance_minor=int(row[2]))
+        AccountState(
+            account_id=row[0],
+            name=row[1],
+            account_type=row[2],
+            account_class=row[3],
+            account_role=row[4],
+            current_balance_minor=int(row[5]),
+        )
         for row in account_rows
     ]
     # Category reference uses available = 0 until monthly state exists.
     categories = [
-        CategoryState(category_id=row[0], name=row[1], available_minor=0) for row in category_rows
+        CategoryState(
+            category_id=row[0],
+            name=row[1],
+            available_minor=0,
+            activity_minor=0,
+        )
+        for row in category_rows
     ]
     return ReferenceDataResponse(
         accounts=accounts,
         categories=categories,
     )
+
+
+@router.post(
+    "/transfers",
+    response_model=CategorizedTransferResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_transfer(
+    payload: CategorizedTransferRequest,
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: TransactionEntryService = Depends(transaction_service_dep),
+) -> CategorizedTransferResponse:
+    """Perform a categorized transfer consisting of budgeted and transfer legs."""
+
+    try:
+        return service.transfer(conn, payload)
+    except BudgetingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/accounts", response_model=list[AccountDetail])
@@ -231,3 +267,21 @@ def deactivate_category(
     except BudgetingError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/budget/ready-to-assign", response_model=ReadyToAssignResponse)
+def ready_to_assign(
+    month: date | None = Query(None, description="Month start (YYYY-MM-01)."),
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: TransactionEntryService = Depends(transaction_service_dep),
+) -> ReadyToAssignResponse:
+    """Return the Ready to Assign amount for the given month."""
+
+    if month is None:
+        month = date.today().replace(day=1)
+    ready_minor = service.ready_to_assign(conn, month)
+    return ReadyToAssignResponse(
+        month_start=month,
+        ready_to_assign_minor=ready_minor,
+        ready_to_assign_decimal=Decimal(ready_minor).scaleb(-2).quantize(Decimal("0.01")),
+    )

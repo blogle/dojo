@@ -2,6 +2,8 @@ INSERT INTO accounts (
     account_id,
     name,
     account_type,
+    account_class,
+    account_role,
     current_balance_minor,
     currency,
     is_active,
@@ -9,4 +11,4 @@ INSERT INTO accounts (
     created_at,
     updated_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

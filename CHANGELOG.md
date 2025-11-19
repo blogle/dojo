@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit + property tests covering transaction invariants and net worth aggregation.
 - Cypress-based e2e suite (config + docs) that drives the SPA transaction flow via `npx cypress run --e2e --browser <browser> [--headed]` from an activated dev shell.
 - Account and budget management APIs plus SPA pages to create, edit, and deactivate accounts and categories with new Cypress coverage.
+- Account classes/roles, SCD detail tables, and special categories plus a categorized-transfer API, Ready to Assign query/route, and tangibles valuation table that feed the net worth snapshot (ledger + positions + tangibles) along with unit tests for transfers, RTA, and net worth.
+- SPA updates that drive the Assets & Liabilities page from the backend, show net worth and Ready to Assign stats, group cards by account class with role icons, surface an account detail modal, and convert the Add Account modal into a real POST flow with sensible defaults.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.

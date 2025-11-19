@@ -12,40 +12,103 @@ const selectors = {
   assetsTotal: "#assets-total",
   liabilitiesTotal: "#liabilities-total",
   netWorth: "#net-worth",
+  readyToAssign: "#ready-to-assign",
   accountGroups: "#account-groups",
   addAccountButton: "[data-add-account-button]",
   accountModal: "#account-modal",
+  accountModalLabel: "[data-modal-label]",
+  accountModalTitle: "[data-modal-title]",
+  accountModalSubtitle: "[data-modal-subtitle]",
+  accountModalMetadata: "[data-modal-metadata]",
+  accountModalBalance: "[data-modal-balance]",
   modalClose: "[data-close-modal]",
   accountSectionLink: "[data-account-section]",
+  modalAddButton: "[data-add-account-submit]",
+  modalTypeSelect: "[name=type]",
+  modalNameInput: "[name=name]",
+  modalBalanceInput: "[name=balance]",
+};
+
+const accountGroupDefinitions = [
+  {
+    id: "cash",
+    title: "Cash & Checking",
+    type: "asset",
+    description: "Everyday banking and liquid cash.",
+  },
+  {
+    id: "accessible",
+    title: "Accessible Assets",
+    type: "asset",
+    description: "Short-term deposits and cash equivalents.",
+  },
+  {
+    id: "investment",
+    title: "Investments",
+    type: "asset",
+    description: "Brokerage, retirement, and long-term holdings.",
+  },
+  {
+    id: "credit",
+    title: "Credit & Borrowing",
+    type: "liability",
+    description: "Credit cards, lines of credit, and short-duration loans.",
+  },
+  {
+    id: "loan",
+    title: "Loans & Mortgages",
+    type: "liability",
+    description: "Mortgages, auto loans, and other long-term debt.",
+  },
+  {
+    id: "tangible",
+    title: "Tangibles",
+    type: "asset",
+    description: "Appraised property, vehicles, and collectables.",
+  },
+];
+
+const accountTypeMapping = {
+  checking: { account_type: "asset", account_class: "cash", account_role: "on_budget" },
+  credit: { account_type: "liability", account_class: "credit", account_role: "on_budget" },
+  brokerage: { account_type: "asset", account_class: "investment", account_role: "tracking" },
+  loan: { account_type: "liability", account_class: "loan", account_role: "tracking" },
+  asset: { account_type: "asset", account_class: "tangible", account_role: "tracking" },
 };
 
 const state = {
   transactions: [],
   accountFilter: "all",
+  accounts: [],
+  netWorth: null,
+  readyToAssign: null,
 };
 
-const fetchJSON = async (url, options) => {
+const fetchJSON = async (url, options = {}) => {
   const response = await fetch(url, options);
+  if (!response.ok) {
+    const text = await response.text();
+    let message = `Request failed: ${response.status}`;
+    try {
+      const payload = JSON.parse(text);
+      message = payload.detail || payload.error || message;
+    } catch {
+      if (text) {
+        message = text;
+      }
+    }
+    throw new Error(message);
+  }
+
   if (response.status === 204) {
     return null;
   }
+
   const text = await response.text();
   if (!text) {
     return null;
   }
-  try {
-    const data = JSON.parse(text);
-    if (!response.ok) {
-      const error = new Error(data?.detail ?? "Request failed");
-      error.status = response.status;
-      error.payload = data;
-      throw error;
-    }
-    return data;
-  } catch (error) {
-    console.error("Failed to parse JSON:", text);
-    throw new Error("Server returned non-JSON response");
-  }
+  return JSON.parse(text);
 };
 
 const formatAmount = (minor) => currencyFormatter.format(minor / 100);
@@ -56,38 +119,6 @@ const getTransactionStatus = (transactionDate) => {
   const diffTime = Math.abs(today - txDate);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays > 3 ? "Settled" : "Pending";
-};
-
-const renderTransactions = (bodyEl, transactions) => {
-  bodyEl.innerHTML = "";
-  if (!Array.isArray(transactions) || !transactions.length) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 6;
-    cell.className = "muted";
-    cell.style.textAlign = "center";
-    cell.textContent = "No transactions found.";
-    row.appendChild(cell);
-    bodyEl.appendChild(row);
-    return;
-  }
-
-  transactions.forEach((tx) => {
-    if (!tx) return; // Skip if transaction is null or undefined
-    const row = document.createElement("tr");
-    const status = getTransactionStatus(tx.transaction_date);
-    const statusClass = status === "Settled" ? "status-settled" : "status-pending";
-
-    row.innerHTML = `
-      <td>${tx.transaction_date || "N/A"}</td>
-      <td>${tx.account_name || "N/A"}</td>
-      <td>${tx.category_name || "N/A"}</td>
-      <td>${tx.memo || "—"}</td>
-      <td class="${statusClass}">${status}</td>
-      <td class="amount-cell">${formatAmount(tx.amount_minor || 0)}</td>
-    `;
-    bodyEl.appendChild(row);
-  });
 };
 
 const computeCurrentMonthSpend = (transactions) => {
@@ -123,11 +154,10 @@ const updateHeaderStats = () => {
     spendEl.textContent = formatAmount(computeCurrentMonthSpend(state.transactions));
   }
 
-  // Mock "Last Reconcile Date"
   const reconcileEl = document.querySelector(selectors.lastReconcileDate);
   if (reconcileEl) {
     const today = new Date();
-    today.setDate(today.getDate() - 1); // Yesterday
+    today.setDate(today.getDate() - 1);
     reconcileEl.textContent = today.toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",
@@ -136,9 +166,39 @@ const updateHeaderStats = () => {
   }
 };
 
+const renderTransactions = (bodyEl, transactions) => {
+  bodyEl.innerHTML = "";
+  if (!Array.isArray(transactions) || !transactions.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.className = "muted";
+    cell.style.textAlign = "center";
+    cell.textContent = "No transactions found.";
+    row.appendChild(cell);
+    bodyEl.appendChild(row);
+    return;
+  }
+
+  transactions.forEach((tx) => {
+    if (!tx) return;
+    const row = document.createElement("tr");
+    const status = getTransactionStatus(tx.transaction_date);
+    const statusClass = status === "Settled" ? "status-settled" : "status-pending";
+    row.innerHTML = `
+      <td>${tx.transaction_date || "N/A"}</td>
+      <td>${tx.account_name || "N/A"}</td>
+      <td>${tx.category_name || "N/A"}</td>
+      <td>${tx.memo || "—"}</td>
+      <td class="${statusClass}">${status}</td>
+      <td class="amount-cell">${formatAmount(tx.amount_minor || 0)}</td>
+    `;
+    bodyEl.appendChild(row);
+  });
+};
+
 const refreshTransactions = async (bodyEl) => {
   const data = await fetchJSON("/api/transactions?limit=100");
-  // Sort by date descending
   state.transactions = (data || []).sort((a, b) => {
     const dateA = a.transaction_date ? new Date(a.transaction_date) : 0;
     const dateB = b.transaction_date ? new Date(b.transaction_date) : 0;
@@ -148,102 +208,69 @@ const refreshTransactions = async (bodyEl) => {
   updateHeaderStats();
 };
 
-const accountGroupsData = [
-  {
-    id: "cash",
-    title: "Cash & Checking",
-    type: "asset",
-    description: "Everyday banking and liquid cash.",
-    accounts: [
-      { name: "Main Checking", institution: "Northwind Bank", balance_minor: 542_000 },
-      { name: "Backup Savings", institution: "Tidal Savings", balance_minor: 128_450 },
-    ],
-  },
-  {
-    id: "short-term",
-    title: "Accessible Assets",
-    type: "asset",
-    description: "Short-term deposits and cash equivalents.",
-    accounts: [
-      {
-        name: "Money Market",
-        institution: "Atlas Capital",
-        balance_minor: 89_320,
-      },
-      {
-        name: "High Yield CD",
-        institution: "Brightline Credit",
-        balance_minor: 41_200,
-      },
-    ],
-  },
-  {
-    id: "investment",
-    title: "Investments",
-    type: "asset",
-    description: "Brokerage, retirement accounts, and other holdings.",
-    accounts: [
-      {
-        name: "Core Brokerage",
-        institution: "Northwind Investments",
-        balance_minor: 185_670,
-      },
-      {
-        name: "IRA",
-        institution: "Northwind Investments",
-        balance_minor: 139_890,
-      },
-    ],
-  },
-  {
-    id: "borrowing",
-    title: "Credit & Borrowing",
-    type: "liability",
-    description: "Lines of credit, cards, and short-term loans.",
-    accounts: [
-      {
-        name: "Visa Rewards",
-        institution: "Orbital Credit Union",
-        balance_minor: 8_240,
-      },
-      {
-        name: "Business Card",
-        institution: "Axis Trust",
-        balance_minor: 15_750,
-      },
-    ],
-  },
-  {
-    id: "long-term",
-    title: "Long-Term Borrowing",
-    type: "liability",
-    description: "Mortgages, student loans, and other long-duration debt.",
-    accounts: [
-      {
-        name: "Mortgage",
-        institution: "Atlas Home Loans",
-        balance_minor: 355_420,
-      },
-      {
-        name: "Student Loan",
-        institution: "Lumen Education",
-        balance_minor: 23_750,
-      },
-    ],
-  },
-];
+const fetchAccounts = async () => {
+  const accounts = await fetchJSON("/api/accounts");
+  state.accounts = (accounts || []).filter((acct) => acct.is_active);
+};
 
-const formatAccountBalance = (minor, type) => {
-  const value = type === "liability" ? -Math.abs(minor) : minor;
-  return formatAmount(value);
+const fetchNetWorth = async () => {
+  state.netWorth = await fetchJSON("/api/net-worth/current");
+};
+
+const fetchReadyToAssign = async () => {
+  state.readyToAssign = await fetchJSON("/api/budget/ready-to-assign");
+};
+
+const updateAccountStats = () => {
+  const assetsEl = document.querySelector(selectors.assetsTotal);
+  const liabilitiesEl = document.querySelector(selectors.liabilitiesTotal);
+  const netWorthEl = document.querySelector(selectors.netWorth);
+  const readyEl = document.querySelector(selectors.readyToAssign);
+
+  if (state.netWorth) {
+    if (assetsEl) {
+      assetsEl.textContent = formatAmount(state.netWorth.assets_minor);
+    }
+    if (liabilitiesEl) {
+      liabilitiesEl.textContent = formatAmount(-state.netWorth.liabilities_minor);
+    }
+    if (netWorthEl) {
+      netWorthEl.textContent = formatAmount(state.netWorth.net_worth_minor);
+    }
+  }
+
+  if (readyEl) {
+    if (state.readyToAssign) {
+      readyEl.textContent = formatAmount(state.readyToAssign.ready_to_assign_minor);
+    } else {
+      readyEl.textContent = "—";
+    }
+  }
+};
+
+const slugify = (value) => {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const trimmed = normalized.replace(/^_+|_+$/g, "");
+  return `${trimmed || "account"}_${Date.now().toString(36)}`;
+};
+
+const groupAccounts = () => {
+  return accountGroupDefinitions.map((group) => ({
+    ...group,
+    accounts: state.accounts.filter((account) => account.account_class === group.id),
+  }));
 };
 
 const getFilteredGroups = () => {
-  if (state.accountFilter === "all") {
-    return accountGroupsData;
-  }
-  return accountGroupsData.filter((group) => group.type === state.accountFilter);
+  const groups = groupAccounts();
+  const scope =
+    state.accountFilter === "all"
+      ? groups
+      : groups.filter((group) => (state.accountFilter === "assets" ? group.type === "asset" : group.type === "liability"));
+  return scope.filter((group) => group.accounts.length > 0);
 };
+
+const formatRoleLabel = (role) => (role === "on_budget" ? "On-budget" : "Tracking");
 
 const renderAccountGroups = () => {
   const container = document.querySelector(selectors.accountGroups);
@@ -252,9 +279,38 @@ const renderAccountGroups = () => {
   }
 
   const groups = getFilteredGroups();
+  if (!groups.length) {
+    container.innerHTML = "<p class=\"muted\">No accounts available.</p>";
+    return;
+  }
+
   container.innerHTML = groups
-    .map(
-      (group) => `
+    .map((group) => {
+      const cards = group.accounts
+        .map(
+          (account) => `
+            <div class="account-card" data-account-id="${account.account_id}">
+              <div class="account-card__header">
+                <div class="account-card__title">
+                  <span class="account-card__name">${account.name}</span>
+                  <span class="account-card__role-icon" data-role="${account.account_role}" aria-label="${formatRoleLabel(
+                    account.account_role
+                  )}"></span>
+                </div>
+                <span class="account-card__balance">${formatAmount(
+                  account.account_type === "liability" ? -account.current_balance_minor : account.current_balance_minor
+                )}</span>
+              </div>
+              <div class="account-card__meta">
+                <span>${account.account_class.replace(/_/g, " ")}</span>
+                <span>${account.account_type === "asset" ? "Asset" : "Liability"}</span>
+              </div>
+            </div>
+          `
+        )
+        .join("");
+
+      return `
         <article class="account-group">
           <header class="account-group__header">
             <div>
@@ -264,66 +320,134 @@ const renderAccountGroups = () => {
             <span class="muted">${group.accounts.length} account${group.accounts.length === 1 ? "" : "s"}</span>
           </header>
           <div class="account-cards">
-            ${group.accounts
-              .map(
-                (account) => `
-                  <div class="account-card">
-                    <div class="account-card__header">
-                      <span class="account-card__name">${account.name}</span>
-                      <span class="account-card__balance">${formatAccountBalance(
-                        account.balance_minor,
-                        group.type
-                      )}</span>
-                    </div>
-                    <div class="account-card__meta">
-                      <span>${account.institution}</span>
-                      <span>${group.type === "asset" ? "Asset" : "Liability"}</span>
-                    </div>
-                  </div>
-                `
-              )
-              .join("")}
+            ${cards || `<p class=\"muted\">No accounts in this section yet.</p>`}
           </div>
         </article>
-      `
-    )
+      `;
+    })
     .join("");
+
+  container
+    .querySelectorAll(".account-card")
+    .forEach((card) => {
+      card.addEventListener("click", () => {
+        const accountId = card.getAttribute("data-account-id");
+        const account = state.accounts.find((acc) => acc.account_id === accountId);
+        if (account) {
+          showAccountDetail(account);
+        }
+      });
+    });
 };
 
-const updateAccountStats = () => {
-  const assetsEl = document.querySelector(selectors.assetsTotal);
-  const liabilitiesEl = document.querySelector(selectors.liabilitiesTotal);
-  const netWorthEl = document.querySelector(selectors.netWorth);
-  if (!assetsEl || !liabilitiesEl || !netWorthEl) {
+const modalOverlay = document.querySelector(selectors.accountModal);
+const modalElement = modalOverlay?.querySelector(".modal");
+const modalTitle = document.querySelector(selectors.accountModalTitle);
+const modalLabel = document.querySelector(selectors.accountModalLabel);
+const modalSubtitle = document.querySelector(selectors.accountModalSubtitle);
+const modalMetadata = document.querySelector(selectors.accountModalMetadata);
+const modalBalance = document.querySelector(selectors.accountModalBalance);
+
+const setModalView = (view) => {
+  if (!modalOverlay) return;
+  modalOverlay.dataset.view = view;
+  if (modalElement) {
+    modalElement.dataset.view = view;
+  }
+};
+
+const toggleAccountModal = (show, view = "add") => {
+  if (!modalOverlay) return;
+  modalOverlay.classList.toggle("is-visible", show);
+  modalOverlay.style.display = show ? "flex" : "none";
+  modalOverlay.setAttribute("aria-hidden", show ? "false" : "true");
+  setModalView(show ? view : modalOverlay.dataset.view || "add");
+};
+
+const showAccountDetail = (account) => {
+  modalLabel.textContent = "Account detail";
+  modalTitle.textContent = account.name;
+  modalSubtitle.textContent = `ID • ${account.account_id}`;
+  if (modalBalance) {
+    modalBalance.textContent = formatAmount(account.current_balance_minor);
+  }
+  if (modalMetadata) {
+    modalMetadata.innerHTML = `
+      <li><strong>Type</strong><span>${account.account_type === "asset" ? "Asset" : "Liability"}</span></li>
+      <li><strong>Class</strong><span>${account.account_class.replace(/_/g, " ")}</span></li>
+      <li><strong>Role</strong><span>${formatRoleLabel(account.account_role)}</span></li>
+    `;
+  }
+  toggleAccountModal(true, "detail");
+};
+
+const showAddAccountModal = () => {
+  modalLabel.textContent = "Add account";
+  modalTitle.textContent = "Follow the guided steps";
+  modalSubtitle.textContent = "Create a new asset or liability";
+  toggleAccountModal(true, "add");
+};
+
+const handleAddAccount = async () => {
+  const formData = {};
+  const nameInput = document.querySelector(selectors.modalNameInput);
+  const balanceInput = document.querySelector(selectors.modalBalanceInput);
+  const typeSelect = document.querySelector(selectors.modalTypeSelect);
+
+  if (!nameInput || !balanceInput || !typeSelect) return;
+
+  const name = nameInput.value.trim();
+  if (!name) {
+    alert("Please provide an account name.");
     return;
   }
 
-  const totals = accountGroupsData.reduce(
-    (acc, group) => {
-      const sum = group.accounts.reduce((grp, account) => grp + account.balance_minor, 0);
-      if (group.type === "asset") {
-        acc.assets += sum;
-      } else {
-        acc.liabilities += sum;
-      }
-      return acc;
-    },
-    { assets: 0, liabilities: 0 }
-  );
-
-  const netWorth = totals.assets - totals.liabilities;
-  assetsEl.textContent = formatAmount(totals.assets);
-  liabilitiesEl.textContent = formatAmount(-totals.liabilities);
-  netWorthEl.textContent = formatAmount(netWorth);
-};
-
-const accountModalElement = document.querySelector(selectors.accountModal);
-const toggleAccountModal = (show) => {
-  if (!accountModalElement) {
+  const mapping = accountTypeMapping[typeSelect.value];
+  if (!mapping) {
+    alert("Please choose a valid account type.");
     return;
   }
-  accountModalElement.classList.toggle("is-visible", show);
-  accountModalElement.setAttribute("aria-hidden", show ? "false" : "true");
+
+  const parsedBalance = Number.parseFloat(balanceInput.value) || 0;
+  const balanceMinor = Math.round(parsedBalance * 100);
+  const accountId = slugify(name);
+
+  const payload = {
+    account_id: accountId,
+    name,
+    account_type: mapping.account_type,
+    account_class: mapping.account_class,
+    account_role: mapping.account_role,
+    current_balance_minor: balanceMinor,
+    currency: "USD",
+  };
+
+  try {
+    await fetchJSON("/api/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    nameInput.value = "";
+    balanceInput.value = "";
+    toggleAccountModal(false);
+    await refreshAccountsPage();
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Failed to create account.");
+  }
+};
+
+const refreshAccountsPage = async () => {
+  try {
+    await fetchAccounts();
+    await fetchNetWorth();
+    await fetchReadyToAssign();
+    updateAccountStats();
+    renderAccountGroups();
+  } catch (error) {
+    console.error("Failed to refresh account data", error);
+  }
 };
 
 const init = async () => {
@@ -390,7 +514,7 @@ const init = async () => {
 
   const addAccountBtn = document.querySelector(selectors.addAccountButton);
   if (addAccountBtn) {
-    addAccountBtn.addEventListener("click", () => toggleAccountModal(true));
+    addAccountBtn.addEventListener("click", () => showAddAccountModal());
   }
 
   const modalClose = document.querySelector(selectors.modalClose);
@@ -398,16 +522,35 @@ const init = async () => {
     modalClose.addEventListener("click", () => toggleAccountModal(false));
   }
 
-  if (accountModalElement) {
-    accountModalElement.addEventListener("click", (event) => {
-      if (event.target === accountModalElement) {
+  if (modalOverlay) {
+    modalOverlay.addEventListener("click", (event) => {
+      if (event.target === modalOverlay) {
         toggleAccountModal(false);
       }
     });
   }
 
-  renderAccountGroups();
-  updateAccountStats();
+  const modalSubmit = document.querySelector(selectors.modalAddButton);
+  if (modalSubmit) {
+    modalSubmit.addEventListener("click", async () => {
+      await handleAddAccount();
+    });
+  }
+
+  const addFormType = document.querySelector(selectors.modalTypeSelect);
+  if (addFormType) {
+    addFormType.addEventListener("change", () => {
+      const mapping = accountTypeMapping[addFormType.value];
+      const subtitle = document.querySelector("[data-modal-type-hint]");
+      if (subtitle) {
+        subtitle.textContent = mapping
+          ? `${mapping.account_class.replace(/_/g, " ")} · ${mapping.account_role === "on_budget" ? "On-budget" : "Tracking"}`
+          : "";
+      }
+    });
+  }
+
+  await refreshAccountsPage();
 };
 
 document.addEventListener("DOMContentLoaded", init);

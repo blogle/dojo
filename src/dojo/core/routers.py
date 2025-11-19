@@ -26,6 +26,7 @@ def net_worth_current(conn: duckdb.DuckDBPyConnection = Depends(connection_dep))
         assets_minor=snapshot.assets_minor,
         liabilities_minor=snapshot.liabilities_minor,
         positions_minor=snapshot.positions_minor,
+        tangibles_minor=snapshot.tangibles_minor,
         net_worth_minor=snapshot.net_worth_minor,
         net_worth_decimal=snapshot.net_worth_decimal,
     )

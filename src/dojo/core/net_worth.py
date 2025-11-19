@@ -17,6 +17,7 @@ class NetWorthSnapshot:
     assets_minor: int
     liabilities_minor: int
     positions_minor: int
+    tangibles_minor: int
     net_worth_minor: int
 
     @property
@@ -31,10 +32,11 @@ def current_snapshot(conn: duckdb.DuckDBPyConnection) -> NetWorthSnapshot:
     row = conn.execute(sql).fetchone()
     if row is None:
         return NetWorthSnapshot(0, 0, 0, 0)
-    assets, liabilities, positions, net_worth = row
+    assets, liabilities, positions, tangibles, net_worth = row
     return NetWorthSnapshot(
         assets_minor=int(assets),
         liabilities_minor=int(liabilities),
         positions_minor=int(positions),
+        tangibles_minor=int(tangibles),
         net_worth_minor=int(net_worth),
     )

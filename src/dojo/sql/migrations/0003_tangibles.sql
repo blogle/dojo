@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS tangible_assets (
+    tangible_id UUID PRIMARY KEY,
+    account_id TEXT,
+    asset_name TEXT NOT NULL,
+    acquisition_cost_minor BIGINT NOT NULL DEFAULT 0,
+    current_fair_value_minor BIGINT NOT NULL DEFAULT 0,
+    valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    valid_to TIMESTAMP NOT NULL DEFAULT (TIMESTAMP '9999-12-31 00:00:00'),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+);

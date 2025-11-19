@@ -2,6 +2,8 @@ UPDATE accounts
 SET
     name = ?,
     account_type = ?,
+    account_class = ?,
+    account_role = ?,
     current_balance_minor = ?,
     currency = ?,
     opened_on = ?,

@@ -272,6 +272,7 @@ body {
 .account-cards {
   display: grid;
   gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .account-card {
@@ -285,6 +286,29 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.account-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.account-card__role-icon {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.account-card__role-icon[data-role="on_budget"] {
+  background: var(--text);
+}
+
+.account-card__role-icon[data-role="tracking"] {
+  background: transparent;
 }
 
 .account-card__name {
@@ -320,7 +344,9 @@ body {
 }
 
 .modal {
-  width: min(480px, 100%);
+  width: min(900px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
   background: var(--surface);
   border: var(--border-thick);
   padding: 1.5rem;
@@ -339,6 +365,85 @@ body {
   margin-top: 0.25rem;
 }
 
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.modal-detail,
+.modal-add {
+  display: none;
+}
+
+.modal[data-view="detail"] .modal-detail,
+.modal-overlay[data-view="detail"] .modal-detail {
+  display: block;
+}
+
+.modal[data-view="detail"] .modal-add,
+.modal-overlay[data-view="detail"] .modal-add {
+  display: none;
+}
+
+.modal[data-view="add"] .modal-add,
+.modal-overlay[data-view="add"] .modal-add {
+  display: block;
+}
+
+
+
+.modal-detail__balance {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.modal-detail__metadata {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.modal-detail__metadata li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  border-bottom: var(--border-thick);
+  padding-bottom: 0.35rem;
+}
+
+.role-legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.role-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.role-icon {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.role-icon[data-role=\"on_budget\"] {
+  background: var(--text);
+}
+
+.role-icon[data-role=\"tracking\"] {
+  background: transparent;
+}
 .modal-steps {
   display: flex;
   flex-direction: column;
