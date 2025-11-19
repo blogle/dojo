@@ -204,7 +204,35 @@ class BudgetCategoryCommand(BaseModel):
     """Shared fields for budget category mutations."""
 
     name: str = Field(min_length=1, max_length=120)
+    group_id: Optional[str] = Field(default=None, description="Parent category group ID.")
     is_active: bool = Field(default=True)
+
+
+class BudgetCategoryGroupCommand(BaseModel):
+    """Shared fields for budget category group mutations."""
+
+    name: str = Field(min_length=1, max_length=120)
+    sort_order: int = Field(default=0)
+    is_active: bool = Field(default=True)
+
+
+class BudgetCategoryGroupCreateRequest(BudgetCategoryGroupCommand):
+    """Payload for creating a new category group."""
+
+    group_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the group.")
+
+
+class BudgetCategoryGroupUpdateRequest(BudgetCategoryGroupCommand):
+    """Payload for editing an existing category group."""
+
+
+class BudgetCategoryGroupDetail(BudgetCategoryGroupCommand):
+    """Serialized category group data."""
+
+    group_id: str
+    created_at: datetime
+    updated_at: datetime
+
 
 
 class BudgetCategoryCreateRequest(BudgetCategoryCommand):
@@ -221,6 +249,7 @@ class BudgetCategoryDetail(BudgetCategoryCommand):
     """Serialized budget category data for the admin UI."""
 
     category_id: str
+    group_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     available_minor: int = Field(default=0, description="Current available funds for the month in minor units.")

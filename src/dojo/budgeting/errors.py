@@ -31,3 +31,11 @@ class CategoryAlreadyExists(BudgetingError):
 
 class CategoryNotFound(BudgetingError):
     """Raised when the requested budget category cannot be located."""
+
+
+class GroupAlreadyExists(BudgetingError):
+    """Raised when attempting to create a category group with a duplicate identifier."""
+
+
+class GroupNotFound(BudgetingError):
+    """Raised when the requested category group cannot be located."""

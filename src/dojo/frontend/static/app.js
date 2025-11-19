@@ -62,6 +62,13 @@ const selectors = {
   categoryForm: "[data-category-form]",
   categorySubmit: "[data-category-submit]",
   categoryModalClose: "[data-close-category-modal]",
+  categoryGroupSelect: "[data-category-group]",
+  groupModal: "#group-modal",
+  groupModalTitle: "[data-group-modal-title]",
+  groupForm: "[data-group-form]",
+  groupSubmit: "[data-group-submit]",
+  groupError: "[data-group-error]",
+  groupModalClose: "[data-close-group-modal]",
   toastStack: "#toast-stack",
 };
 
@@ -124,6 +131,7 @@ const state = {
   },
   budgets: {
     categories: [],
+    groups: [],
     readyToAssignMinor: 0,
     activityMinor: 0,
     availableMinor: 0,
@@ -968,8 +976,9 @@ const refreshAccountsPage = async () => {
 const loadBudgetsData = async () => {
   const month = currentMonthStartISO();
   try {
-    const [categories, ready] = await Promise.all([
+    const [categories, groups, ready] = await Promise.all([
       fetchJSON(`/api/budget-categories?month=${month}`),
+      fetchJSON("/api/budget-category-groups"),
       fetchJSON(`/api/budget/ready-to-assign?month=${month}`),
     ]);
     state.budgets.categories = (categories || []).map((category) => ({
@@ -978,6 +987,7 @@ const loadBudgetsData = async () => {
       activity_minor: category.activity_minor ?? 0,
       allocated_minor: category.allocated_minor ?? 0,
     }));
+    state.budgets.groups = (groups || []).sort((a, b) => a.sort_order - b.sort_order);
     state.budgets.readyToAssignMinor = ready?.ready_to_assign_minor ?? 0;
     state.budgets.activityMinor = state.budgets.categories.reduce((total, category) => total + (category.activity_minor ?? 0), 0);
     state.budgets.availableMinor = state.budgets.categories.reduce((total, category) => total + (category.available_minor ?? 0), 0);
@@ -1028,50 +1038,80 @@ const renderBudgetsPage = () => {
   if (monthLabelEl) {
     monthLabelEl.textContent = state.budgets.monthLabel || "—";
   }
-  const grid = document.querySelector(selectors.budgetsGrid);
-  if (!grid) {
+  const body = document.querySelector("#budgets-body");
+  if (!body) {
     return;
   }
-  if (!state.budgets.categories.length) {
-    grid.innerHTML = '<p class="muted">No categories found. Use “Add category” to get started.</p>';
-    return;
+  
+  const groups = state.budgets.groups;
+  const categories = state.budgets.categories;
+  const grouped = {};
+
+  groups.forEach((g) => (grouped[g.group_id] = { ...g, items: [] }));
+  grouped["uncategorized"] = { group_id: "uncategorized", name: "Uncategorized", items: [] };
+
+  categories.forEach((cat) => {
+    const gid = cat.group_id || "uncategorized";
+    if (!grouped[gid]) {
+      grouped[gid] = { group_id: gid, name: "Unknown Group", items: [] };
+    }
+    grouped[gid].items.push(cat);
+  });
+
+  body.innerHTML = "";
+
+  const renderGroup = (group) => {
+    if (group.group_id === "uncategorized" && group.items.length === 0) return;
+
+    const groupRow = document.createElement("tr");
+    groupRow.className = "group-row";
+    groupRow.innerHTML = `
+      <td colspan="4" class="group-cell" style="background-color: var(--stone-50); font-weight: 600;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>${group.name}</span>
+          ${group.group_id !== "uncategorized" ? `<button class="secondary" data-edit-group="${group.group_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>` : ""}
+        </div>
+      </td>
+    `;
+    body.appendChild(groupRow);
+
+    group.items.forEach((cat) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>${cat.name}</span>
+            <button class="secondary" data-edit-category="${cat.category_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>
+          </div>
+        </td>
+        <td class="amount-cell">${formatBudgetDisplay(cat.allocated_minor)}</td>
+        <td class="amount-cell">${formatBudgetDisplay(cat.activity_minor)}</td>
+        <td class="amount-cell">
+          <span class="${cat.available_minor < 0 ? "form-error" : ""}">${formatBudgetDisplay(cat.available_minor)}</span>
+        </td>
+      `;
+      body.appendChild(row);
+    });
+  };
+
+  groups.forEach((g) => renderGroup(grouped[g.group_id]));
+  if (grouped["uncategorized"].items.length > 0) {
+    renderGroup(grouped["uncategorized"]);
   }
-  grid.innerHTML = state.budgets.categories
-    .map(
-      (category) => `
-        <article class="budget-card" data-category-id="${category.category_id}">
-          <div class="budget-card__header">
-            <div>
-              <h3>${category.name}</h3>
-              <p class="muted small-note">${category.category_id}</p>
-            </div>
-            <div class="budget-card__actions">
-              <button type="button" class="secondary" data-action="allocate" data-category-id="${category.category_id}">Allocate</button>
-              <button type="button" class="secondary" data-action="rename" data-category-id="${category.category_id}">Rename</button>
-            </div>
-          </div>
-          <div class="budget-card__meta">
-            <span>Available: ${formatBudgetDisplay(category.available_minor ?? 0)}</span>
-            <span>Activity: ${formatBudgetDisplay(category.activity_minor ?? 0)}</span>
-          </div>
-        </article>
-      `
-    )
-    .join("");
-  grid.querySelectorAll('[data-action="allocate"]').forEach((button) => {
-    button.addEventListener("click", () => {
-      const categoryId = button.getAttribute("data-category-id");
-      state.forms.allocation.pendingToCategory = categoryId;
-      window.location.hash = "#/allocations";
+
+  body.querySelectorAll("[data-edit-group]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const gid = btn.dataset.editGroup;
+      const group = state.budgets.groups.find((g) => g.group_id === gid);
+      if (group) openGroupModal(group);
     });
   });
-  grid.querySelectorAll('[data-action="rename"]').forEach((button) => {
-    button.addEventListener("click", () => {
-      const categoryId = button.getAttribute("data-category-id");
-      const category = state.budgets.categories.find((cat) => cat.category_id === categoryId);
-      if (category) {
-        openCategoryModal(category);
-      }
+
+  body.querySelectorAll("[data-edit-category]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const cid = btn.dataset.editCategory;
+      const cat = state.budgets.categories.find((c) => c.category_id === cid);
+      if (cat) openCategoryModal(cat);
     });
   });
 };
@@ -1201,9 +1241,107 @@ const handleAllocationFormSubmit = async (event) => {
   }
 };
 
+const openGroupModal = (group = null) => {
+  const modal = document.querySelector(selectors.groupModal);
+  const title = document.querySelector(selectors.groupModalTitle);
+  const form = document.querySelector(selectors.groupForm);
+  const errorEl = document.querySelector(selectors.groupError);
+  if (!modal || !form) return;
+
+  state.pendingGroupEdit = group;
+  setFormError(errorEl, "");
+
+  const nameInput = form.querySelector("input[name='name']");
+  const sortInput = form.querySelector("input[name='sort_order']");
+
+  if (group) {
+    title.textContent = "Edit Group";
+    nameInput.value = group.name;
+    sortInput.value = group.sort_order;
+  } else {
+    title.textContent = "Add Group";
+    nameInput.value = "";
+    sortInput.value = 0;
+  }
+
+  modal.classList.add("is-visible");
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+  nameInput.focus();
+};
+
+const closeGroupModal = () => {
+  const modal = document.querySelector(selectors.groupModal);
+  if (!modal) return;
+  modal.classList.remove("is-visible");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+  state.pendingGroupEdit = null;
+};
+
+const handleGroupFormSubmit = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const name = formData.get("name").trim();
+  const sortOrder = parseInt(formData.get("sort_order"), 10) || 0;
+  const errorEl = document.querySelector(selectors.groupError);
+  const submitButton = document.querySelector(selectors.groupSubmit);
+
+  if (!name) {
+    setFormError(errorEl, "Name is required.");
+    return;
+  }
+
+  try {
+    setButtonBusy(submitButton, true);
+    setFormError(errorEl, "");
+    const isEditing = Boolean(state.pendingGroupEdit);
+
+    if (isEditing) {
+      await fetchJSON(`/api/budget-category-groups/${state.pendingGroupEdit.group_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, sort_order: sortOrder, is_active: true }),
+      });
+    } else {
+      const groupId = slugify(name);
+      await fetchJSON("/api/budget-category-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId, name, sort_order: sortOrder, is_active: true }),
+      });
+    }
+    closeGroupModal();
+    await loadBudgetsData();
+    renderBudgetsPage();
+    showToast(isEditing ? `Updated ${name}` : `Created ${name}`);
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Failed to save group.");
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
+};
+
+const initGroupModal = () => {
+  const modal = document.querySelector(selectors.groupModal);
+  if (!modal) return;
+  const form = document.querySelector(selectors.groupForm);
+  form?.addEventListener("submit", handleGroupFormSubmit);
+  const closeButton = document.querySelector(selectors.groupModalClose);
+  closeButton?.addEventListener("click", () => closeGroupModal());
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeGroupModal();
+  });
+};
+
 const initBudgetsInteractions = () => {
   const openModalButton = document.querySelector("[data-open-category-modal]");
   openModalButton?.addEventListener("click", () => openCategoryModal());
+
+  const openGroupButton = document.querySelector("[data-open-group-modal]");
+  openGroupButton?.addEventListener("click", () => openGroupModal());
 };
 
 const initAllocationsPage = () => {
@@ -1404,6 +1542,7 @@ const openCategoryModal = (category = null) => {
   const hint = document.querySelector(selectors.categoryModalHint);
   const nameInput = document.querySelector(selectors.categoryNameInput);
   const slugInput = document.querySelector(selectors.categorySlugInput);
+  const groupSelect = document.querySelector(selectors.categoryGroupSelect);
   const errorEl = document.querySelector(selectors.categoryError);
   if (!modal || !title || !hint || !nameInput || !slugInput) {
     return;
@@ -1411,18 +1550,25 @@ const openCategoryModal = (category = null) => {
   state.pendingCategoryEdit = category;
   categorySlugDirty = false;
   setFormError(errorEl, "");
+
+  if (groupSelect) {
+    populateSelect(groupSelect, state.budgets.groups, { valueKey: "group_id", labelKey: "name" }, "Uncategorized");
+  }
+
   if (category) {
     title.textContent = "Rename category";
     hint.textContent = "Slug edits require migrations, so only the name is editable.";
     nameInput.value = category.name;
     slugInput.value = category.category_id;
     slugInput.disabled = true;
+    if (groupSelect) groupSelect.value = category.group_id || "";
   } else {
     title.textContent = "Add category";
     hint.textContent = "Create a new envelope slug for allocations.";
     nameInput.value = "";
     slugInput.value = "";
     slugInput.disabled = false;
+    if (groupSelect) groupSelect.value = "";
   }
   modal.classList.add("is-visible");
   modal.style.display = "flex";
@@ -1446,6 +1592,7 @@ const handleCategoryFormSubmit = async (event) => {
   const form = event.currentTarget;
   const nameInput = document.querySelector(selectors.categoryNameInput);
   const slugInput = document.querySelector(selectors.categorySlugInput);
+  const groupSelect = document.querySelector(selectors.categoryGroupSelect);
   const errorEl = document.querySelector(selectors.categoryError);
   const submitButton = document.querySelector(selectors.categorySubmit);
   if (!nameInput || !slugInput) {
@@ -1453,6 +1600,7 @@ const handleCategoryFormSubmit = async (event) => {
   }
   const name = nameInput.value.trim();
   const slug = slugInput.value.trim();
+  const groupId = groupSelect?.value || null;
   if (!name || !slug) {
     setFormError(errorEl, "Name and slug are required.");
     return;
@@ -1465,13 +1613,13 @@ const handleCategoryFormSubmit = async (event) => {
       await fetchJSON(`/api/budget-categories/${state.pendingCategoryEdit.category_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, is_active: true }),
+        body: JSON.stringify({ name, is_active: true, group_id: groupId }),
       });
     } else {
       await fetchJSON("/api/budget-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category_id: slug, name, is_active: true }),
+        body: JSON.stringify({ category_id: slug, name, is_active: true, group_id: groupId }),
       });
     }
     closeCategoryModal();
@@ -1559,6 +1707,7 @@ const init = async () => {
   initBudgetsInteractions();
   initAllocationsPage();
   initCategoryModal();
+  initGroupModal();
   initTransactionForm();
   initTransferForm();
 

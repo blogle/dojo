@@ -13,6 +13,8 @@ from dojo.budgeting.errors import (
     BudgetingError,
     CategoryAlreadyExists,
     CategoryNotFound,
+    GroupAlreadyExists,
+    GroupNotFound,
     InvalidTransaction,
 )
 from dojo.budgeting.schemas import (
@@ -25,6 +27,9 @@ from dojo.budgeting.schemas import (
     BudgetAllocationsResponse,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
+    BudgetCategoryGroupCreateRequest,
+    BudgetCategoryGroupDetail,
+    BudgetCategoryGroupUpdateRequest,
     BudgetCategoryUpdateRequest,
     CategoryState,
     CategorizedTransferRequest,
@@ -270,6 +275,62 @@ def deactivate_category(
     try:
         service.deactivate_category(conn, category_id)
     except CategoryNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BudgetingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/budget-category-groups", response_model=list[BudgetCategoryGroupDetail])
+def list_groups(
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+) -> list[BudgetCategoryGroupDetail]:
+    return service.list_groups(conn)
+
+
+@router.post(
+    "/budget-category-groups",
+    response_model=BudgetCategoryGroupDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_group(
+    payload: BudgetCategoryGroupCreateRequest,
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+) -> BudgetCategoryGroupDetail:
+    try:
+        return service.create_group(conn, payload)
+    except GroupAlreadyExists as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except BudgetingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/budget-category-groups/{group_id}", response_model=BudgetCategoryGroupDetail)
+def update_group(
+    group_id: str,
+    payload: BudgetCategoryGroupUpdateRequest,
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+) -> BudgetCategoryGroupDetail:
+    try:
+        return service.update_group(conn, group_id, payload)
+    except GroupNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BudgetingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/budget-category-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_group(
+    group_id: str,
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+) -> Response:
+    try:
+        service.deactivate_group(conn, group_id)
+    except GroupNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

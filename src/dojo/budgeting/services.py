@@ -13,6 +13,8 @@ from dojo.budgeting.errors import (
     AccountNotFound,
     CategoryAlreadyExists,
     CategoryNotFound,
+    GroupAlreadyExists,
+    GroupNotFound,
     InvalidTransaction,
     UnknownAccount,
     UnknownCategory,
@@ -24,6 +26,9 @@ from dojo.budgeting.schemas import (
     AccountUpdateRequest,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
+    BudgetCategoryGroupCreateRequest,
+    BudgetCategoryGroupDetail,
+    BudgetCategoryGroupUpdateRequest,
     BudgetCategoryUpdateRequest,
     CategoryState,
     CategorizedTransferLeg,
@@ -562,7 +567,15 @@ class BudgetCategoryAdminService:
         sql = load_sql("insert_budget_category.sql")
         conn.execute("BEGIN")
         try:
-            conn.execute(sql, [payload.category_id, payload.name, payload.is_active])
+            conn.execute(
+                sql,
+                [
+                    payload.category_id,
+                    payload.group_id,
+                    payload.name,
+                    payload.is_active,
+                ],
+            )
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -580,7 +593,10 @@ class BudgetCategoryAdminService:
         sql = load_sql("update_budget_category.sql")
         conn.execute("BEGIN")
         try:
-            conn.execute(sql, [payload.name, payload.is_active, category_id])
+            conn.execute(
+                sql,
+                [payload.name, payload.group_id, payload.is_active, category_id],
+            )
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -593,6 +609,93 @@ class BudgetCategoryAdminService:
         conn.execute("BEGIN")
         try:
             conn.execute(sql, [category_id])
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+    def list_groups(
+        self, conn: duckdb.DuckDBPyConnection
+    ) -> list[BudgetCategoryGroupDetail]:
+        sql = load_sql("select_budget_category_groups.sql")
+        rows = conn.execute(sql).fetchall()
+        return [
+            BudgetCategoryGroupDetail(
+                group_id=row[0],
+                name=row[1],
+                sort_order=row[2],
+                is_active=bool(row[3]),
+                created_at=row[4],
+                updated_at=row[5],
+            )
+            for row in rows
+        ]
+
+    def create_group(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        payload: BudgetCategoryGroupCreateRequest,
+    ) -> BudgetCategoryGroupDetail:
+        sql = load_sql("insert_budget_category_group.sql")
+        conn.execute("BEGIN")
+        try:
+            row = conn.execute(
+                sql,
+                [payload.group_id, payload.name, payload.sort_order],
+            ).fetchone()
+            conn.execute("COMMIT")
+            return BudgetCategoryGroupDetail(
+                group_id=row[0],
+                name=row[1],
+                sort_order=row[2],
+                is_active=bool(row[3]),
+                created_at=row[4],
+                updated_at=row[5],
+            )
+        except duckdb.ConstraintException as exc:
+            conn.execute("ROLLBACK")
+            raise GroupAlreadyExists(
+                f"Group `{payload.group_id}` already exists."
+            ) from exc
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+    def update_group(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        group_id: str,
+        payload: BudgetCategoryGroupUpdateRequest,
+    ) -> BudgetCategoryGroupDetail:
+        sql = load_sql("update_budget_category_group.sql")
+        conn.execute("BEGIN")
+        try:
+            row = conn.execute(
+                sql,
+                [payload.name, payload.sort_order, group_id],
+            ).fetchone()
+            if row is None:
+                raise GroupNotFound(f"Group `{group_id}` not found.")
+            conn.execute("COMMIT")
+            return BudgetCategoryGroupDetail(
+                group_id=row[0],
+                name=row[1],
+                sort_order=row[2],
+                is_active=bool(row[3]),
+                created_at=row[4],
+                updated_at=row[5],
+            )
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+
+    def deactivate_group(
+        self, conn: duckdb.DuckDBPyConnection, group_id: str
+    ) -> None:
+        sql = load_sql("deactivate_budget_category_group.sql")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql, [group_id])
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -622,13 +725,14 @@ class BudgetCategoryAdminService:
     def _row_to_category(self, row: Tuple[Any, ...]) -> BudgetCategoryDetail:
         return BudgetCategoryDetail(
             category_id=row[0],
-            name=row[1],
-            is_active=bool(row[2]),
-            created_at=row[3],
-            updated_at=row[4],
-            available_minor=int(row[5]),
-            activity_minor=int(row[6]),
-            allocated_minor=int(row[7]),
+            group_id=row[1],
+            name=row[2],
+            is_active=bool(row[3]),
+            created_at=row[4],
+            updated_at=row[5],
+            available_minor=int(row[6]),
+            activity_minor=int(row[7]),
+            allocated_minor=int(row[8]),
         )
 
     @staticmethod

@@ -293,7 +293,8 @@
               <p class="muted small-note">Allocate Ready-to-Assign into envelopes.</p>
             </div>
             <div class="budgets-header__actions">
-              <button type="button" class="primary" data-open-category-modal>+ Add category</button>
+              <button type="button" class="secondary" data-open-group-modal>+ Add group</button>
+              <button type="button" class="primary" data-open-category-modal>+ Add budget</button>
             </div>
           </header>
           <div class="summary-bar" role="region" aria-label="Budget summary">
@@ -315,8 +316,22 @@
             </article>
           </div>
           <p class="muted small-note">Use the Allocations page to move Ready-to-Assign between envelopes.</p>
-          <div class="budgets-grid" data-budgets-grid>
-            <p class="muted" data-empty-budgets>No categories found. Use “Add category” to get started.</p>
+          <div class="ledger-wrapper">
+            <table class="ledger-table ledger-table--budgets">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th class="amount-cell">Budgeted</th>
+                  <th class="amount-cell">Activity</th>
+                  <th class="amount-cell">Available</th>
+                </tr>
+              </thead>
+              <tbody id="budgets-body">
+                <tr>
+                  <td colspan="4" class="muted">Loading budgets…</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
       </main>
@@ -404,9 +419,41 @@
             <input type="text" name="slug" data-category-slug pattern="[a-z0-9_]+" required />
             <span class="muted small-note">Lowercase letters, numbers, and underscores only.</span>
           </label>
+          <label>
+            Group
+            <select name="group_id" data-category-group>
+              <option value="">Uncategorized</option>
+            </select>
+          </label>
           <p class="form-error" data-category-error aria-live="polite"></p>
           <div class="form-actions">
-            <button type="submit" class="primary" data-category-submit>Save category</button>
+            <button type="submit" class="primary" data-category-submit>Save budget</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="group-modal" aria-hidden="true">
+      <div class="modal">
+        <header class="modal-header">
+          <div>
+            <p class="stat-label">Category Group</p>
+            <h2 data-group-modal-title>Add group</h2>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close modal" data-close-group-modal>×</button>
+        </header>
+        <form class="modal-form" data-group-form>
+          <label>
+            Group Name
+            <input type="text" name="name" required />
+          </label>
+          <label>
+            Sort Order
+            <input type="number" name="sort_order" value="0" required />
+          </label>
+          <p class="form-error" data-group-error aria-live="polite"></p>
+          <div class="form-actions">
+            <button type="submit" class="primary" data-group-submit>Save group</button>
           </div>
         </form>
       </div>

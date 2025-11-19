@@ -1,5 +1,6 @@
 SELECT
     c.category_id,
+    c.group_id,
     c.name,
     c.is_active,
     c.created_at,
