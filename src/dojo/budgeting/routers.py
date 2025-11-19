@@ -13,12 +13,16 @@ from dojo.budgeting.errors import (
     BudgetingError,
     CategoryAlreadyExists,
     CategoryNotFound,
+    InvalidTransaction,
 )
 from dojo.budgeting.schemas import (
     AccountCreateRequest,
     AccountDetail,
     AccountState,
     AccountUpdateRequest,
+    BudgetAllocationRequest,
+    BudgetAllocationEntry,
+    BudgetAllocationsResponse,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
     BudgetCategoryUpdateRequest,
@@ -215,10 +219,11 @@ def deactivate_account(
 
 @router.get("/budget-categories", response_model=list[BudgetCategoryDetail])
 def list_categories(
+    month: date | None = Query(None, description="Month start (YYYY-MM-01) for envelope state."),
     conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
     service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
 ) -> list[BudgetCategoryDetail]:
-    return service.list_categories(conn)
+    return service.list_categories(conn, month_start=month)
 
 
 @router.post(
@@ -228,11 +233,12 @@ def list_categories(
 )
 def create_category(
     payload: BudgetCategoryCreateRequest,
+    month: date | None = Query(None, description="Month start (YYYY-MM-01) for envelope state."),
     conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
     service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
 ) -> BudgetCategoryDetail:
     try:
-        return service.create_category(conn, payload)
+        return service.create_category(conn, payload, month_start=month)
     except CategoryAlreadyExists as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BudgetingError as exc:
@@ -243,11 +249,12 @@ def create_category(
 def update_category(
     category_id: str,
     payload: BudgetCategoryUpdateRequest,
+    month: date | None = Query(None, description="Month start (YYYY-MM-01) for envelope state."),
     conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
     service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
 ) -> BudgetCategoryDetail:
     try:
-        return service.update_category(conn, category_id, payload)
+        return service.update_category(conn, category_id, payload, month_start=month)
     except CategoryNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
@@ -284,4 +291,49 @@ def ready_to_assign(
         month_start=month,
         ready_to_assign_minor=ready_minor,
         ready_to_assign_decimal=Decimal(ready_minor).scaleb(-2).quantize(Decimal("0.01")),
+    )
+
+
+@router.post("/budget/allocations", response_model=CategoryState, status_code=status.HTTP_201_CREATED)
+def allocate_budget(
+    payload: BudgetAllocationRequest,
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: TransactionEntryService = Depends(transaction_service_dep),
+) -> CategoryState:
+    target_category_id = payload.to_category_id or payload.category_id
+    if not target_category_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_category_id is required")
+    try:
+        return service.allocate_envelope(
+            conn,
+            target_category_id,
+            payload.amount_minor,
+            payload.month_start,
+            from_category_id=payload.from_category_id,
+            memo=payload.memo,
+            allocation_date=payload.allocation_date,
+        )
+    except (BudgetingError, InvalidTransaction) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/budget/allocations", response_model=BudgetAllocationsResponse)
+def list_allocations(
+    month: date | None = Query(None, description="Month start (YYYY-MM-01)."),
+    limit: int = Query(100, ge=1, le=500),
+    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    service: TransactionEntryService = Depends(transaction_service_dep),
+) -> BudgetAllocationsResponse:
+    month_start = (month or date.today()).replace(day=1)
+    entries = service.list_allocations(conn, month_start, limit)
+    allocation_models = [BudgetAllocationEntry(**entry) for entry in entries]
+    ready_minor = service.ready_to_assign(conn, month_start)
+    inflow_minor = service.month_cash_inflow(conn, month_start)
+    return BudgetAllocationsResponse(
+        month_start=month_start,
+        inflow_minor=inflow_minor,
+        inflow_decimal=Decimal(inflow_minor).scaleb(-2).quantize(Decimal("0.01")),
+        ready_to_assign_minor=ready_minor,
+        ready_to_assign_decimal=Decimal(ready_minor).scaleb(-2).quantize(Decimal("0.01")),
+        allocations=allocation_models,
     )

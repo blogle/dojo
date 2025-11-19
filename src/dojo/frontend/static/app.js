@@ -5,9 +5,8 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 });
 
 const selectors = {
-  todayDate: "#today-date",
-  lastReconcileDate: "#last-reconcile-date",
   monthSpend: "#month-spend",
+  monthBudgeted: "#month-budgeted",
   transactionsBody: "#transactions-body",
   assetsTotal: "#assets-total",
   liabilitiesTotal: "#liabilities-total",
@@ -27,6 +26,43 @@ const selectors = {
   modalTypeSelect: "[name=type]",
   modalNameInput: "[name=name]",
   modalBalanceInput: "[name=balance]",
+  transactionForm: "#transaction-form",
+  transactionSubmit: "[data-transaction-submit]",
+  transactionError: "[data-testid='transaction-error']",
+  transactionAccountSelect: "[data-transaction-account]",
+  transactionCategorySelect: "[data-transaction-category]",
+  transactionFlowInputs: "[data-transaction-flow]",
+  transferForm: "#transfer-form",
+  transferSubmit: "[data-transfer-submit]",
+  transferError: "[data-testid='transfer-error']",
+  transferSourceSelect: "[data-transfer-source]",
+  transferDestinationSelect: "[data-transfer-destination]",
+  transferCategorySelect: "[data-transfer-category]",
+  allocationForm: "[data-testid='allocation-form']",
+  allocationSubmit: "[data-allocation-submit]",
+  allocationError: "[data-testid='allocation-error']",
+  allocationFromSelect: "[data-allocation-from]",
+  allocationToSelect: "[data-allocation-to]",
+  allocationDateInput: "[data-allocation-date]",
+  allocationsBody: "#allocations-body",
+  allocationInflowValue: "#allocations-inflow-value",
+  allocationReadyValue: "#allocations-ready-value",
+  allocationMonthLabel: "#allocations-month-label",
+  budgetsGrid: "[data-budgets-grid]",
+  budgetsReadyValue: "#budgets-ready-value",
+  budgetsActivityValue: "#budgets-activity-value",
+  budgetsAvailableValue: "#budgets-available-value",
+  budgetsMonthLabel: "#budgets-month-label",
+  categoryModal: "#category-modal",
+  categoryModalTitle: "[data-category-modal-title]",
+  categoryModalHint: "[data-category-modal-hint]",
+  categoryNameInput: "[data-category-name]",
+  categorySlugInput: "[data-category-slug]",
+  categoryError: "[data-category-error]",
+  categoryForm: "[data-category-form]",
+  categorySubmit: "[data-category-submit]",
+  categoryModalClose: "[data-close-category-modal]",
+  toastStack: "#toast-stack",
 };
 
 const accountGroupDefinitions = [
@@ -82,7 +118,48 @@ const state = {
   accounts: [],
   netWorth: null,
   readyToAssign: null,
+  reference: {
+    accounts: [],
+    categories: [],
+  },
+  budgets: {
+    categories: [],
+    readyToAssignMinor: 0,
+    activityMinor: 0,
+    availableMinor: 0,
+    allocatedMinor: 0,
+    monthLabel: "",
+    monthStartISO: null,
+  },
+  allocations: {
+    entries: [],
+    inflowMinor: 0,
+    readyMinor: 0,
+    monthLabel: "",
+    monthStartISO: null,
+  },
+  forms: {
+    transaction: { flow: "outflow", submitting: false },
+    allocation: { submitting: false, error: null, pendingToCategory: null },
+    transfer: { submitting: false, error: null },
+    transactionEdit: { submitting: false, conceptId: null, transactionId: null },
+  },
+  pendingCategoryEdit: null,
+  editingTransactionId: null,
 };
+
+let transactionsBodyEl = null;
+let categorySlugDirty = false;
+let detachInlineEscHandler = null;
+
+const statusToggleIcons = `
+  <svg class="status-icon status-icon--check" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 12.5 L10 16.5 L18 8" />
+  </svg>
+  <svg class="status-icon status-icon--pending" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="6.5" />
+  </svg>
+`;
 
 const fetchJSON = async (url, options = {}) => {
   const response = await fetch(url, options);
@@ -113,13 +190,24 @@ const fetchJSON = async (url, options = {}) => {
 
 const formatAmount = (minor) => currencyFormatter.format(minor / 100);
 
-const getTransactionStatus = (transactionDate) => {
-  const today = new Date();
-  const txDate = new Date(transactionDate);
-  const diffTime = Math.abs(today - txDate);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays > 3 ? "Settled" : "Pending";
+const minorToDollars = (minor) => (minor / 100).toFixed(2);
+
+// Amount inputs always accept dollars; cents remain an internal storage detail.
+const dollarsToMinor = (value) => {
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed)) {
+    return 0;
+  }
+  return Math.round(parsed * 100);
 };
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+const currentMonthStartISO = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+};
+
 
 const computeCurrentMonthSpend = (transactions) => {
   const now = new Date();
@@ -139,30 +227,325 @@ const computeCurrentMonthSpend = (transactions) => {
   }, 0);
 };
 
-const updateHeaderStats = () => {
-  const todayEl = document.querySelector(selectors.todayDate);
-  if (todayEl) {
-    todayEl.textContent = new Date().toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+const populateSelect = (selectEl, items, { valueKey, labelKey }, placeholder) => {
+  if (!selectEl) {
+    return;
   }
+  const previous = selectEl.value;
+  const fragment = document.createDocumentFragment();
+  if (placeholder) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.disabled = true;
+    option.selected = !previous || previous === "";
+    option.textContent = placeholder;
+    fragment.appendChild(option);
+  }
+  items.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item[valueKey];
+    option.textContent = item[labelKey];
+    fragment.appendChild(option);
+  });
+  selectEl.innerHTML = "";
+  selectEl.appendChild(fragment);
+  if (items.some((item) => item[valueKey] === previous)) {
+    selectEl.value = previous;
+  }
+};
 
+const updateAccountSelects = () => {
+  const sorted = [...state.reference.accounts].sort((a, b) => a.name.localeCompare(b.name));
+  populateSelect(document.querySelector(selectors.transactionAccountSelect), sorted, { valueKey: "account_id", labelKey: "name" }, "Select account");
+  populateSelect(document.querySelector(selectors.transferSourceSelect), sorted, { valueKey: "account_id", labelKey: "name" }, "Select source");
+  populateSelect(document.querySelector(selectors.transferDestinationSelect), sorted, { valueKey: "account_id", labelKey: "name" }, "Select destination");
+};
+
+const getCategoryOptions = () => {
+  const source = state.budgets.categories.length ? state.budgets.categories : state.reference.categories;
+  return [...source].filter((category) => category.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const findBudgetCategory = (categoryId) => state.budgets.categories.find((category) => category.category_id === categoryId);
+
+const getCategoryAvailableMinor = (categoryId) => {
+  const category = findBudgetCategory(categoryId);
+  return category ? category.available_minor ?? 0 : 0;
+};
+
+const getCategoryDisplayName = (categoryId) => {
+  if (!categoryId) {
+    return "Ready to Assign";
+  }
+  const category = findBudgetCategory(categoryId) || state.reference.categories.find((cat) => cat.category_id === categoryId);
+  return category ? category.name : categoryId;
+};
+
+const updateCategorySelects = () => {
+  const categories = getCategoryOptions();
+  populateSelect(document.querySelector(selectors.transactionCategorySelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  populateSelect(document.querySelector(selectors.transferCategorySelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  populateSelect(document.querySelector(selectors.allocationToSelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  const fromSelect = document.querySelector(selectors.allocationFromSelect);
+  if (fromSelect) {
+    const previous = fromSelect.value;
+    const fragment = document.createDocumentFragment();
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "Ready to Assign";
+    fragment.appendChild(defaultOption);
+    categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category.category_id;
+      option.textContent = category.name;
+      fragment.appendChild(option);
+    });
+    fromSelect.innerHTML = "";
+    fromSelect.appendChild(fragment);
+    if (previous && categories.some((category) => category.category_id === previous)) {
+      fromSelect.value = previous;
+    } else {
+      fromSelect.value = "";
+    }
+  }
+};
+
+const updateHeaderStats = () => {
   const spendEl = document.querySelector(selectors.monthSpend);
   if (spendEl) {
     spendEl.textContent = formatAmount(computeCurrentMonthSpend(state.transactions));
   }
 
-  const reconcileEl = document.querySelector(selectors.lastReconcileDate);
-  if (reconcileEl) {
-    const today = new Date();
-    today.setDate(today.getDate() - 1);
-    reconcileEl.textContent = today.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+  const budgetedEl = document.querySelector(selectors.monthBudgeted);
+  if (budgetedEl) {
+    budgetedEl.textContent = formatAmount(state.budgets.allocatedMinor ?? 0);
+  }
+};
+
+const setInlineRowBusy = (row, busy) => {
+  if (!row) {
+    return;
+  }
+  row.classList.toggle("is-saving", Boolean(busy));
+};
+
+const bindInlineEscHandler = (transactionVersionId) => {
+  if (detachInlineEscHandler) {
+    detachInlineEscHandler();
+  }
+  const handler = (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    if (state.editingTransactionId !== transactionVersionId) {
+      return;
+    }
+    event.preventDefault();
+    cancelInlineTransactionEdit();
+  };
+  document.addEventListener("keydown", handler, true);
+  detachInlineEscHandler = () => {
+    document.removeEventListener("keydown", handler, true);
+    detachInlineEscHandler = null;
+  };
+};
+
+const applyStatusToggleState = (toggle, state) => {
+  if (!toggle) {
+    return;
+  }
+  const nextState = state === "cleared" ? "cleared" : "pending";
+  toggle.dataset.state = nextState;
+  toggle.classList.toggle("is-cleared", nextState === "cleared");
+  toggle.classList.toggle("is-pending", nextState !== "cleared");
+  const isSwitch = toggle.getAttribute("role") === "switch";
+  if (isSwitch) {
+    toggle.setAttribute("aria-checked", nextState === "cleared" ? "true" : "false");
+  }
+  const labelText = nextState === "cleared" ? "Status: Cleared" : "Status: Pending";
+  toggle.setAttribute("title", labelText);
+  toggle.setAttribute("aria-label", labelText);
+};
+
+const initializeStatusToggle = (toggle, initialState = "pending") => {
+  if (!toggle) {
+    return;
+  }
+  applyStatusToggleState(toggle, initialState);
+  const handleToggle = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextState = toggle.dataset.state === "cleared" ? "pending" : "cleared";
+    applyStatusToggleState(toggle, nextState);
+  };
+  toggle.addEventListener("click", handleToggle);
+  toggle.addEventListener("keydown", (event) => {
+    if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
+      handleToggle(event);
+    }
+  });
+};
+
+const startInlineTransactionEdit = (transaction) => {
+  if (!transaction) {
+    return;
+  }
+  state.editingTransactionId = transaction.transaction_version_id;
+  state.forms.transactionEdit.conceptId = transaction.concept_id || null;
+  state.forms.transactionEdit.transactionId = transaction.transaction_version_id || null;
+  bindInlineEscHandler(transaction.transaction_version_id);
+  renderTransactions(transactionsBodyEl, state.transactions);
+};
+
+const cancelInlineTransactionEdit = () => {
+  state.editingTransactionId = null;
+  state.forms.transactionEdit.conceptId = null;
+  state.forms.transactionEdit.transactionId = null;
+  if (detachInlineEscHandler) {
+    detachInlineEscHandler();
+  }
+  renderTransactions(transactionsBodyEl, state.transactions);
+};
+
+const hydrateInlineEditRow = (row, transaction) => {
+  if (!row || !transaction) {
+    return;
+  }
+  row.classList.add("inline-edit-row");
+  const errorEl = row.querySelector("[data-inline-error]");
+  setFormError(errorEl, "");
+  const accountSelect = row.querySelector("[data-inline-account]");
+  if (accountSelect) {
+    const sortedAccounts = [...state.reference.accounts].sort((a, b) => a.name.localeCompare(b.name));
+    populateSelect(accountSelect, sortedAccounts, { valueKey: "account_id", labelKey: "name" }, "Select account");
+    accountSelect.value = transaction.account_id || "";
+  }
+  const categorySelect = row.querySelector("[data-inline-category]");
+  if (categorySelect) {
+    const categories = getCategoryOptions();
+    populateSelect(categorySelect, categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+    categorySelect.value = transaction.category_id || "";
+  }
+  const dateInput = row.querySelector("[data-inline-date]");
+  if (dateInput) {
+    dateInput.value = transaction.transaction_date || todayISO();
+  }
+  const memoInput = row.querySelector("[data-inline-memo]");
+  if (memoInput) {
+    memoInput.value = transaction.memo || "";
+  }
+  const inflowInput = row.querySelector("[data-inline-inflow]");
+  const outflowInput = row.querySelector("[data-inline-outflow]");
+  if (inflowInput || outflowInput) {
+    const amountMinor = transaction.amount_minor ?? 0;
+    if (outflowInput) {
+      outflowInput.value = amountMinor < 0 ? minorToDollars(Math.abs(amountMinor)) : "";
+    }
+    if (inflowInput) {
+      inflowInput.value = amountMinor >= 0 ? minorToDollars(Math.abs(amountMinor)) : "";
+    }
+    const enforceExclusiveAmount = (source, target) => {
+      if (!source || !target) {
+        return;
+      }
+      source.addEventListener("input", () => {
+        if (source.value && source.value.trim() !== "") {
+          target.value = "";
+        }
+      });
+    };
+    enforceExclusiveAmount(inflowInput, outflowInput);
+    enforceExclusiveAmount(outflowInput, inflowInput);
+  }
+  const statusToggle = row.querySelector("[data-inline-status-toggle]");
+  initializeStatusToggle(statusToggle, transaction.status === "cleared" ? "cleared" : "pending");
+
+  const keyHandler = (event) => {
+    const isStatusToggle = event.target?.closest?.("[data-inline-status-toggle]");
+    if (event.key === "Enter" && !event.shiftKey && !isStatusToggle) {
+      event.preventDefault();
+      handleInlineTransactionSave(row, transaction);
+    }
+  };
+  row.addEventListener("keydown", keyHandler);
+  window.requestAnimationFrame(() => {
+    dateInput?.focus();
+  });
+};
+
+const handleInlineTransactionSave = async (row, transaction) => {
+  if (!row || !transaction) {
+    return;
+  }
+  if (state.forms.transactionEdit.submitting) {
+    return;
+  }
+  const errorEl = row.querySelector("[data-inline-error]");
+  const dateInput = row.querySelector("[data-inline-date]");
+  const accountSelect = row.querySelector("[data-inline-account]");
+  const categorySelect = row.querySelector("[data-inline-category]");
+  const memoInput = row.querySelector("[data-inline-memo]");
+  const inflowInput = row.querySelector("[data-inline-inflow]");
+  const outflowInput = row.querySelector("[data-inline-outflow]");
+  const statusToggle = row.querySelector("[data-inline-status-toggle]");
+  const conceptId = transaction.concept_id || state.forms.transactionEdit.conceptId;
+  if (!conceptId) {
+    setFormError(errorEl, "Missing concept identifier for edit.");
+    return;
+  }
+  if (!accountSelect?.value || !categorySelect?.value) {
+    setFormError(errorEl, "Account and category are required.");
+    return;
+  }
+  if (!inflowInput && !outflowInput) {
+    setFormError(errorEl, "Amount inputs are missing.");
+    return;
+  }
+  const inflowMinor = inflowInput ? Math.abs(dollarsToMinor(inflowInput.value)) : 0;
+  const outflowMinor = outflowInput ? Math.abs(dollarsToMinor(outflowInput.value)) : 0;
+  if (inflowMinor > 0 && outflowMinor > 0) {
+    setFormError(errorEl, "Enter either an inflow or an outflow, not both.");
+    return;
+  }
+  const pickedAmountMinor = inflowMinor || outflowMinor;
+  if (pickedAmountMinor === 0) {
+    setFormError(errorEl, "Amount must be non-zero.");
+    return;
+  }
+  const signedAmount = inflowMinor ? Math.abs(pickedAmountMinor) : -Math.abs(pickedAmountMinor);
+  const payload = {
+    concept_id: conceptId,
+    transaction_date: dateInput?.value || todayISO(),
+    account_id: accountSelect.value,
+    category_id: categorySelect.value,
+    memo: (memoInput?.value || "").trim() || null,
+    amount_minor: signedAmount,
+    status: statusToggle?.dataset.state === "cleared" ? "cleared" : "pending",
+  };
+  try {
+    state.forms.transactionEdit.submitting = true;
+    setInlineRowBusy(row, true);
+    setFormError(errorEl, "");
+    await fetchJSON("/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
+    state.editingTransactionId = null;
+    state.forms.transactionEdit.conceptId = null;
+    state.forms.transactionEdit.transactionId = null;
+    if (detachInlineEscHandler) {
+      detachInlineEscHandler();
+    }
+    await Promise.all([refreshTransactions(transactionsBodyEl), refreshAccountsPage(), loadBudgetsData()]);
+    updateCategorySelects();
+    renderBudgetsPage();
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Failed to save changes.");
+  } finally {
+    state.forms.transactionEdit.submitting = false;
+    setInlineRowBusy(row, false);
   }
 };
 
@@ -171,7 +554,7 @@ const renderTransactions = (bodyEl, transactions) => {
   if (!Array.isArray(transactions) || !transactions.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 6;
+    cell.colSpan = 7;
     cell.className = "muted";
     cell.style.textAlign = "center";
     cell.textContent = "No transactions found.";
@@ -183,21 +566,101 @@ const renderTransactions = (bodyEl, transactions) => {
   transactions.forEach((tx) => {
     if (!tx) return;
     const row = document.createElement("tr");
-    const status = getTransactionStatus(tx.transaction_date);
-    const statusClass = status === "Settled" ? "status-settled" : "status-pending";
-    row.innerHTML = `
-      <td>${tx.transaction_date || "N/A"}</td>
-      <td>${tx.account_name || "N/A"}</td>
-      <td>${tx.category_name || "N/A"}</td>
-      <td>${tx.memo || "—"}</td>
-      <td class="${statusClass}">${status}</td>
-      <td class="amount-cell">${formatAmount(tx.amount_minor || 0)}</td>
-    `;
+    const isEditing = state.editingTransactionId === tx.transaction_version_id;
+    if (isEditing) {
+      row.innerHTML = `
+        <td><input type="date" data-inline-date /></td>
+        <td>
+          <select data-inline-account>
+            <option value="" disabled>Select account</option>
+          </select>
+        </td>
+        <td>
+          <select data-inline-category>
+            <option value="" disabled>Select category</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" data-inline-memo placeholder="Optional memo" />
+          <p class="inline-row-feedback" data-inline-error aria-live="polite"></p>
+        </td>
+        <td class="amount-cell amount-edit-cell">
+          <input
+            type="number"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0.00"
+            data-inline-outflow
+            aria-label="Outflow amount"
+          />
+        </td>
+        <td class="amount-cell amount-edit-cell">
+          <input
+            type="number"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0.00"
+            data-inline-inflow
+            aria-label="Inflow amount"
+          />
+        </td>
+        <td>
+          <button
+            type="button"
+            class="status-toggle-badge is-pending"
+            data-inline-status-toggle
+            data-state="pending"
+            role="switch"
+            aria-checked="false"
+            tabindex="0"
+          >
+            ${statusToggleIcons}
+          </button>
+        </td>
+      `;
+      hydrateInlineEditRow(row, tx);
+    } else {
+      const statusValue = tx.status === "cleared" ? "cleared" : "pending";
+      const amountMinor = tx.amount_minor ?? 0;
+      const outflowDisplay = amountMinor < 0 ? formatAmount(Math.abs(amountMinor)) : "—";
+      const inflowDisplay = amountMinor >= 0 ? formatAmount(Math.abs(amountMinor)) : "—";
+      row.innerHTML = `
+        <td>${tx.transaction_date || "N/A"}</td>
+        <td>${tx.account_name || "N/A"}</td>
+        <td>${tx.category_name || "N/A"}</td>
+        <td>${tx.memo || "—"}</td>
+        <td class="amount-cell">${outflowDisplay}</td>
+        <td class="amount-cell">${inflowDisplay}</td>
+        <td>
+          <button
+            type="button"
+            class="status-toggle-badge"
+            data-status-display
+            data-state="${statusValue}"
+            role="status"
+            aria-disabled="true"
+            tabindex="-1"
+          >
+            ${statusToggleIcons}
+          </button>
+        </td>
+      `;
+      row.dataset.conceptId = tx.concept_id || "";
+      row.dataset.transactionId = tx.transaction_version_id || "";
+      row.addEventListener("click", (event) => {
+        startInlineTransactionEdit(tx);
+      });
+      const displayToggle = row.querySelector("[data-status-display]");
+      applyStatusToggleState(displayToggle, statusValue);
+    }
     bodyEl.appendChild(row);
   });
 };
 
-const refreshTransactions = async (bodyEl) => {
+const refreshTransactions = async (bodyEl = document.querySelector(selectors.transactionsBody)) => {
+  if (!bodyEl) {
+    return;
+  }
   const data = await fetchJSON("/api/transactions?limit=100");
   state.transactions = (data || []).sort((a, b) => {
     const dateA = a.transaction_date ? new Date(a.transaction_date) : 0;
@@ -219,6 +682,18 @@ const fetchNetWorth = async () => {
 
 const fetchReadyToAssign = async () => {
   state.readyToAssign = await fetchJSON("/api/budget/ready-to-assign");
+};
+
+const loadReferenceData = async () => {
+  try {
+    const reference = await fetchJSON("/api/reference-data");
+    state.reference.accounts = reference?.accounts ?? [];
+    state.reference.categories = reference?.categories ?? [];
+    updateAccountSelects();
+    updateCategorySelects();
+  } catch (error) {
+    console.error("Failed to load reference data", error);
+  }
 };
 
 const updateAccountStats = () => {
@@ -252,6 +727,11 @@ const slugify = (value) => {
   const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
   const trimmed = normalized.replace(/^_+|_+$/g, "");
   return `${trimmed || "account"}_${Date.now().toString(36)}`;
+};
+
+const slugifyCategoryName = (value) => {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return normalized.replace(/^_+|_+$/g, "") || "category";
 };
 
 const groupAccounts = () => {
@@ -338,6 +818,40 @@ const renderAccountGroups = () => {
         }
       });
     });
+};
+
+
+
+
+const setFormError = (element, message) => {
+  if (!element) {
+    return;
+  }
+  element.textContent = message || "";
+};
+
+const setButtonBusy = (button, busy) => {
+  if (!button) {
+    return;
+  }
+  button.disabled = busy;
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+};
+
+const formatBudgetDisplay = (minor) => formatAmount(minor);
+
+const showToast = (message) => {
+  const stack = document.querySelector(selectors.toastStack);
+  if (!stack) {
+    return;
+  }
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  stack.appendChild(toast);
+  window.setTimeout(() => {
+    toast.remove();
+  }, 6000);
 };
 
 const modalOverlay = document.querySelector(selectors.accountModal);
@@ -432,6 +946,7 @@ const handleAddAccount = async () => {
     balanceInput.value = "";
     toggleAccountModal(false);
     await refreshAccountsPage();
+    await loadReferenceData();
   } catch (error) {
     console.error(error);
     alert(error.message || "Failed to create account.");
@@ -450,9 +965,558 @@ const refreshAccountsPage = async () => {
   }
 };
 
+const loadBudgetsData = async () => {
+  const month = currentMonthStartISO();
+  try {
+    const [categories, ready] = await Promise.all([
+      fetchJSON(`/api/budget-categories?month=${month}`),
+      fetchJSON(`/api/budget/ready-to-assign?month=${month}`),
+    ]);
+    state.budgets.categories = (categories || []).map((category) => ({
+      ...category,
+      available_minor: category.available_minor ?? 0,
+      activity_minor: category.activity_minor ?? 0,
+      allocated_minor: category.allocated_minor ?? 0,
+    }));
+    state.budgets.readyToAssignMinor = ready?.ready_to_assign_minor ?? 0;
+    state.budgets.activityMinor = state.budgets.categories.reduce((total, category) => total + (category.activity_minor ?? 0), 0);
+    state.budgets.availableMinor = state.budgets.categories.reduce((total, category) => total + (category.available_minor ?? 0), 0);
+    state.budgets.allocatedMinor = state.budgets.categories.reduce((total, category) => total + (category.allocated_minor ?? 0), 0);
+    state.budgets.monthStartISO = month;
+    const monthDate = new Date(`${month}T00:00:00`);
+    state.budgets.monthLabel = monthDate.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+    state.readyToAssign = ready;
+    updateCategorySelects();
+    updateAccountStats();
+    updateHeaderStats();
+  } catch (error) {
+    console.error("Failed to load budgets data", error);
+    throw error;
+  }
+};
+
+const loadAllocationsData = async () => {
+  const month = currentMonthStartISO();
+  try {
+    const data = await fetchJSON(`/api/budget/allocations?month=${month}`);
+    state.allocations.entries = data?.allocations ?? [];
+    state.allocations.inflowMinor = data?.inflow_minor ?? 0;
+    state.allocations.readyMinor = data?.ready_to_assign_minor ?? 0;
+    state.allocations.monthStartISO = data?.month_start ?? month;
+    const labelDate = new Date(`${state.allocations.monthStartISO}T00:00:00`);
+    state.allocations.monthLabel = labelDate.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+  } catch (error) {
+    console.error("Failed to load allocations", error);
+    throw error;
+  }
+};
+
+const renderBudgetsPage = () => {
+  const readyEl = document.querySelector(selectors.budgetsReadyValue);
+  const activityEl = document.querySelector(selectors.budgetsActivityValue);
+  const availableEl = document.querySelector(selectors.budgetsAvailableValue);
+  const monthLabelEl = document.querySelector(selectors.budgetsMonthLabel);
+  if (readyEl) {
+    readyEl.textContent = formatBudgetDisplay(state.budgets.readyToAssignMinor);
+  }
+  if (activityEl) {
+    activityEl.textContent = formatBudgetDisplay(state.budgets.activityMinor);
+  }
+  if (availableEl) {
+    availableEl.textContent = formatBudgetDisplay(state.budgets.availableMinor);
+  }
+  if (monthLabelEl) {
+    monthLabelEl.textContent = state.budgets.monthLabel || "—";
+  }
+  const grid = document.querySelector(selectors.budgetsGrid);
+  if (!grid) {
+    return;
+  }
+  if (!state.budgets.categories.length) {
+    grid.innerHTML = '<p class="muted">No categories found. Use “Add category” to get started.</p>';
+    return;
+  }
+  grid.innerHTML = state.budgets.categories
+    .map(
+      (category) => `
+        <article class="budget-card" data-category-id="${category.category_id}">
+          <div class="budget-card__header">
+            <div>
+              <h3>${category.name}</h3>
+              <p class="muted small-note">${category.category_id}</p>
+            </div>
+            <div class="budget-card__actions">
+              <button type="button" class="secondary" data-action="allocate" data-category-id="${category.category_id}">Allocate</button>
+              <button type="button" class="secondary" data-action="rename" data-category-id="${category.category_id}">Rename</button>
+            </div>
+          </div>
+          <div class="budget-card__meta">
+            <span>Available: ${formatBudgetDisplay(category.available_minor ?? 0)}</span>
+            <span>Activity: ${formatBudgetDisplay(category.activity_minor ?? 0)}</span>
+          </div>
+        </article>
+      `
+    )
+    .join("");
+  grid.querySelectorAll('[data-action="allocate"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const categoryId = button.getAttribute("data-category-id");
+      state.forms.allocation.pendingToCategory = categoryId;
+      window.location.hash = "#/allocations";
+    });
+  });
+  grid.querySelectorAll('[data-action="rename"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const categoryId = button.getAttribute("data-category-id");
+      const category = state.budgets.categories.find((cat) => cat.category_id === categoryId);
+      if (category) {
+        openCategoryModal(category);
+      }
+    });
+  });
+};
+
+const renderAllocationsPage = () => {
+  const inflowEl = document.querySelector(selectors.allocationInflowValue);
+  const readyEl = document.querySelector(selectors.allocationReadyValue);
+  const monthEl = document.querySelector(selectors.allocationMonthLabel);
+  if (inflowEl) {
+    inflowEl.textContent = formatBudgetDisplay(state.allocations.inflowMinor);
+  }
+  if (readyEl) {
+    readyEl.textContent = formatBudgetDisplay(state.allocations.readyMinor);
+  }
+  if (monthEl) {
+    monthEl.textContent = state.allocations.monthLabel || "—";
+  }
+  const body = document.querySelector(selectors.allocationsBody);
+  if (body) {
+    body.innerHTML = "";
+    if (!state.allocations.entries.length) {
+      const row = document.createElement("tr");
+      row.innerHTML = '<td colspan="5" class="muted">No allocations recorded for this month.</td>';
+      body.appendChild(row);
+    } else {
+      state.allocations.entries.forEach((entry) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${entry.allocation_date || "—"}</td>
+          <td class="amount-cell">${formatAmount(entry.amount_minor ?? 0)}</td>
+          <td>${entry.from_category_name || getCategoryDisplayName(entry.from_category_id)}</td>
+          <td>${entry.to_category_name || getCategoryDisplayName(entry.to_category_id)}</td>
+          <td>${entry.memo || "—"}</td>
+        `;
+        body.appendChild(row);
+      });
+    }
+  }
+  const dateInput = document.querySelector(selectors.allocationDateInput);
+  if (dateInput && !dateInput.value) {
+    dateInput.value = todayISO();
+  }
+  const toSelect = document.querySelector(selectors.allocationToSelect);
+  if (toSelect && state.forms.allocation.pendingToCategory) {
+    toSelect.value = state.forms.allocation.pendingToCategory;
+    state.forms.allocation.pendingToCategory = null;
+  }
+};
+
+
+const handleAllocationFormSubmit = async (event) => {
+  event.preventDefault();
+  if (state.forms.allocation.submitting) {
+    return;
+  }
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const toCategoryId = formData.get("to_category_id");
+  const fromCategoryId = formData.get("from_category_id") || null;
+  const allocationDate = formData.get("allocation_date") || todayISO();
+  const memo = (formData.get("memo") || "").toString().trim();
+  const amountMinor = Math.abs(dollarsToMinor(formData.get("amount")));
+  const errorEl = document.querySelector(selectors.allocationError);
+  setFormError(errorEl, "");
+  if (!toCategoryId) {
+    setFormError(errorEl, "Choose the destination category.");
+    return;
+  }
+  if (fromCategoryId && fromCategoryId === toCategoryId) {
+    setFormError(errorEl, "Source and destination categories must differ.");
+    return;
+  }
+  if (amountMinor === 0) {
+    setFormError(errorEl, "Amount must be greater than zero.");
+    return;
+  }
+  if (fromCategoryId) {
+    const available = getCategoryAvailableMinor(fromCategoryId);
+    if (available < amountMinor) {
+      setFormError(errorEl, "Source category does not have enough available funds.");
+      return;
+    }
+  } else if (state.budgets.readyToAssignMinor < amountMinor) {
+    setFormError(errorEl, "Ready-to-Assign is insufficient for this allocation.");
+    return;
+  }
+
+  const payload = {
+    to_category_id: toCategoryId,
+    from_category_id: fromCategoryId || null,
+    amount_minor: amountMinor,
+    allocation_date: allocationDate,
+    memo: memo || null,
+  };
+  const button = document.querySelector(selectors.allocationSubmit);
+  try {
+    state.forms.allocation.submitting = true;
+    setButtonBusy(button, true);
+    await fetchJSON("/api/budget/allocations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const amountInput = form.querySelector("input[name='amount']");
+    if (amountInput) {
+      amountInput.value = "";
+      amountInput.focus();
+    }
+    setFormError(errorEl, "");
+    await Promise.all([
+      loadAllocationsData(),
+      loadBudgetsData(),
+      refreshAccountsPage(),
+    ]);
+    renderAllocationsPage();
+    renderBudgetsPage();
+    updateCategorySelects();
+    const fromLabel = getCategoryDisplayName(fromCategoryId);
+    const toLabel = getCategoryDisplayName(toCategoryId);
+    showToast(`Moved ${formatAmount(Math.abs(payload.amount_minor))} from ${fromLabel} to ${toLabel}`);
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Allocation failed.");
+  } finally {
+    state.forms.allocation.submitting = false;
+    setButtonBusy(button, false);
+  }
+};
+
+const initBudgetsInteractions = () => {
+  const openModalButton = document.querySelector("[data-open-category-modal]");
+  openModalButton?.addEventListener("click", () => openCategoryModal());
+};
+
+const initAllocationsPage = () => {
+  const form = document.querySelector(selectors.allocationForm);
+  form?.addEventListener("submit", handleAllocationFormSubmit);
+};
+
+const setTransactionFlow = (flow) => {
+  state.forms.transaction.flow = flow;
+  document.querySelectorAll(selectors.transactionFlowInputs).forEach((input) => {
+    const isMatch = input.value === flow;
+    input.checked = isMatch;
+  });
+};
+
+const handleTransactionSubmit = async (event) => {
+  event.preventDefault();
+  if (state.forms.transaction.submitting) {
+    return;
+  }
+  const form = event.currentTarget;
+  const errorEl = document.querySelector(selectors.transactionError);
+  const submitButton = document.querySelector(selectors.transactionSubmit);
+  setFormError(errorEl, "");
+  const formData = new FormData(form);
+  const transactionDate = formData.get("transaction_date") || todayISO();
+  const categoryId = formData.get("category_id");
+  const accountId = formData.get("account_id");
+  const memo = (formData.get("memo") || "").toString().trim();
+  const amountMinor = Math.abs(dollarsToMinor(formData.get("amount")));
+  const flow = state.forms.transaction.flow || "outflow";
+  if (!categoryId) {
+    setFormError(errorEl, "Category is required.");
+    return;
+  }
+  if (!accountId) {
+    setFormError(errorEl, "Account is required.");
+    return;
+  }
+  if (amountMinor === 0) {
+    setFormError(errorEl, "Amount must be non-zero.");
+    return;
+  }
+  const signedAmount = flow === "outflow" ? -Math.abs(amountMinor) : Math.abs(amountMinor);
+  const payload = {
+    transaction_date: transactionDate,
+    account_id: accountId,
+    category_id: categoryId,
+    amount_minor: signedAmount,
+    memo: memo || null,
+    status: "pending",
+  };
+  try {
+    state.forms.transaction.submitting = true;
+    setButtonBusy(submitButton, true);
+    await fetchJSON("/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const memoInput = form.querySelector("input[name='memo']");
+    if (memoInput) {
+      memoInput.value = "";
+    }
+    const amountInput = form.querySelector("input[name='amount']");
+    if (amountInput) {
+      amountInput.value = "";
+      amountInput.focus();
+    }
+    await Promise.all([refreshTransactions(transactionsBodyEl), refreshAccountsPage(), loadBudgetsData()]);
+    updateCategorySelects();
+    renderBudgetsPage();
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Failed to save transaction.");
+  } finally {
+    state.forms.transaction.submitting = false;
+    setButtonBusy(submitButton, false);
+  }
+};
+
+const validateTransferForm = () => {
+  const form = document.querySelector(selectors.transferForm);
+  if (!form) {
+    return false;
+  }
+  const sourceSelect = document.querySelector(selectors.transferSourceSelect);
+  const destinationSelect = document.querySelector(selectors.transferDestinationSelect);
+  const categorySelect = document.querySelector(selectors.transferCategorySelect);
+  const amountInput = form.querySelector("input[name='amount']");
+  const source = sourceSelect?.value;
+  const destination = destinationSelect?.value;
+  const categoryId = categorySelect?.value;
+  const amountMinor = Math.abs(dollarsToMinor(amountInput?.value));
+  const sourceHelper = form.querySelector('[data-validation="source"]');
+  const destinationHelper = form.querySelector('[data-validation="destination"]');
+  const identical = source && destination && source === destination;
+  if (sourceHelper) {
+    sourceHelper.textContent = identical ? "Source and destination must differ." : "";
+  }
+  if (destinationHelper) {
+    destinationHelper.textContent = identical ? "Source and destination must differ." : "";
+  }
+  const valid = Boolean(source && destination && categoryId && !identical && amountMinor > 0);
+  const submitButton = document.querySelector(selectors.transferSubmit);
+  if (submitButton) {
+    submitButton.disabled = !valid || state.forms.transfer.submitting;
+  }
+  return valid;
+};
+
+const handleTransferSubmit = async (event) => {
+  event.preventDefault();
+  if (!validateTransferForm() || state.forms.transfer.submitting) {
+    return;
+  }
+  const form = event.currentTarget;
+  const errorEl = document.querySelector(selectors.transferError);
+  setFormError(errorEl, "");
+  const formData = new FormData(form);
+  const payload = {
+    source_account_id: formData.get("source_account_id"),
+    destination_account_id: formData.get("destination_account_id"),
+    category_id: formData.get("category_id"),
+    transaction_date: formData.get("transaction_date") || todayISO(),
+    memo: (formData.get("memo") || "").toString().trim() || null,
+    amount_minor: Math.abs(dollarsToMinor(formData.get("amount"))),
+  };
+  const submitButton = document.querySelector(selectors.transferSubmit);
+  try {
+    state.forms.transfer.submitting = true;
+    setButtonBusy(submitButton, true);
+    const response = await fetchJSON("/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const amountInput = form.querySelector("input[name='amount']");
+    if (amountInput) {
+      amountInput.value = "";
+    }
+    const memoInput = form.querySelector("input[name='memo']");
+    if (memoInput) {
+      memoInput.value = "";
+    }
+    setFormError(errorEl, "");
+    await Promise.all([refreshTransactions(transactionsBodyEl), refreshAccountsPage(), loadBudgetsData()]);
+    renderBudgetsPage();
+    showToast(`Transfer ${response.concept_id} posted (${response.budget_leg.transaction_version_id} & ${response.transfer_leg.transaction_version_id})`);
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Transfer failed.");
+  } finally {
+    state.forms.transfer.submitting = false;
+    setButtonBusy(submitButton, false);
+    validateTransferForm();
+  }
+};
+
+const initTransactionForm = () => {
+  const form = document.querySelector(selectors.transactionForm);
+  if (!form) {
+    return;
+  }
+  const dateInput = form.querySelector("input[name='transaction_date']");
+  if (dateInput) {
+    dateInput.value = todayISO();
+  }
+  form.addEventListener("submit", handleTransactionSubmit);
+  document.querySelectorAll(selectors.transactionFlowInputs).forEach((input) => {
+    input.addEventListener("change", () => {
+      setTransactionFlow(input.value);
+    });
+  });
+  setTransactionFlow(state.forms.transaction.flow);
+};
+
+const initTransferForm = () => {
+  const form = document.querySelector(selectors.transferForm);
+  if (!form) {
+    return;
+  }
+  const dateInput = form.querySelector("input[name='transaction_date']");
+  if (dateInput) {
+    dateInput.value = todayISO();
+  }
+  form.addEventListener("submit", handleTransferSubmit);
+  [selectors.transferSourceSelect, selectors.transferDestinationSelect, selectors.transferCategorySelect].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("change", validateTransferForm);
+  });
+  form.querySelector("input[name='amount']")?.addEventListener("input", validateTransferForm);
+  validateTransferForm();
+};
+
+const openCategoryModal = (category = null) => {
+  const modal = document.querySelector(selectors.categoryModal);
+  const title = document.querySelector(selectors.categoryModalTitle);
+  const hint = document.querySelector(selectors.categoryModalHint);
+  const nameInput = document.querySelector(selectors.categoryNameInput);
+  const slugInput = document.querySelector(selectors.categorySlugInput);
+  const errorEl = document.querySelector(selectors.categoryError);
+  if (!modal || !title || !hint || !nameInput || !slugInput) {
+    return;
+  }
+  state.pendingCategoryEdit = category;
+  categorySlugDirty = false;
+  setFormError(errorEl, "");
+  if (category) {
+    title.textContent = "Rename category";
+    hint.textContent = "Slug edits require migrations, so only the name is editable.";
+    nameInput.value = category.name;
+    slugInput.value = category.category_id;
+    slugInput.disabled = true;
+  } else {
+    title.textContent = "Add category";
+    hint.textContent = "Create a new envelope slug for allocations.";
+    nameInput.value = "";
+    slugInput.value = "";
+    slugInput.disabled = false;
+  }
+  modal.classList.add("is-visible");
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+  nameInput.focus();
+};
+
+const closeCategoryModal = () => {
+  const modal = document.querySelector(selectors.categoryModal);
+  if (!modal) {
+    return;
+  }
+  modal.classList.remove("is-visible");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+  state.pendingCategoryEdit = null;
+};
+
+const handleCategoryFormSubmit = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const nameInput = document.querySelector(selectors.categoryNameInput);
+  const slugInput = document.querySelector(selectors.categorySlugInput);
+  const errorEl = document.querySelector(selectors.categoryError);
+  const submitButton = document.querySelector(selectors.categorySubmit);
+  if (!nameInput || !slugInput) {
+    return;
+  }
+  const name = nameInput.value.trim();
+  const slug = slugInput.value.trim();
+  if (!name || !slug) {
+    setFormError(errorEl, "Name and slug are required.");
+    return;
+  }
+  try {
+    setButtonBusy(submitButton, true);
+    setFormError(errorEl, "");
+    const isEditing = Boolean(state.pendingCategoryEdit);
+    if (isEditing) {
+      await fetchJSON(`/api/budget-categories/${state.pendingCategoryEdit.category_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, is_active: true }),
+      });
+    } else {
+      await fetchJSON("/api/budget-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category_id: slug, name, is_active: true }),
+      });
+    }
+    closeCategoryModal();
+    await Promise.all([loadBudgetsData(), loadReferenceData()]);
+    renderBudgetsPage();
+    showToast(isEditing ? `Renamed ${name}` : `Created ${name}`);
+  } catch (error) {
+    console.error(error);
+    setFormError(errorEl, error.message || "Failed to save category.");
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
+};
+
+const initCategoryModal = () => {
+  const modal = document.querySelector(selectors.categoryModal);
+  if (!modal) {
+    return;
+  }
+  const form = document.querySelector(selectors.categoryForm);
+  form?.addEventListener("submit", handleCategoryFormSubmit);
+  const closeButton = document.querySelector(selectors.categoryModalClose);
+  closeButton?.addEventListener("click", () => closeCategoryModal());
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeCategoryModal();
+    }
+  });
+  const nameInput = document.querySelector(selectors.categoryNameInput);
+  const slugInput = document.querySelector(selectors.categorySlugInput);
+  nameInput?.addEventListener("input", () => {
+    if (state.pendingCategoryEdit || categorySlugDirty || !slugInput) {
+      return;
+    }
+    slugInput.value = slugifyCategoryName(nameInput.value);
+  });
+  slugInput?.addEventListener("input", () => {
+    categorySlugDirty = true;
+  });
+};
+
+
 const init = async () => {
-  const transactionsBody = document.querySelector(selectors.transactionsBody);
-  if (!transactionsBody) {
+  transactionsBodyEl = document.querySelector(selectors.transactionsBody);
+  if (!transactionsBodyEl) {
     console.error("Fatal: Transaction table body not found.");
     return;
   }
@@ -467,6 +1531,19 @@ const init = async () => {
     routeLinks.forEach((link) => {
       link.classList.toggle("active", link.dataset.routeLink === normalizedRoute);
     });
+    if (normalizedRoute === "budgets") {
+      loadBudgetsData()
+        .then(() => renderBudgetsPage())
+        .catch((error) => console.error("Budgets refresh failed", error));
+    }
+    if (normalizedRoute === "allocations") {
+      Promise.all([loadBudgetsData(), loadAllocationsData()])
+        .then(() => {
+          renderBudgetsPage();
+          renderAllocationsPage();
+        })
+        .catch((error) => console.error("Allocations refresh failed", error));
+    }
   };
 
   const handleHashChange = () => {
@@ -479,12 +1556,19 @@ const init = async () => {
 
   updateHeaderStats();
 
+  initBudgetsInteractions();
+  initAllocationsPage();
+  initCategoryModal();
+  initTransactionForm();
+  initTransferForm();
+
+  await loadReferenceData();
+
   try {
-    await refreshTransactions(transactionsBody);
+    await refreshTransactions(transactionsBodyEl);
   } catch (error) {
     console.error(error);
-    const bodyEl = document.querySelector(selectors.transactionsBody);
-    bodyEl.innerHTML = `
+    transactionsBodyEl.innerHTML = `
       <tr>
         <td colspan="6" class="muted" style="text-align: center; color: var(--danger);">
           Error: Could not load transaction data.
@@ -513,14 +1597,10 @@ const init = async () => {
   });
 
   const addAccountBtn = document.querySelector(selectors.addAccountButton);
-  if (addAccountBtn) {
-    addAccountBtn.addEventListener("click", () => showAddAccountModal());
-  }
+  addAccountBtn?.addEventListener("click", () => showAddAccountModal());
 
   const modalClose = document.querySelector(selectors.modalClose);
-  if (modalClose) {
-    modalClose.addEventListener("click", () => toggleAccountModal(false));
-  }
+  modalClose?.addEventListener("click", () => toggleAccountModal(false));
 
   if (modalOverlay) {
     modalOverlay.addEventListener("click", (event) => {
@@ -531,11 +1611,9 @@ const init = async () => {
   }
 
   const modalSubmit = document.querySelector(selectors.modalAddButton);
-  if (modalSubmit) {
-    modalSubmit.addEventListener("click", async () => {
-      await handleAddAccount();
-    });
-  }
+  modalSubmit?.addEventListener("click", async () => {
+    await handleAddAccount();
+  });
 
   const addFormType = document.querySelector(selectors.modalTypeSelect);
   if (addFormType) {
@@ -551,6 +1629,10 @@ const init = async () => {
   }
 
   await refreshAccountsPage();
+  await loadBudgetsData();
+  renderBudgetsPage();
+  await loadAllocationsData();
+  renderAllocationsPage();
 };
 
 document.addEventListener("DOMContentLoaded", init);

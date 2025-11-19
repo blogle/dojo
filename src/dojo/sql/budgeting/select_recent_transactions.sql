@@ -7,6 +7,7 @@ SELECT
     t.category_id,
     c.name AS category_name,
     t.amount_minor,
+    t.status,
     t.memo,
     t.recorded_at
 FROM transactions AS t

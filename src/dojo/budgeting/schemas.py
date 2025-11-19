@@ -16,6 +16,7 @@ class NewTransactionRequest(BaseModel):
     account_id: str = Field(min_length=1, description="Account to impact.")
     category_id: str = Field(min_length=1, description="Budget category to impact.")
     amount_minor: int = Field(description="Signed minor-unit amount (e.g., cents).")
+    status: Literal["pending", "cleared"] = Field(default="pending", description="Ledger status used for reconciliation.")
     memo: Optional[str] = Field(default=None, description="Optional free-form note.")
 
 
@@ -62,6 +63,7 @@ class TransactionResponse(BaseModel):
     concept_id: UUID
     amount_minor: int
     transaction_date: date
+    status: Literal["pending", "cleared"]
     memo: Optional[str]
     account: AccountState
     category: CategoryState
@@ -85,6 +87,7 @@ class TransactionListItem(BaseModel):
     category_id: str
     category_name: str
     amount_minor: int
+    status: Literal["pending", "cleared"]
     memo: Optional[str]
     recorded_at: datetime
 
@@ -120,7 +123,44 @@ class ReadyToAssignResponse(BaseModel):
     ready_to_assign_decimal: Decimal
 
 
+class BudgetAllocationRequest(BaseModel):
+    """Move Ready-to-Assign or reassign funds between envelopes."""
+
+    category_id: str | None = Field(default=None, description="Deprecated alias for `to_category_id`.")
+    to_category_id: str | None = Field(default=None, description="Destination category receiving funds.")
+    from_category_id: str | None = Field(default=None, description="Optional source category providing funds.")
+    amount_minor: int = Field(gt=0)
+    allocation_date: date | None = Field(default=None, description="Date the allocation is recorded (defaults to today).")
+    memo: Optional[str] = Field(default=None, description="Optional note for the allocation ledger.")
+    month_start: date | None = Field(default=None, description="Optional month override (YYYY-MM-01).")
+
+
 SLUG_PATTERN = r"^[a-z0-9_]+$"
+
+
+class BudgetAllocationEntry(BaseModel):
+    """Single ledger entry describing a budget allocation."""
+
+    allocation_id: UUID
+    allocation_date: date
+    amount_minor: int
+    from_category_id: Optional[str]
+    from_category_name: Optional[str]
+    to_category_id: str
+    to_category_name: str
+    memo: Optional[str]
+    created_at: datetime
+
+
+class BudgetAllocationsResponse(BaseModel):
+    """Allocation ledger plus month summary information."""
+
+    month_start: date
+    inflow_minor: int
+    inflow_decimal: Decimal
+    ready_to_assign_minor: int
+    ready_to_assign_decimal: Decimal
+    allocations: list[BudgetAllocationEntry]
 
 
 class AccountCommand(BaseModel):
@@ -183,3 +223,6 @@ class BudgetCategoryDetail(BudgetCategoryCommand):
     category_id: str
     created_at: datetime
     updated_at: datetime
+    available_minor: int = Field(default=0, description="Current available funds for the month in minor units.")
+    activity_minor: int = Field(default=0, description="Month-to-date activity amount in minor units.")
+    allocated_minor: int = Field(default=0, description="Month-to-date allocations applied to this envelope in minor units.")

@@ -22,12 +22,14 @@ def test_create_transaction_updates_account_and_category(in_memory_db: duckdb.Du
 
     response = service.create(in_memory_db, cmd)
 
+    assert response.status == "pending"
     assert response.account.current_balance_minor == 500000 - 12345
     assert response.category.available_minor == 12345 * -1
     rows = in_memory_db.execute(
         "SELECT COUNT(*) FROM transactions WHERE concept_id = ?",
         [str(response.concept_id)],
     ).fetchone()
+    assert rows is not None
     assert rows[0] == 1
 
 
@@ -47,8 +49,11 @@ def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyC
         account_id="house_checking",
         category_id="groceries",
         amount_minor=-2000,
+        status="cleared",
     )
-    service.create(in_memory_db, edit_cmd)
+    updated = service.create(in_memory_db, edit_cmd)
+
+    assert updated.status == "cleared"
 
     counts = in_memory_db.execute(
         """
@@ -59,7 +64,15 @@ def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyC
         """,
         [str(first.concept_id)],
     ).fetchone()
+    assert counts is not None
     assert counts[0] == 1
+
+    status_row = in_memory_db.execute(
+        "SELECT status FROM transactions WHERE transaction_version_id = ?",
+        [str(updated.transaction_version_id)],
+    ).fetchone()
+    assert status_row is not None
+    assert status_row[0] == "cleared"
 
 
 def test_zero_amount_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -170,6 +183,7 @@ def test_transfer_cash_to_investment_updates_balances(in_memory_db: duckdb.DuckD
         "SELECT COUNT(*) FROM transactions WHERE concept_id = ?",
         [str(response.concept_id)],
     ).fetchone()
+    assert rows is not None
     assert rows[0] == 2
 
     checking = in_memory_db.execute(
@@ -178,6 +192,8 @@ def test_transfer_cash_to_investment_updates_balances(in_memory_db: duckdb.DuckD
     investment = in_memory_db.execute(
         "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_investment'"
     ).fetchone()
+    assert checking is not None
+    assert investment is not None
     assert checking[0] == 500000 - amount
     assert investment[0] == amount
     assert response.category.available_minor == -amount
@@ -201,19 +217,120 @@ def test_transfer_cash_to_liability_updates_category_state(in_memory_db: duckdb.
         CategorizedTransferRequest(
             source_account_id="house_checking",
             destination_account_id="house_loan",
-            category_id="housing",
+            category_id="groceries",
             amount_minor=amount,
             transaction_date=date.today(),
-            memo="Mortgage payment",
+            memo="Pay down loan",
         ),
     )
 
-    loan_balance = in_memory_db.execute(
+    liability = in_memory_db.execute(
         "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_loan'"
     ).fetchone()
-    assert loan_balance[0] == 400000 - amount
-    assert response.category.activity_minor == amount
+    assert liability is not None
+    assert liability[0] == 400000 - amount
     assert response.category.available_minor == -amount
+
+
+def test_allocate_envelope_updates_ready_to_assign(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+    baseline_ready = service.ready_to_assign(in_memory_db, month_start)
+
+    category_state = service.allocate_envelope(in_memory_db, "groceries", 5000, month_start)
+
+    assert category_state.available_minor == 5000
+    updated_ready = service.ready_to_assign(in_memory_db, month_start)
+    assert updated_ready == baseline_ready - 5000
+
+
+def test_allocate_envelope_blocks_when_ready_insufficient(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+    ready_minor = service.ready_to_assign(in_memory_db, month_start)
+    with pytest.raises(InvalidTransaction):
+        service.allocate_envelope(in_memory_db, "groceries", ready_minor + 100, month_start)
+
+
+def test_reassign_between_categories_updates_both_states(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+    service.allocate_envelope(in_memory_db, "groceries", 5000, month_start)
+
+    service.allocate_envelope(
+        in_memory_db,
+        "housing",
+        2000,
+        month_start,
+        from_category_id="groceries",
+        memo="cover rent",
+    )
+
+    groceries_state = in_memory_db.execute(
+        "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = ? AND month_start = ?",
+        ["groceries", month_start],
+    ).fetchone()
+    housing_state = in_memory_db.execute(
+        "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = ? AND month_start = ?",
+        ["housing", month_start],
+    ).fetchone()
+    assert groceries_state is not None
+    assert groceries_state[0] == 3000
+    assert housing_state is not None
+    assert housing_state[0] == 2000
+    ledger_row = in_memory_db.execute(
+        "SELECT to_category_id, from_category_id, amount_minor, memo FROM budget_allocations ORDER BY created_at DESC LIMIT 1",
+        [],
+    ).fetchone()
+    assert ledger_row is not None
+    assert ledger_row[0] == "housing"
+    assert ledger_row[1] == "groceries"
+    assert ledger_row[2] == 2000
+    assert ledger_row[3] == "cover rent"
+
+
+def test_month_cash_inflow_counts_cash_accounts_only(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+    service.create(
+        in_memory_db,
+        NewTransactionRequest(
+            transaction_date=date.today(),
+            account_id="house_checking",
+            category_id="income",
+            amount_minor=60000,
+        ),
+    )
+    service.create(
+        in_memory_db,
+        NewTransactionRequest(
+            transaction_date=date.today(),
+            account_id="house_checking",
+            category_id="groceries",
+            amount_minor=-1000,
+        ),
+    )
+    insert_account(
+        in_memory_db,
+        "external_brokerage",
+        "External Brokerage",
+        "asset",
+        "investment",
+        "tracking",
+        0,
+    )
+    service.create(
+        in_memory_db,
+        NewTransactionRequest(
+            transaction_date=date.today(),
+            account_id="external_brokerage",
+            category_id="income",
+            amount_minor=40000,
+        ),
+    )
+
+    inflow = service.month_cash_inflow(in_memory_db, month_start)
+    assert inflow == 60000
 
 
 def test_transfer_investment_to_cash_treated_as_income(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -247,6 +364,8 @@ def test_transfer_investment_to_cash_treated_as_income(in_memory_db: duckdb.Duck
     checking_balance = in_memory_db.execute(
         "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_checking'"
     ).fetchone()
+    assert investment_balance is not None
+    assert checking_balance is not None
     assert investment_balance[0] == 50000 - amount
     assert checking_balance[0] == 500000 + amount
     assert response.category.activity_minor == amount

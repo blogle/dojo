@@ -114,7 +114,12 @@ nix develop
 
 ## Usage
 
-*(Copy-pasteable snippets for CLI/API usage)*
+### SPA Budgeting Flows
+
+- **Transactions (`#/transactions`)**: Use the compact transaction form above the ledger to record inflows or outflows. Pick the account & category, set the type toggle (Outflow/Inflow), enter the memo/amount (always dollars), and submit to post `/api/transactions`. Click any ledger row (or its status pill) to edit inline—change the amount, account, category, flow, or pending/cleared flag—and save without leaving the table. Hero cards surface spent vs. budgeted month-to-date totals sourced directly from the ledger and allocation APIs so they reconcile with Ready-to-Assign.
+- **Allocations (`#/allocations`)**: Dedicated summary chips show “Inflow (this month)” and “Available to budget,” and the ledger lists every movement between envelopes. The form captures date, optional source category (defaulting to Ready-to-Assign), destination category, memo, and amount before posting to `/api/budget/allocations`.
+- **Budgets (`#/budgets`)**: The summary bar shows Ready-to-Assign, activity, available amounts, and the active month for quick context. Use “Add category” to open the modal (slug auto-fills from the name) and manage envelopes; the Allocate button routes to the allocations page with the destination pre-selected.
+- **Categorized transfers (`#/transfers`)**: The dedicated Transfers page hosts the dual-leg form. Select distinct source/destination accounts plus a reimbursement category, enter the amount in dollars, and submit to hit `/api/transfers`. The toast exposes concept + transaction ids so you can cross-check the ledger rows (`data-concept-id` attributes).
 
 ### CLI
 

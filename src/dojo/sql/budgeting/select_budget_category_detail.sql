@@ -1,8 +1,14 @@
 SELECT
-    category_id,
-    name,
-    is_active,
-    created_at,
-    updated_at
-FROM budget_categories
-WHERE category_id = ?;
+    c.category_id,
+    c.name,
+    c.is_active,
+    c.created_at,
+    c.updated_at,
+    COALESCE(s.available_minor, 0) AS available_minor,
+    COALESCE(s.activity_minor, 0) AS activity_minor,
+    COALESCE(s.allocated_minor, 0) AS allocated_minor
+FROM budget_categories AS c
+LEFT JOIN budget_category_monthly_state AS s
+    ON s.category_id = c.category_id
+   AND s.month_start = ?
+WHERE c.category_id = ?;

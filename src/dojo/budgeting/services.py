@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Any, Tuple
+from typing import Any, Literal, Optional, Tuple
 from uuid import UUID, uuid4
 
 import duckdb
@@ -74,6 +74,7 @@ class TransactionEntryService:
                 transaction_date=cmd.transaction_date,
                 amount_minor=cmd.amount_minor,
                 memo=cmd.memo,
+                status=cmd.status,
                 recorded_at=recorded_at,
             )
 
@@ -104,6 +105,7 @@ class TransactionEntryService:
             concept_id=concept_id,
             amount_minor=cmd.amount_minor,
             transaction_date=cmd.transaction_date,
+            status=cmd.status,
             memo=cmd.memo,
             account=account_state,
             category=category_state,
@@ -143,6 +145,7 @@ class TransactionEntryService:
                 transaction_date=cmd.transaction_date,
                 amount_minor=source_amount,
                 memo=cmd.memo,
+                status="cleared",
                 recorded_at=recorded_at,
             )
             update_account_sql = load_sql("update_account_balance.sql")
@@ -160,6 +163,7 @@ class TransactionEntryService:
                 transaction_date=cmd.transaction_date,
                 amount_minor=destination_amount,
                 memo=cmd.memo,
+                status="cleared",
                 recorded_at=recorded_at,
             )
             conn.execute(
@@ -203,6 +207,74 @@ class TransactionEntryService:
             return 0
         return int(row[0])
 
+    def allocate_envelope(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        category_id: str,
+        amount_minor: int,
+        month_start: date | None = None,
+        *,
+        from_category_id: str | None = None,
+        memo: str | None = None,
+        allocation_date: date | None = None,
+    ) -> CategoryState:
+        if amount_minor <= 0:
+            raise InvalidTransaction("amount_minor must be positive for allocations.")
+        destination_category_id = category_id
+        if not destination_category_id:
+            raise InvalidTransaction("to_category_id is required for allocations.")
+        if from_category_id and from_category_id == destination_category_id:
+            raise InvalidTransaction("Source and destination categories must differ.")
+        allocation_day = allocation_date or date.today()
+        month = (month_start or allocation_day).replace(day=1)
+        memo_value = memo.strip() if memo else None
+
+        # Ensure the categories exist and states are available before mutating balances.
+        self._fetch_category(conn, destination_category_id)
+        source_state: CategoryState | None = None
+        if from_category_id:
+            self._fetch_category(conn, from_category_id)
+            source_state = self._fetch_category_month_state(conn, from_category_id, month)
+            if source_state.available_minor < amount_minor:
+                raise InvalidTransaction("Source category does not have enough available funds.")
+        else:
+            ready_minor = self.ready_to_assign(conn, month)
+            if ready_minor < amount_minor:
+                raise InvalidTransaction("Ready-to-Assign is insufficient for this allocation.")
+
+        adjust_sql = load_sql("adjust_category_allocation.sql")
+        insert_sql = load_sql("insert_budget_allocation.sql")
+        allocation_id = uuid4()
+        conn.execute("BEGIN")
+        try:
+            conn.execute(
+                insert_sql,
+                [
+                    str(allocation_id),
+                    allocation_day,
+                    month,
+                    from_category_id,
+                    destination_category_id,
+                    amount_minor,
+                    memo_value,
+                ],
+            )
+            conn.execute(
+                adjust_sql,
+                [destination_category_id, month, amount_minor, amount_minor],
+            )
+            if from_category_id:
+                conn.execute(
+                    adjust_sql,
+                    [from_category_id, month, -amount_minor, -amount_minor],
+                )
+            category_state = self._fetch_category_month_state(conn, destination_category_id, month)
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        return category_state
+
     def list_recent(
         self,
         conn: duckdb.DuckDBPyConnection,
@@ -220,11 +292,46 @@ class TransactionEntryService:
                 category_id=row[5],
                 category_name=row[6],
                 amount_minor=int(row[7]),
-                memo=row[8],
-                recorded_at=row[9],
+                status=row[8],
+                memo=row[9],
+                recorded_at=row[10],
             )
             for row in rows
         ]
+
+    def list_allocations(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        month_start: date,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        sql = load_sql("select_budget_allocations.sql")
+        rows = conn.execute(sql, [month_start, limit]).fetchall()
+        return [
+            {
+                "allocation_id": row[0],
+                "allocation_date": row[1],
+                "amount_minor": int(row[2]),
+                "memo": row[3],
+                "from_category_id": row[4],
+                "from_category_name": row[5],
+                "to_category_id": row[6],
+                "to_category_name": row[7],
+                "created_at": row[8],
+            }
+            for row in rows
+        ]
+
+    def month_cash_inflow(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        month_start: date,
+    ) -> int:
+        sql = load_sql("sum_month_cash_inflows.sql")
+        row = conn.execute(sql, [month_start, month_start]).fetchone()
+        if row is None:
+            return 0
+        return int(row[0])
 
     def _validate_payload(self, cmd: NewTransactionRequest) -> None:
         if cmd.amount_minor == 0:
@@ -252,6 +359,7 @@ class TransactionEntryService:
         transaction_date: date,
         amount_minor: int,
         memo: Optional[str],
+        status: Literal["pending", "cleared"],
         recorded_at: datetime,
     ) -> None:
         insert_sql = load_sql("insert_transaction.sql")
@@ -265,6 +373,7 @@ class TransactionEntryService:
                 transaction_date,
                 amount_minor,
                 memo,
+                status,
                 recorded_at,
                 recorded_at,
                 self.SOURCE,
@@ -432,17 +541,23 @@ class AccountAdminService:
 class BudgetCategoryAdminService:
     """CRUD surface for budget categories."""
 
-    def list_categories(self, conn: duckdb.DuckDBPyConnection) -> list[BudgetCategoryDetail]:
+    def list_categories(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        month_start: date | None = None,
+    ) -> list[BudgetCategoryDetail]:
+        month = self._coerce_month_start(month_start)
         sql = load_sql("select_budget_categories_admin.sql")
-        rows = conn.execute(sql).fetchall()
+        rows = conn.execute(sql, [month]).fetchall()
         return [self._row_to_category(row) for row in rows]
 
     def create_category(
         self,
         conn: duckdb.DuckDBPyConnection,
         payload: BudgetCategoryCreateRequest,
+        month_start: date | None = None,
     ) -> BudgetCategoryDetail:
-        if self._fetch_category_optional(conn, payload.category_id) is not None:
+        if self._fetch_category_optional(conn, payload.category_id, month_start) is not None:
             raise CategoryAlreadyExists(f"Category `{payload.category_id}` already exists.")
         sql = load_sql("insert_budget_category.sql")
         conn.execute("BEGIN")
@@ -452,15 +567,16 @@ class BudgetCategoryAdminService:
         except Exception:
             conn.execute("ROLLBACK")
             raise
-        return self._require_category(conn, payload.category_id)
+        return self._require_category(conn, payload.category_id, month_start)
 
     def update_category(
         self,
         conn: duckdb.DuckDBPyConnection,
         category_id: str,
         payload: BudgetCategoryUpdateRequest,
+        month_start: date | None = None,
     ) -> BudgetCategoryDetail:
-        self._require_category(conn, category_id)
+        self._require_category(conn, category_id, month_start)
         sql = load_sql("update_budget_category.sql")
         conn.execute("BEGIN")
         try:
@@ -469,7 +585,7 @@ class BudgetCategoryAdminService:
         except Exception:
             conn.execute("ROLLBACK")
             raise
-        return self._require_category(conn, category_id)
+        return self._require_category(conn, category_id, month_start)
 
     def deactivate_category(self, conn: duckdb.DuckDBPyConnection, category_id: str) -> None:
         self._require_category(conn, category_id)
@@ -483,18 +599,25 @@ class BudgetCategoryAdminService:
             raise
 
     def _require_category(
-        self, conn: duckdb.DuckDBPyConnection, category_id: str
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        category_id: str,
+        month_start: date | None = None,
     ) -> BudgetCategoryDetail:
-        row = self._fetch_category_optional(conn, category_id)
+        row = self._fetch_category_optional(conn, category_id, month_start)
         if row is None:
             raise CategoryNotFound(f"Category `{category_id}` was not found.")
         return self._row_to_category(row)
 
     def _fetch_category_optional(
-        self, conn: duckdb.DuckDBPyConnection, category_id: str
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        category_id: str,
+        month_start: date | None = None,
     ) -> Tuple[Any, ...] | None:
         sql = load_sql("select_budget_category_detail.sql")
-        return conn.execute(sql, [category_id]).fetchone()
+        month = self._coerce_month_start(month_start)
+        return conn.execute(sql, [month, category_id]).fetchone()
 
     def _row_to_category(self, row: Tuple[Any, ...]) -> BudgetCategoryDetail:
         return BudgetCategoryDetail(
@@ -503,4 +626,14 @@ class BudgetCategoryAdminService:
             is_active=bool(row[2]),
             created_at=row[3],
             updated_at=row[4],
+            available_minor=int(row[5]),
+            activity_minor=int(row[6]),
+            allocated_minor=int(row[7]),
         )
+
+    @staticmethod
+    def _coerce_month_start(month_start: date | None) -> date:
+        if month_start is None:
+            today = date.today()
+            return today.replace(day=1)
+        return month_start.replace(day=1)
