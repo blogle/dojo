@@ -90,7 +90,29 @@ const selectors = {
   toastStack: "#toast-stack",
 };
 
+const SPECIAL_CATEGORY_IDS = {
+  openingBalance: "opening_balance",
+  accountTransfer: "account_transfer",
+  availableToBudget: "available_to_budget",
+  balanceAdjustment: "balance_adjustment",
+};
+
+const SPECIAL_CATEGORY_LABELS = {
+  [SPECIAL_CATEGORY_IDS.openingBalance]: "Opening Balance",
+  [SPECIAL_CATEGORY_IDS.accountTransfer]: "Account Transfer",
+  [SPECIAL_CATEGORY_IDS.availableToBudget]: "Available to Budget",
+  [SPECIAL_CATEGORY_IDS.balanceAdjustment]: "Balance Adjustment",
+};
+
+const systemCategoryIds = new Set(Object.values(SPECIAL_CATEGORY_IDS));
+
+const isSystemCategoryId = (categoryId) => Boolean(categoryId && systemCategoryIds.has(categoryId));
+
+const filterUserFacingCategories = (categories = []) =>
+  categories.filter((category) => category.is_active !== false && !isSystemCategoryId(category.category_id));
+
 const accountGroupDefinitions = [
+
   {
     id: "cash",
     title: "Cash & Checking",
@@ -149,6 +171,7 @@ const state = {
   },
   budgets: {
     categories: [],
+    rawCategories: [],
     groups: [],
     readyToAssignMinor: 0,
     activityMinor: 0,
@@ -236,6 +259,28 @@ const currentMonthStartISO = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
+const postOpeningBalanceTransaction = async (account, openingBalanceMinor) => {
+  if (!account || !openingBalanceMinor) {
+    return;
+  }
+  const signedAmount = account.account_type === "liability" ? -openingBalanceMinor : openingBalanceMinor;
+  if (signedAmount === 0) {
+    return;
+  }
+  await fetchJSON("/api/transactions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transaction_date: todayISO(),
+      account_id: account.account_id,
+      category_id: SPECIAL_CATEGORY_IDS.openingBalance,
+      amount_minor: signedAmount,
+      memo: "Opening balance",
+      status: "cleared",
+    }),
+  });
+};
+
 
 const computeCurrentMonthSpend = (transactions) => {
   const now = new Date();
@@ -289,12 +334,23 @@ const updateAccountSelects = () => {
   populateSelect(document.querySelector(selectors.transferDestinationSelect), sorted, { valueKey: "account_id", labelKey: "name" }, "Select destination");
 };
 
-const getCategoryOptions = () => {
+const getCategoryOptions = ({ includeSystem = false } = {}) => {
   const source = state.budgets.categories.length ? state.budgets.categories : state.reference.categories;
-  return [...source].filter((category) => category.is_active !== false).sort((a, b) => a.name.localeCompare(b.name));
+  return [...source]
+    .filter((category) => {
+      const isSystem = isSystemCategoryId(category.category_id);
+      if (isSystem) {
+        return includeSystem;
+      }
+      return category.is_active !== false;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 };
 
-const findBudgetCategory = (categoryId) => state.budgets.categories.find((category) => category.category_id === categoryId);
+const findBudgetCategory = (categoryId, { includeHidden = false } = {}) => {
+  const source = includeHidden && state.budgets.rawCategories?.length ? state.budgets.rawCategories : state.budgets.categories;
+  return source.find((category) => category.category_id === categoryId);
+};
 
 const getCategoryAvailableMinor = (categoryId) => {
   const category = findBudgetCategory(categoryId);
@@ -305,15 +361,20 @@ const getCategoryDisplayName = (categoryId) => {
   if (!categoryId) {
     return "Ready to Assign";
   }
-  const category = findBudgetCategory(categoryId) || state.reference.categories.find((cat) => cat.category_id === categoryId);
+  if (SPECIAL_CATEGORY_LABELS[categoryId]) {
+    return SPECIAL_CATEGORY_LABELS[categoryId];
+  }
+  const category =
+    findBudgetCategory(categoryId, { includeHidden: true }) || state.reference.categories.find((cat) => cat.category_id === categoryId);
   return category ? category.name : categoryId;
 };
 
 const updateCategorySelects = () => {
-  const categories = getCategoryOptions();
-  populateSelect(document.querySelector(selectors.transactionCategorySelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
-  populateSelect(document.querySelector(selectors.transferCategorySelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
-  populateSelect(document.querySelector(selectors.allocationToSelect), categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  const userCategories = getCategoryOptions();
+  const transactionCategories = getCategoryOptions({ includeSystem: true });
+  populateSelect(document.querySelector(selectors.transactionCategorySelect), transactionCategories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  populateSelect(document.querySelector(selectors.transferCategorySelect), userCategories, { valueKey: "category_id", labelKey: "name" }, "Select category");
+  populateSelect(document.querySelector(selectors.allocationToSelect), userCategories, { valueKey: "category_id", labelKey: "name" }, "Select category");
   const fromSelect = document.querySelector(selectors.allocationFromSelect);
   if (fromSelect) {
     const previous = fromSelect.value;
@@ -322,7 +383,7 @@ const updateCategorySelects = () => {
     defaultOption.value = "";
     defaultOption.textContent = "Ready to Assign";
     fragment.appendChild(defaultOption);
-    categories.forEach((category) => {
+    userCategories.forEach((category) => {
       const option = document.createElement("option");
       option.value = category.category_id;
       option.textContent = category.name;
@@ -330,7 +391,7 @@ const updateCategorySelects = () => {
     });
     fromSelect.innerHTML = "";
     fromSelect.appendChild(fragment);
-    if (previous && categories.some((category) => category.category_id === previous)) {
+    if (previous && userCategories.some((category) => category.category_id === previous)) {
       fromSelect.value = previous;
     } else {
       fromSelect.value = "";
@@ -450,7 +511,7 @@ const hydrateInlineEditRow = (row, transaction) => {
   }
   const categorySelect = row.querySelector("[data-inline-category]");
   if (categorySelect) {
-    const categories = getCategoryOptions();
+    const categories = getCategoryOptions({ includeSystem: true });
     populateSelect(categorySelect, categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
     categorySelect.value = transaction.category_id || "";
   }
@@ -931,7 +992,6 @@ const showAddAccountModal = () => {
 };
 
 const handleAddAccount = async () => {
-  const formData = {};
   const nameInput = document.querySelector(selectors.modalNameInput);
   const balanceInput = document.querySelector(selectors.modalBalanceInput);
   const typeSelect = document.querySelector(selectors.modalTypeSelect);
@@ -960,21 +1020,37 @@ const handleAddAccount = async () => {
     account_type: mapping.account_type,
     account_class: mapping.account_class,
     account_role: mapping.account_role,
-    current_balance_minor: balanceMinor,
+    current_balance_minor: 0,
     currency: "USD",
   };
 
   try {
-    await fetchJSON("/api/accounts", {
+    const createdAccount = await fetchJSON("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
+    if (balanceMinor !== 0) {
+      try {
+        await postOpeningBalanceTransaction(createdAccount, balanceMinor);
+      } catch (innerError) {
+        console.error(innerError);
+        alert(
+          "Account created, but we couldn't record the opening balance transaction. You can retry from the ledger later."
+        );
+      }
+    }
+
     nameInput.value = "";
     balanceInput.value = "";
     toggleAccountModal(false);
-    await refreshAccountsPage();
-    await loadReferenceData();
+    try {
+      await Promise.all([refreshAccountsPage(), loadReferenceData(), loadBudgetsData()]);
+      renderBudgetsPage();
+    } catch (refreshError) {
+      console.error("Account created but failed to refresh UI state", refreshError);
+    }
   } catch (error) {
     console.error(error);
     alert(error.message || "Failed to create account.");
@@ -1001,12 +1077,14 @@ const loadBudgetsData = async () => {
       fetchJSON("/api/budget-category-groups"),
       fetchJSON(`/api/budget/ready-to-assign?month=${month}`),
     ]);
-    state.budgets.categories = (categories || []).map((category) => ({
+    const normalizedCategories = (categories || []).map((category) => ({
       ...category,
       available_minor: category.available_minor ?? 0,
       activity_minor: category.activity_minor ?? 0,
       allocated_minor: category.allocated_minor ?? 0,
     }));
+    state.budgets.rawCategories = normalizedCategories;
+    state.budgets.categories = filterUserFacingCategories(normalizedCategories);
     state.budgets.groups = (groups || []).sort((a, b) => a.sort_order - b.sort_order);
     state.budgets.readyToAssignMinor = ready?.ready_to_assign_minor ?? 0;
     state.budgets.activityMinor = state.budgets.categories.reduce((total, category) => total + (category.activity_minor ?? 0), 0);

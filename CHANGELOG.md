@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rebuilt the Transactions UI with an inflow/outflow toggle, inline editable rows (no modal hops), and moved categorized transfers into their own page so single-leg ledger work stays focused.
 - Transactions ledger rows now enter inline edit mode on click with separate inflow/outflow columns and the compact StatusToggle badge, removing the redundant actions column and the old “quick edit” buttons.
 - Removed the hard-coded house accounts/categories from `0001_core.sql`; README now documents optional seed scripts so migrations stay production-safe by default.
+- Promoted opening balance, available-to-budget, transfer, and balance-adjustment categories to first-class system envelopes so ledger posts stay valid, hidden from the budgets UI, and excluded from activity math while still contributing to Ready to Assign.
 
 ### Deprecated
 

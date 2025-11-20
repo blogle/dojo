@@ -26,4 +26,5 @@ LEFT JOIN budget_category_monthly_state AS s
 LEFT JOIN budget_category_monthly_state AS prev
     ON prev.category_id = c.category_id
     AND prev.month_start = ?
+WHERE c.is_system IS NOT TRUE
 ORDER BY c.created_at ASC;

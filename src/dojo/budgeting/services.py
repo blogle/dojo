@@ -64,6 +64,7 @@ class TransactionEntryService:
         try:
             account_row = self._fetch_account(conn, cmd.account_id)
             category_row = self._fetch_category(conn, cmd.category_id)
+            track_budget_activity = not self._is_system_category(category_row)
 
             if cmd.concept_id is not None:
                 close_sql = load_sql("close_active_transaction.sql")
@@ -91,11 +92,12 @@ class TransactionEntryService:
                 [cmd.amount_minor, cmd.amount_minor, cmd.account_id],
             )
 
-            upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
-            conn.execute(
-                upsert_category_sql,
-                [cmd.category_id, month_start, activity_delta, activity_delta],
-            )
+            if track_budget_activity:
+                upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
+                conn.execute(
+                    upsert_category_sql,
+                    [cmd.category_id, month_start, activity_delta, activity_delta],
+                )
 
             account_state = self._account_state_from_row(
                 self._fetch_account(conn, cmd.account_id)
@@ -139,6 +141,7 @@ class TransactionEntryService:
             source_row = self._fetch_account(conn, cmd.source_account_id)
             destination_row = self._fetch_account(conn, cmd.destination_account_id)
             category_row = self._fetch_category(conn, cmd.category_id)
+            track_budget_activity = not self._is_system_category(category_row)
 
             budget_leg_id = uuid4()
             transfer_leg_id = uuid4()
@@ -178,12 +181,13 @@ class TransactionEntryService:
                 [destination_amount, destination_amount, cmd.destination_account_id],
             )
 
-            upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
-            activity_delta = -source_amount
-            conn.execute(
-                upsert_category_sql,
-                [cmd.category_id, month_start, activity_delta, activity_delta],
-            )
+            if track_budget_activity:
+                upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
+                activity_delta = -source_amount
+                conn.execute(
+                    upsert_category_sql,
+                    [cmd.category_id, month_start, activity_delta, activity_delta],
+                )
 
             source_state = self._account_state_from_row(self._fetch_account(conn, cmd.source_account_id))
             destination_state = self._account_state_from_row(self._fetch_account(conn, cmd.destination_account_id))
@@ -237,10 +241,14 @@ class TransactionEntryService:
         memo_value = memo.strip() if memo else None
 
         # Ensure the categories exist and states are available before mutating balances.
-        self._fetch_category(conn, destination_category_id)
+        destination_category = self._fetch_category(conn, destination_category_id)
+        if self._is_system_category(destination_category):
+            raise InvalidTransaction("System categories cannot receive allocations.")
         source_state: CategoryState | None = None
         if from_category_id:
-            self._fetch_category(conn, from_category_id)
+            source_category = self._fetch_category(conn, from_category_id)
+            if self._is_system_category(source_category):
+                raise InvalidTransaction("System categories cannot provide allocations.")
             source_state = self._fetch_category_month_state(conn, from_category_id, month)
             if source_state.available_minor < amount_minor:
                 raise InvalidTransaction("Source category does not have enough available funds.")
@@ -410,6 +418,12 @@ class TransactionEntryService:
         if row is None or not row[2]:
             raise UnknownCategory(f"Category `{category_id}` is not active.")
         return row
+
+    @staticmethod
+    def _is_system_category(category_row: Tuple[Any, ...]) -> bool:
+        if len(category_row) < 4:
+            return False
+        return bool(category_row[3])
 
     def _fetch_category_month_state(
         self,

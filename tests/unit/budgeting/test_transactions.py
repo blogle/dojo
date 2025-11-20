@@ -33,6 +33,48 @@ def test_create_transaction_updates_account_and_category(in_memory_db: duckdb.Du
     assert rows[0] == 1
 
 
+def test_system_category_transactions_skip_budget_activity(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    cmd = NewTransactionRequest(
+        transaction_date=date.today(),
+        account_id="house_checking",
+        category_id="opening_balance",
+        amount_minor=25000,
+        memo="Seed balance",
+    )
+
+    response = service.create(in_memory_db, cmd)
+
+    assert response.category.activity_minor == 0
+    assert response.category.available_minor == 0
+    row = in_memory_db.execute(
+        "SELECT COUNT(*) FROM budget_category_monthly_state WHERE category_id = 'opening_balance'",
+        []
+    ).fetchone()
+    assert row is not None
+    assert row[0] == 0
+
+
+def test_available_to_budget_increases_ready_to_assign(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+    baseline_ready = service.ready_to_assign(in_memory_db, month_start)
+
+    service.create(
+        in_memory_db,
+        NewTransactionRequest(
+            transaction_date=date.today(),
+            account_id="house_checking",
+            category_id="available_to_budget",
+            amount_minor=50000,
+            memo="Paycheck",
+        ),
+    )
+
+    updated_ready = service.ready_to_assign(in_memory_db, month_start)
+    assert updated_ready == baseline_ready + 50000
+
+
 def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     service = TransactionEntryService()
     first_cmd = NewTransactionRequest(
@@ -230,6 +272,23 @@ def test_transfer_cash_to_liability_updates_category_state(in_memory_db: duckdb.
     assert liability is not None
     assert liability[0] == 400000 - amount
     assert response.category.available_minor == -amount
+
+
+def test_allocate_envelope_blocked_for_system_categories(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+
+    with pytest.raises(InvalidTransaction):
+        service.allocate_envelope(in_memory_db, "opening_balance", 1000, month_start)
+
+    with pytest.raises(InvalidTransaction):
+        service.allocate_envelope(
+            in_memory_db,
+            "groceries",
+            500,
+            month_start,
+            from_category_id="opening_balance",
+        )
 
 
 def test_allocate_envelope_updates_ready_to_assign(in_memory_db: duckdb.DuckDBPyConnection) -> None:
