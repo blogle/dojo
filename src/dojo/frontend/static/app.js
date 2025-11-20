@@ -1085,11 +1085,12 @@ const renderBudgetsPage = () => {
 
     const groupRow = document.createElement("tr");
     groupRow.className = "group-row";
+    groupRow.style.cursor = "pointer";
+    groupRow.dataset.groupId = group.group_id;
     groupRow.innerHTML = `
       <td colspan="4" class="group-cell" style="background-color: var(--stone-50); font-weight: 600;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="cursor: pointer;" data-open-group-detail="${group.group_id}">${group.name}</span>
-          ${group.group_id !== "uncategorized" ? `<button class="secondary" data-edit-group="${group.group_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>` : ""}
+          <span>${group.name}</span>
         </div>
       </td>
     `;
@@ -1097,6 +1098,9 @@ const renderBudgetsPage = () => {
 
     group.items.forEach((cat) => {
       const row = document.createElement("tr");
+      row.style.cursor = "pointer";
+      row.dataset.categoryId = cat.category_id;
+      
       let goalText = "";
       if (cat.goal_type === "target_date" && cat.goal_amount_minor) {
         goalText = `<div class="small-note muted">Goal: ${formatAmount(cat.goal_amount_minor)} by ${cat.goal_target_date || "?"}</div>`;
@@ -1108,11 +1112,10 @@ const renderBudgetsPage = () => {
       row.innerHTML = `
         <td>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="cursor: pointer;" data-open-detail="${cat.category_id}">
+            <div>
               <span>${cat.name}</span>
               ${goalText}
             </div>
-            <button class="secondary" data-edit-category="${cat.category_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>
           </div>
         </td>
         <td class="amount-cell">${formatBudgetDisplay(cat.allocated_minor)}</td>
@@ -1130,41 +1133,24 @@ const renderBudgetsPage = () => {
     renderGroup(grouped["uncategorized"]);
   }
 
-  body.querySelectorAll("[data-edit-group]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const gid = btn.dataset.editGroup;
-      const group = state.budgets.groups.find((g) => g.group_id === gid);
-      if (group) openGroupModal(group);
+  // Attach click listeners to rows
+  body.querySelectorAll("tr[data-group-id]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const gid = row.dataset.groupId;
+      if (gid === "uncategorized") {
+        openGroupDetailModal(grouped["uncategorized"]);
+      } else {
+        const group = state.budgets.groups.find((g) => g.group_id === gid);
+        if (group) openGroupDetailModal(grouped[gid]);
+      }
     });
   });
 
-  body.querySelectorAll("[data-edit-category]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const cid = btn.dataset.editCategory;
-      const cat = state.budgets.categories.find((c) => c.category_id === cid);
-      if (cat) openCategoryModal(cat);
-    });
-  });
-
-  body.querySelectorAll("[data-open-detail]").forEach((div) => {
-    div.addEventListener("click", () => {
-      const cid = div.dataset.openDetail;
+  body.querySelectorAll("tr[data-category-id]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const cid = row.dataset.categoryId;
       const cat = state.budgets.categories.find((c) => c.category_id === cid);
       if (cat) openBudgetDetailModal(cat);
-    });
-  });
-
-  body.querySelectorAll("[data-open-group-detail]").forEach((span) => {
-    span.addEventListener("click", () => {
-      const gid = span.dataset.openGroupDetail;
-      const group = state.budgets.groups.find((g) => g.group_id === gid);
-      if (group) {
-          // Reconstruct group object with items
-          const fullGroup = grouped[gid];
-          if (fullGroup) openGroupDetailModal(fullGroup);
-      } else if (gid === "uncategorized") {
-          openGroupDetailModal(grouped["uncategorized"]);
-      }
     });
   });
 };
