@@ -69,6 +69,24 @@ const selectors = {
   groupSubmit: "[data-group-submit]",
   groupError: "[data-group-error]",
   groupModalClose: "[data-close-group-modal]",
+  budgetDetailModal: "#budget-detail-modal",
+  budgetDetailTitle: "[data-budget-detail-title]",
+  budgetDetailClose: "[data-close-budget-detail-modal]",
+  budgetDetailLeftover: "[data-detail-leftover]",
+  budgetDetailBudgeted: "[data-detail-budgeted]",
+  budgetDetailActivity: "[data-detail-activity]",
+  budgetDetailAvailable: "[data-detail-available]",
+  budgetDetailQuickActions: "[data-quick-actions]",
+  budgetDetailEdit: "[data-detail-edit]",
+  groupDetailModal: "#group-detail-modal",
+  groupDetailTitle: "[data-group-detail-title]",
+  groupDetailClose: "[data-close-group-detail-modal]",
+  groupDetailLeftover: "[data-group-detail-leftover]",
+  groupDetailBudgeted: "[data-group-detail-budgeted]",
+  groupDetailActivity: "[data-group-detail-activity]",
+  groupDetailAvailable: "[data-group-detail-available]",
+  groupDetailQuickActions: "[data-group-quick-actions]",
+  groupDetailEdit: "[data-group-detail-edit]",
   toastStack: "#toast-stack",
 };
 
@@ -153,6 +171,8 @@ const state = {
     transactionEdit: { submitting: false, conceptId: null, transactionId: null },
   },
   pendingCategoryEdit: null,
+  pendingGroupEdit: null,
+  activeBudgetDetail: null,
   editingTransactionId: null,
 };
 
@@ -1068,7 +1088,7 @@ const renderBudgetsPage = () => {
     groupRow.innerHTML = `
       <td colspan="4" class="group-cell" style="background-color: var(--stone-50); font-weight: 600;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>${group.name}</span>
+          <span style="cursor: pointer;" data-open-group-detail="${group.group_id}">${group.name}</span>
           ${group.group_id !== "uncategorized" ? `<button class="secondary" data-edit-group="${group.group_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>` : ""}
         </div>
       </td>
@@ -1077,10 +1097,21 @@ const renderBudgetsPage = () => {
 
     group.items.forEach((cat) => {
       const row = document.createElement("tr");
+      let goalText = "";
+      if (cat.goal_type === "target_date" && cat.goal_amount_minor) {
+        goalText = `<div class="small-note muted">Goal: ${formatAmount(cat.goal_amount_minor)} by ${cat.goal_target_date || "?"}</div>`;
+      } else if (cat.goal_type === "recurring" && cat.goal_amount_minor) {
+        const freq = cat.goal_frequency ? cat.goal_frequency.charAt(0).toUpperCase() + cat.goal_frequency.slice(1) : "Recurring";
+        goalText = `<div class="small-note muted">${freq}: ${formatAmount(cat.goal_amount_minor)}</div>`;
+      }
+
       row.innerHTML = `
         <td>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span>${cat.name}</span>
+            <div style="cursor: pointer;" data-open-detail="${cat.category_id}">
+              <span>${cat.name}</span>
+              ${goalText}
+            </div>
             <button class="secondary" data-edit-category="${cat.category_id}" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Edit</button>
           </div>
         </td>
@@ -1112,6 +1143,28 @@ const renderBudgetsPage = () => {
       const cid = btn.dataset.editCategory;
       const cat = state.budgets.categories.find((c) => c.category_id === cid);
       if (cat) openCategoryModal(cat);
+    });
+  });
+
+  body.querySelectorAll("[data-open-detail]").forEach((div) => {
+    div.addEventListener("click", () => {
+      const cid = div.dataset.openDetail;
+      const cat = state.budgets.categories.find((c) => c.category_id === cid);
+      if (cat) openBudgetDetailModal(cat);
+    });
+  });
+
+  body.querySelectorAll("[data-open-group-detail]").forEach((span) => {
+    span.addEventListener("click", () => {
+      const gid = span.dataset.openGroupDetail;
+      const group = state.budgets.groups.find((g) => g.group_id === gid);
+      if (group) {
+          // Reconstruct group object with items
+          const fullGroup = grouped[gid];
+          if (fullGroup) openGroupDetailModal(fullGroup);
+      } else if (gid === "uncategorized") {
+          openGroupDetailModal(grouped["uncategorized"]);
+      }
     });
   });
 };
@@ -1336,12 +1389,226 @@ const initGroupModal = () => {
   });
 };
 
+const handleQuickAllocation = async (categoryId, amountMinor) => {
+  if (state.budgets.readyToAssignMinor < amountMinor) {
+    alert("Not enough Ready to Assign funds.");
+    return;
+  }
+  const payload = {
+    to_category_id: categoryId,
+    amount_minor: amountMinor,
+    allocation_date: todayISO(),
+    memo: "Quick allocation",
+  };
+  try {
+    await fetchJSON("/api/budget/allocations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    closeBudgetDetailModal();
+    await Promise.all([loadBudgetsData(), loadAllocationsData(), refreshAccountsPage()]);
+    renderBudgetsPage();
+    renderAllocationsPage();
+    showToast(`Allocated ${formatAmount(amountMinor)}`);
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Allocation failed.");
+  }
+};
+
+const openBudgetDetailModal = (category) => {
+  const modal = document.querySelector(selectors.budgetDetailModal);
+  if (!modal) return;
+
+  state.activeBudgetDetail = category;
+
+  document.querySelector(selectors.budgetDetailTitle).textContent = category.name;
+
+  // available = leftover + allocated + activity (activity is negative)
+  // leftover = available - allocated - activity
+  const leftover = category.available_minor - category.allocated_minor - category.activity_minor;
+  
+  document.querySelector(selectors.budgetDetailLeftover).textContent = formatAmount(leftover);
+  document.querySelector(selectors.budgetDetailBudgeted).textContent = formatAmount(category.allocated_minor);
+  document.querySelector(selectors.budgetDetailActivity).textContent = formatAmount(category.activity_minor);
+  document.querySelector(selectors.budgetDetailAvailable).textContent = formatAmount(category.available_minor);
+
+  const actionsContainer = document.querySelector(selectors.budgetDetailQuickActions);
+  actionsContainer.innerHTML = "";
+
+  if (category.goal_amount_minor && category.goal_amount_minor > 0) {
+    const target = category.goal_amount_minor;
+    const needed = Math.max(0, target - category.available_minor);
+
+    if (needed > 0) {
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.textContent = `Fund Goal: ${formatAmount(needed)}`;
+      btn.onclick = () => handleQuickAllocation(category.category_id, needed);
+      actionsContainer.appendChild(btn);
+    } else {
+      const p = document.createElement("p");
+      p.className = "muted small-note";
+      p.textContent = "Goal fully funded.";
+      actionsContainer.appendChild(p);
+    }
+  } else {
+      const p = document.createElement("p");
+      p.className = "muted small-note";
+      p.textContent = "No goal set.";
+      actionsContainer.appendChild(p);
+  }
+
+  const editBtn = document.querySelector(selectors.budgetDetailEdit);
+  editBtn.onclick = () => {
+    closeBudgetDetailModal();
+    openCategoryModal(category);
+  };
+
+  modal.classList.add("is-visible");
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+};
+
+const closeBudgetDetailModal = () => {
+  const modal = document.querySelector(selectors.budgetDetailModal);
+  if (!modal) return;
+  modal.classList.remove("is-visible");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+  state.activeBudgetDetail = null;
+};
+
+const initBudgetDetailModal = () => {
+  const modal = document.querySelector(selectors.budgetDetailModal);
+  if (!modal) return;
+  const closeButton = document.querySelector(selectors.budgetDetailClose);
+  closeButton?.addEventListener("click", () => closeBudgetDetailModal());
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeBudgetDetailModal();
+  });
+};
+
+const handleGroupQuickAllocation = async (group, totalNeeded) => {
+  if (state.budgets.readyToAssignMinor < totalNeeded) {
+    alert("Not enough Ready to Assign funds.");
+    return;
+  }
+
+  try {
+    // Execute sequentially
+    for (const cat of group.items) {
+      const needed = Math.max(0, (cat.goal_amount_minor || 0) - cat.available_minor);
+      if (needed > 0) {
+        await fetchJSON("/api/budget/allocations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to_category_id: cat.category_id,
+            amount_minor: needed,
+            allocation_date: todayISO(),
+            memo: "Group quick allocation",
+          }),
+        });
+      }
+    }
+    closeGroupDetailModal();
+    await Promise.all([loadBudgetsData(), loadAllocationsData(), refreshAccountsPage()]);
+    renderBudgetsPage();
+    renderAllocationsPage();
+    showToast(`Funded group ${group.name} with ${formatAmount(totalNeeded)}`);
+  } catch (error) {
+    console.error(error);
+    alert("Partial failure during group allocation.");
+    await loadBudgetsData();
+    renderBudgetsPage();
+  }
+};
+
+const openGroupDetailModal = (group) => {
+  const modal = document.querySelector(selectors.groupDetailModal);
+  if (!modal) return;
+
+  document.querySelector(selectors.groupDetailTitle).textContent = group.name;
+
+  let totalLeftover = 0;
+  let totalBudgeted = 0;
+  let totalActivity = 0;
+  let totalAvailable = 0;
+  let totalNeeded = 0;
+
+  group.items.forEach((cat) => {
+    const leftover = cat.available_minor - cat.allocated_minor - cat.activity_minor;
+    totalLeftover += leftover;
+    totalBudgeted += cat.allocated_minor;
+    totalActivity += cat.activity_minor;
+    totalAvailable += cat.available_minor;
+    
+    if (cat.goal_amount_minor && cat.goal_amount_minor > 0) {
+        totalNeeded += Math.max(0, cat.goal_amount_minor - cat.available_minor);
+    }
+  });
+
+  document.querySelector(selectors.groupDetailLeftover).textContent = formatAmount(totalLeftover);
+  document.querySelector(selectors.groupDetailBudgeted).textContent = formatAmount(totalBudgeted);
+  document.querySelector(selectors.groupDetailActivity).textContent = formatAmount(totalActivity);
+  document.querySelector(selectors.groupDetailAvailable).textContent = formatAmount(totalAvailable);
+
+  const actionsContainer = document.querySelector(selectors.groupDetailQuickActions);
+  actionsContainer.innerHTML = "";
+
+  if (totalNeeded > 0) {
+    const btn = document.createElement("button");
+    btn.className = "secondary";
+    btn.textContent = `Fund Underfunded: ${formatAmount(totalNeeded)}`;
+    btn.onclick = () => handleGroupQuickAllocation(group, totalNeeded);
+    actionsContainer.appendChild(btn);
+  } else {
+    const p = document.createElement("p");
+    p.className = "muted small-note";
+    p.textContent = "All goals in this group are fully funded.";
+    actionsContainer.appendChild(p);
+  }
+
+  const editBtn = document.querySelector(selectors.groupDetailEdit);
+  editBtn.onclick = () => {
+    closeGroupDetailModal();
+    openGroupModal(group);
+  };
+
+  modal.classList.add("is-visible");
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+};
+
+const closeGroupDetailModal = () => {
+  const modal = document.querySelector(selectors.groupDetailModal);
+  if (!modal) return;
+  modal.classList.remove("is-visible");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+};
+
+const initGroupDetailModal = () => {
+  const modal = document.querySelector(selectors.groupDetailModal);
+  if (!modal) return;
+  const closeButton = document.querySelector(selectors.groupDetailClose);
+  closeButton?.addEventListener("click", () => closeGroupDetailModal());
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeGroupDetailModal();
+  });
+};
+
 const initBudgetsInteractions = () => {
   const openModalButton = document.querySelector("[data-open-category-modal]");
   openModalButton?.addEventListener("click", () => openCategoryModal());
 
   const openGroupButton = document.querySelector("[data-open-group-modal]");
   openGroupButton?.addEventListener("click", () => openGroupModal());
+
+  initBudgetDetailModal();
+  initGroupDetailModal();
 };
 
 const initAllocationsPage = () => {
@@ -1544,7 +1811,9 @@ const openCategoryModal = (category = null) => {
   const slugInput = document.querySelector(selectors.categorySlugInput);
   const groupSelect = document.querySelector(selectors.categoryGroupSelect);
   const errorEl = document.querySelector(selectors.categoryError);
-  if (!modal || !title || !hint || !nameInput || !slugInput) {
+  const form = document.querySelector(selectors.categoryForm);
+  
+  if (!modal || !title || !hint || !nameInput || !slugInput || !form) {
     return;
   }
   state.pendingCategoryEdit = category;
@@ -1555,6 +1824,17 @@ const openCategoryModal = (category = null) => {
     populateSelect(groupSelect, state.budgets.groups, { valueKey: "group_id", labelKey: "name" }, "Uncategorized");
   }
 
+  // Reset goal fields
+  const goalRadios = form.querySelectorAll("input[name='goal_type']");
+  goalRadios.forEach(r => r.checked = r.value === "");
+  form.querySelector("[data-goal-section='target_date']").style.display = "none";
+  form.querySelector("[data-goal-section='recurring']").style.display = "none";
+  form.querySelector("input[name='target_date_dt']").value = "";
+  form.querySelector("input[name='target_amount']").value = "";
+  form.querySelector("select[name='frequency']").value = "monthly";
+  form.querySelector("input[name='recurring_date_dt']").value = "";
+  form.querySelector("input[name='recurring_amount']").value = "";
+
   if (category) {
     title.textContent = "Rename category";
     hint.textContent = "Slug edits require migrations, so only the name is editable.";
@@ -1562,6 +1842,25 @@ const openCategoryModal = (category = null) => {
     slugInput.value = category.category_id;
     slugInput.disabled = true;
     if (groupSelect) groupSelect.value = category.group_id || "";
+
+    // Populate goal
+    if (category.goal_type) {
+      const radio = form.querySelector(`input[name='goal_type'][value='${category.goal_type}']`);
+      if (radio) {
+        radio.checked = true;
+        const section = form.querySelector(`[data-goal-section='${category.goal_type}']`);
+        if (section) section.style.display = "block";
+        
+        if (category.goal_type === "target_date") {
+          form.querySelector("input[name='target_date_dt']").value = category.goal_target_date || "";
+          form.querySelector("input[name='target_amount']").value = category.goal_amount_minor ? minorToDollars(category.goal_amount_minor) : "";
+        } else if (category.goal_type === "recurring") {
+          form.querySelector("select[name='frequency']").value = category.goal_frequency || "monthly";
+          form.querySelector("input[name='recurring_date_dt']").value = category.goal_target_date || "";
+          form.querySelector("input[name='recurring_amount']").value = category.goal_amount_minor ? minorToDollars(category.goal_amount_minor) : "";
+        }
+      }
+    }
   } else {
     title.textContent = "Add category";
     hint.textContent = "Create a new envelope slug for allocations.";
@@ -1605,6 +1904,32 @@ const handleCategoryFormSubmit = async (event) => {
     setFormError(errorEl, "Name and slug are required.");
     return;
   }
+
+  const formData = new FormData(form);
+  const goalType = formData.get("goal_type") || null;
+  let goalAmount = null;
+  let goalDate = null;
+  let goalFrequency = null;
+
+  if (goalType === "target_date") {
+    goalDate = formData.get("target_date_dt");
+    goalAmount = dollarsToMinor(formData.get("target_amount"));
+  } else if (goalType === "recurring") {
+    goalFrequency = formData.get("frequency");
+    goalDate = formData.get("recurring_date_dt");
+    goalAmount = dollarsToMinor(formData.get("recurring_amount"));
+  }
+
+  const payload = {
+    name,
+    is_active: true,
+    group_id: groupId,
+    goal_type: goalType,
+    goal_amount_minor: goalAmount,
+    goal_target_date: goalDate || null,
+    goal_frequency: goalFrequency,
+  };
+
   try {
     setButtonBusy(submitButton, true);
     setFormError(errorEl, "");
@@ -1613,13 +1938,14 @@ const handleCategoryFormSubmit = async (event) => {
       await fetchJSON(`/api/budget-categories/${state.pendingCategoryEdit.category_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, is_active: true, group_id: groupId }),
+        body: JSON.stringify(payload),
       });
     } else {
+      payload.category_id = slug;
       await fetchJSON("/api/budget-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category_id: slug, name, is_active: true, group_id: groupId }),
+        body: JSON.stringify(payload),
       });
     }
     closeCategoryModal();
@@ -1658,6 +1984,14 @@ const initCategoryModal = () => {
   });
   slugInput?.addEventListener("input", () => {
     categorySlugDirty = true;
+  });
+
+  const goalRadios = form.querySelectorAll("input[name='goal_type']");
+  goalRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      form.querySelector("[data-goal-section='target_date']").style.display = radio.value === "target_date" ? "block" : "none";
+      form.querySelector("[data-goal-section='recurring']").style.display = radio.value === "recurring" ? "block" : "none";
+    });
   });
 };
 

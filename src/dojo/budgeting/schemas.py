@@ -206,6 +206,10 @@ class BudgetCategoryCommand(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     group_id: Optional[str] = Field(default=None, description="Parent category group ID.")
     is_active: bool = Field(default=True)
+    goal_type: Optional[Literal["target_date", "recurring"]] = Field(default=None)
+    goal_amount_minor: Optional[int] = Field(default=None)
+    goal_target_date: Optional[date] = Field(default=None)
+    goal_frequency: Optional[Literal["monthly", "quarterly", "yearly"]] = Field(default=None)
 
 
 class BudgetCategoryGroupCommand(BaseModel):

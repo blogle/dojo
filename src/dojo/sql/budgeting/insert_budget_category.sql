@@ -3,7 +3,11 @@ INSERT INTO budget_categories (
     group_id,
     name,
     is_active,
+    goal_type,
+    goal_amount_minor,
+    goal_target_date,
+    goal_frequency,
     created_at,
     updated_at
 )
-VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

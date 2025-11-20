@@ -11,6 +11,7 @@ import duckdb
 from dojo.budgeting.errors import (
     AccountAlreadyExists,
     AccountNotFound,
+    BudgetingError,
     CategoryAlreadyExists,
     CategoryNotFound,
     GroupAlreadyExists,
@@ -574,6 +575,10 @@ class BudgetCategoryAdminService:
                     payload.group_id,
                     payload.name,
                     payload.is_active,
+                    payload.goal_type,
+                    payload.goal_amount_minor,
+                    payload.goal_target_date,
+                    payload.goal_frequency,
                 ],
             )
             conn.execute("COMMIT")
@@ -595,7 +600,16 @@ class BudgetCategoryAdminService:
         try:
             conn.execute(
                 sql,
-                [payload.name, payload.group_id, payload.is_active, category_id],
+                [
+                    payload.name,
+                    payload.group_id,
+                    payload.is_active,
+                    payload.goal_type,
+                    payload.goal_amount_minor,
+                    payload.goal_target_date,
+                    payload.goal_frequency,
+                    category_id,
+                ],
             )
             conn.execute("COMMIT")
         except Exception:
@@ -643,6 +657,8 @@ class BudgetCategoryAdminService:
                 sql,
                 [payload.group_id, payload.name, payload.sort_order],
             ).fetchone()
+            if row is None:
+                raise BudgetingError("Failed to create group")
             conn.execute("COMMIT")
             return BudgetCategoryGroupDetail(
                 group_id=row[0],
@@ -730,9 +746,13 @@ class BudgetCategoryAdminService:
             is_active=bool(row[3]),
             created_at=row[4],
             updated_at=row[5],
-            available_minor=int(row[6]),
-            activity_minor=int(row[7]),
-            allocated_minor=int(row[8]),
+            goal_type=row[6],
+            goal_amount_minor=row[7],
+            goal_target_date=row[8],
+            goal_frequency=row[9],
+            available_minor=int(row[10]),
+            activity_minor=int(row[11]),
+            allocated_minor=int(row[12]),
         )
 
     @staticmethod

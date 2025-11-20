@@ -5,6 +5,10 @@ SELECT
     c.is_active,
     c.created_at,
     c.updated_at,
+    c.goal_type,
+    c.goal_amount_minor,
+    c.goal_target_date,
+    c.goal_frequency,
     COALESCE(s.available_minor, 0) AS available_minor,
     COALESCE(s.activity_minor, 0) AS activity_minor,
     COALESCE(s.allocated_minor, 0) AS allocated_minor
