@@ -13,6 +13,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-19 12:20Z) Completed Milestone 1: removed the cents/dollars toggles, rewired the hero cards to real ledger/allocation aggregates, and added the budgets month chip so currency display stays invariant.
 - [x] (2025-11-19 15:05Z) Completed Milestone 2: rebuilt the transactions form (inflow/outflow toggle), removed transfer helpers from the page, introduced the status-aware edit modal, and moved categorized transfers to their own route.
 - [x] (2025-11-19 17:20Z) Completed Milestone 3: replaced the budgets inline allocation form with the dedicated allocations ledger + summary chips so Ready-to-Assign guard rails live in one place before moving on to the hierarchical budgets table and modal workflows.
+- [x] (2025-11-19 19:30Z) Completed Milestone 4: implemented hierarchical budgets table, category groups, budget goals (recurring/target date), and detail modals with quick allocation logic. Refined UI based on feedback (compact forms, hidden slugs).
 
 ## Surprises & Discoveries
 
