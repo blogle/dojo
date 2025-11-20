@@ -121,6 +121,27 @@ nix develop
 - **Budgets (`#/budgets`)**: The summary bar shows Ready-to-Assign, activity, available amounts, and the active month for quick context. Use “Add category” to open the modal (slug auto-fills from the name) and manage envelopes; the Allocate button routes to the allocations page with the destination pre-selected.
 - **Categorized transfers (`#/transfers`)**: The dedicated Transfers page hosts the dual-leg form. Select distinct source/destination accounts plus a reimbursement category, enter the amount in dollars, and submit to hit `/api/transfers`. The toast exposes concept + transaction ids so you can cross-check the ledger rows (`data-concept-id` attributes).
 
+### Manual Validation Walkthrough
+
+To verify the end-to-end flows manually:
+
+1.  **Transaction capture & reconciliation**:
+    - Navigate to `#/transactions`.
+    - Record a $50.00 outflow for "Dining Out".
+    - Click the row to edit, change the amount to $60.00 (adding a tip), and toggle status to "Cleared".
+    - Verify the row updates and the "Spent This Month" card increases.
+
+2.  **Allocation logging**:
+    - Navigate to `#/budgets` and click a category row (e.g., "Groceries").
+    - Use the "Quick Allocations" buttons in the modal to fund the category.
+    - If you try to allocate more than your "Ready to Assign" balance, observe the error message preventing the action.
+
+3.  **Budget hierarchy management**:
+    - Navigate to `#/budgets`.
+    - Click "+ Add group" to create a "Subscriptions" group.
+    - Create a new budget "Netflix" and assign it to "Subscriptions".
+    - Verify the hierarchy renders correctly and the "Uncategorized" group hides if it becomes empty.
+
 ### CLI
 
 The MVP focuses on the FastAPI + SPA surface; there is no standalone CLI today. All interactions happen via HTTP:

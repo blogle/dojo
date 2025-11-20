@@ -561,7 +561,7 @@ class BudgetCategoryAdminService:
             prev_month = date(month.year, month.month - 1, 1)
             
         sql = load_sql("select_budget_categories_admin.sql")
-        rows = conn.execute(sql, [month, prev_month]).fetchall()
+        rows = conn.execute(sql, [month, month, prev_month]).fetchall()
         return [self._row_to_category(row) for row in rows]
 
     def create_category(

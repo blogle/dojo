@@ -14,6 +14,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-19 15:05Z) Completed Milestone 2: rebuilt the transactions form (inflow/outflow toggle), removed transfer helpers from the page, introduced the status-aware edit modal, and moved categorized transfers to their own route.
 - [x] (2025-11-19 17:20Z) Completed Milestone 3: replaced the budgets inline allocation form with the dedicated allocations ledger + summary chips so Ready-to-Assign guard rails live in one place before moving on to the hierarchical budgets table and modal workflows.
 - [x] (2025-11-19 19:30Z) Completed Milestone 4: implemented hierarchical budgets table, category groups, budget goals (recurring/target date), and detail modals with quick allocation logic. Refined UI based on feedback (compact forms, hidden slugs).
+- [x] (2025-11-20 10:00Z) Completed Milestone 5: extended Cypress coverage for advanced flows (inflows, status toggling, allocations, groups), added backend unit tests for monthly state invariants, fixed available funds rollover logic, and updated documentation with manual validation steps.
 
 ## Surprises & Discoveries
 
@@ -22,6 +23,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - (2025-11-18 16:05Z) Allocations could not be represented via `/api/transactions` because it only mutates activity/cash, so we added `/api/budget/allocations` that adjusts `allocated_minor`/`available_minor` and therefore RTA without faking ledger rows.
 - (2025-11-18 16:45Z) The legacy account modal still flickers closed before Cypress gains focus, so the account-creation spec is marked `it.skip` until the modal logic is reworked or Cypress gains a deterministic hook; other budgeting specs now pass headlessly.
 - (2025-11-19 16:50Z) Allocations need real ledger rows, so we introduced a `budget_allocations` table plus RTA/category guardrails on the POST endpoint to keep Ready-to-Assign and envelope balances honest when reassigning funds.
+- (2025-11-20 09:45Z) Discovered that `available_minor` in `budget_category_monthly_state` was not rolling over across months because the SQL view only queried the current month. Fixed by updating `select_budget_categories_admin.sql` to calculate `available_minor` as a cumulative sum of all historical monthly states.
 
 ## Decision Log
 
@@ -35,11 +37,12 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - (2025-11-19 16:10Z) Replaced the transaction edit modal with inline table editing so rows become forms on click, enabling rapid multi-row reconciliation without context switching.
 - (2025-11-19 16:55Z) Added `GET /api/budget/allocations` so the SPA can load the allocation ledger plus inflow/Ready-to-Assign summaries for the active month.
 - (2025-11-19 17:05Z) Removed the inline budgets allocation form and routed the “Allocate” CTA to the dedicated allocations page so guardrails and ledger visibility stay in one UX surface.
+- (2025-11-20 09:50Z) Updated `select_budget_categories_admin.sql` to compute `available_minor` as a cumulative sum over time, ensuring that unspent funds roll over to subsequent months as expected in envelope budgeting.
 
 ## Outcomes & Retrospective
 
 SPA users can now record transactions, allocate Ready-to-Assign into envelopes via the dedicated allocations ledger, and run categorized transfers entirely through the UI with immediate ledger + summary refreshes.
- Cypress exercises the three critical journeys, and README callouts document how to reach each flow. Remaining work: expose slug migrations + richer reference data once the backend supports editable primary keys.
+Cypress exercises the critical journeys including advanced flows like status toggling and group management. The backend now correctly handles envelope rollovers. Remaining work: expose slug migrations + richer reference data once the backend supports editable primary keys.
 
 ## Context and Orientation
 
