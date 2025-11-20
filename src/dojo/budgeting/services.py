@@ -554,8 +554,14 @@ class BudgetCategoryAdminService:
         month_start: date | None = None,
     ) -> list[BudgetCategoryDetail]:
         month = self._coerce_month_start(month_start)
+        # Calculate previous month
+        if month.month == 1:
+            prev_month = date(month.year - 1, 12, 1)
+        else:
+            prev_month = date(month.year, month.month - 1, 1)
+            
         sql = load_sql("select_budget_categories_admin.sql")
-        rows = conn.execute(sql, [month]).fetchall()
+        rows = conn.execute(sql, [month, prev_month]).fetchall()
         return [self._row_to_category(row) for row in rows]
 
     def create_category(
@@ -753,6 +759,15 @@ class BudgetCategoryAdminService:
         return conn.execute(sql, [month, category_id]).fetchone()
 
     def _row_to_category(self, row: Tuple[Any, ...]) -> BudgetCategoryDetail:
+        # Handle optional last month columns if they exist (for list_categories)
+        # row length 13 means basic detail, 15 means list with history
+        last_month_allocated = 0
+        last_month_activity = 0
+        
+        if len(row) >= 15:
+            last_month_allocated = int(row[13])
+            last_month_activity = int(row[14])
+
         return BudgetCategoryDetail(
             category_id=row[0],
             group_id=row[1],
@@ -767,6 +782,8 @@ class BudgetCategoryAdminService:
             available_minor=int(row[10]),
             activity_minor=int(row[11]),
             allocated_minor=int(row[12]),
+            last_month_allocated_minor=last_month_allocated,
+            last_month_activity_minor=last_month_activity,
         )
 
     @staticmethod

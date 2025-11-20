@@ -1375,7 +1375,7 @@ const initGroupModal = () => {
   });
 };
 
-const handleQuickAllocation = async (categoryId, amountMinor) => {
+const handleQuickAllocation = async (categoryId, amountMinor, memo = "Quick allocation") => {
   if (state.budgets.readyToAssignMinor < amountMinor) {
     alert("Not enough Ready to Assign funds.");
     return;
@@ -1384,7 +1384,7 @@ const handleQuickAllocation = async (categoryId, amountMinor) => {
     to_category_id: categoryId,
     amount_minor: amountMinor,
     allocation_date: todayISO(),
-    memo: "Quick allocation",
+    memo: memo,
   };
   try {
     await fetchJSON("/api/budget/allocations", {
@@ -1423,16 +1423,22 @@ const openBudgetDetailModal = (category) => {
   const actionsContainer = document.querySelector(selectors.budgetDetailQuickActions);
   actionsContainer.innerHTML = "";
 
+  // Helper to create button
+  const createBtn = (label, amount, memo) => {
+    const btn = document.createElement("button");
+    btn.className = "secondary";
+    btn.textContent = `${label}: ${formatAmount(amount)}`;
+    btn.onclick = () => handleQuickAllocation(category.category_id, amount, memo);
+    actionsContainer.appendChild(btn);
+  };
+
+  // 1. Fund Goal / Target Amount
   if (category.goal_amount_minor && category.goal_amount_minor > 0) {
     const target = category.goal_amount_minor;
     const needed = Math.max(0, target - category.available_minor);
 
     if (needed > 0) {
-      const btn = document.createElement("button");
-      btn.className = "secondary";
-      btn.textContent = `Fund Goal: ${formatAmount(needed)}`;
-      btn.onclick = () => handleQuickAllocation(category.category_id, needed);
-      actionsContainer.appendChild(btn);
+      createBtn("Fund Goal", needed, "Fund Goal");
     } else {
       const p = document.createElement("p");
       p.className = "muted small-note";
@@ -1444,6 +1450,17 @@ const openBudgetDetailModal = (category) => {
       p.className = "muted small-note";
       p.textContent = "No goal set.";
       actionsContainer.appendChild(p);
+  }
+
+  // 2. Budgeted Last Month
+  if (category.last_month_allocated_minor > 0) {
+      createBtn("Budgeted Last Month", category.last_month_allocated_minor, "Budgeted Last Month");
+  }
+
+  // 3. Spent Last Month (activity is usually negative for spending, so we flip it)
+  const spentLastMonth = -1 * category.last_month_activity_minor;
+  if (spentLastMonth > 0) {
+      createBtn("Spent Last Month", spentLastMonth, "Spent Last Month");
   }
 
   const editBtn = document.querySelector(selectors.budgetDetailEdit);

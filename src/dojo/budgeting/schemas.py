@@ -259,3 +259,5 @@ class BudgetCategoryDetail(BudgetCategoryCommand):
     available_minor: int = Field(default=0, description="Current available funds for the month in minor units.")
     activity_minor: int = Field(default=0, description="Month-to-date activity amount in minor units.")
     allocated_minor: int = Field(default=0, description="Month-to-date allocations applied to this envelope in minor units.")
+    last_month_allocated_minor: int = Field(default=0, description="Allocated amount from the previous month.")
+    last_month_activity_minor: int = Field(default=0, description="Activity amount from the previous month.")
