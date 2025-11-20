@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 from typing import Any, Literal, Optional, Tuple
 from uuid import UUID, uuid4
@@ -563,15 +564,28 @@ class BudgetCategoryAdminService:
         payload: BudgetCategoryCreateRequest,
         month_start: date | None = None,
     ) -> BudgetCategoryDetail:
-        if self._fetch_category_optional(conn, payload.category_id, month_start) is not None:
-            raise CategoryAlreadyExists(f"Category `{payload.category_id}` already exists.")
+        category_id = payload.category_id
+        if not category_id:
+            # Generate slug from name
+            normalized = payload.name.lower()
+            normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
+            category_id = normalized.strip("_")
+            if not category_id:
+                category_id = f"category_{int(datetime.now().timestamp())}"
+
+        # Ensure category_id is a string for type safety
+        category_id = str(category_id)
+
+        if self._fetch_category_optional(conn, category_id, month_start) is not None:
+            raise CategoryAlreadyExists(f"Category `{category_id}` already exists.")
+        
         sql = load_sql("insert_budget_category.sql")
         conn.execute("BEGIN")
         try:
             conn.execute(
                 sql,
                 [
-                    payload.category_id,
+                    category_id,
                     payload.group_id,
                     payload.name,
                     payload.is_active,
@@ -585,7 +599,7 @@ class BudgetCategoryAdminService:
         except Exception:
             conn.execute("ROLLBACK")
             raise
-        return self._require_category(conn, payload.category_id, month_start)
+        return self._require_category(conn, category_id, month_start)
 
     def update_category(
         self,

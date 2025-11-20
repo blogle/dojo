@@ -1826,9 +1826,9 @@ const openCategoryModal = (category = null) => {
 
   // Reset goal fields
   const goalRadios = form.querySelectorAll("input[name='goal_type']");
-  goalRadios.forEach(r => r.checked = r.value === "");
+  goalRadios.forEach(r => r.checked = r.value === "recurring");
   form.querySelector("[data-goal-section='target_date']").style.display = "none";
-  form.querySelector("[data-goal-section='recurring']").style.display = "none";
+  form.querySelector("[data-goal-section='recurring']").style.display = "block";
   form.querySelector("input[name='target_date_dt']").value = "";
   form.querySelector("input[name='target_amount']").value = "";
   form.querySelector("select[name='frequency']").value = "monthly";
@@ -1840,7 +1840,6 @@ const openCategoryModal = (category = null) => {
     hint.textContent = "Slug edits require migrations, so only the name is editable.";
     nameInput.value = category.name;
     slugInput.value = category.category_id;
-    slugInput.disabled = true;
     if (groupSelect) groupSelect.value = category.group_id || "";
 
     // Populate goal
@@ -1850,6 +1849,11 @@ const openCategoryModal = (category = null) => {
         radio.checked = true;
         const section = form.querySelector(`[data-goal-section='${category.goal_type}']`);
         if (section) section.style.display = "block";
+        
+        // Hide other sections
+        const otherType = category.goal_type === "recurring" ? "target_date" : "recurring";
+        const otherSection = form.querySelector(`[data-goal-section='${otherType}']`);
+        if (otherSection) otherSection.style.display = "none";
         
         if (category.goal_type === "target_date") {
           form.querySelector("input[name='target_date_dt']").value = category.goal_target_date || "";
@@ -1866,7 +1870,6 @@ const openCategoryModal = (category = null) => {
     hint.textContent = "Create a new envelope slug for allocations.";
     nameInput.value = "";
     slugInput.value = "";
-    slugInput.disabled = false;
     if (groupSelect) groupSelect.value = "";
   }
   modal.classList.add("is-visible");
@@ -1900,13 +1903,13 @@ const handleCategoryFormSubmit = async (event) => {
   const name = nameInput.value.trim();
   const slug = slugInput.value.trim();
   const groupId = groupSelect?.value || null;
-  if (!name || !slug) {
-    setFormError(errorEl, "Name and slug are required.");
+  if (!name) {
+    setFormError(errorEl, "Name is required.");
     return;
   }
 
   const formData = new FormData(form);
-  const goalType = formData.get("goal_type") || null;
+  const goalType = formData.get("goal_type") || "recurring";
   let goalAmount = null;
   let goalDate = null;
   let goalFrequency = null;
@@ -1941,7 +1944,10 @@ const handleCategoryFormSubmit = async (event) => {
         body: JSON.stringify(payload),
       });
     } else {
-      payload.category_id = slug;
+      // Slug is optional now, backend generates it if missing
+      if (slug) {
+        payload.category_id = slug;
+      }
       await fetchJSON("/api/budget-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1980,6 +1986,7 @@ const initCategoryModal = () => {
     if (state.pendingCategoryEdit || categorySlugDirty || !slugInput) {
       return;
     }
+    // Slug input is hidden now, but we keep this logic if we ever re-enable it or use it internally
     slugInput.value = slugifyCategoryName(nameInput.value);
   });
   slugInput?.addEventListener("input", () => {

@@ -231,7 +231,7 @@
 
           <section class="form-card">
             <form class="allocation-form" data-testid="allocation-form">
-              <div class="form-grid">
+              <div class="form-grid form-grid--compact">
                 <label class="form-field">
                   <span>Date</span>
                   <input type="date" name="allocation_date" required data-allocation-date />
@@ -241,7 +241,6 @@
                   <select name="from_category_id" data-allocation-from>
                     <option value="">Ready to Assign</option>
                   </select>
-                  <p class="form-helper">Leave as Ready to Assign to allocate fresh cash.</p>
                 </label>
                 <label class="form-field">
                   <span>To category</span>
@@ -414,11 +413,7 @@
             Display name
             <input type="text" name="name" data-category-name required />
           </label>
-          <label>
-            Slug
-            <input type="text" name="slug" data-category-slug pattern="[a-z0-9_]+" required />
-            <span class="muted small-note">Lowercase letters, numbers, and underscores only.</span>
-          </label>
+          <input type="hidden" name="slug" data-category-slug />
           <label>
             Group
             <select name="group_id" data-category-group>
@@ -429,16 +424,12 @@
           <div class="segmented-control" role="group" aria-label="Goal type">
             <span class="segmented-label">Goal</span>
             <label class="segmented-option">
-              <input type="radio" name="goal_type" value="" checked data-goal-type />
-              <span>None</span>
+              <input type="radio" name="goal_type" value="recurring" checked data-goal-type />
+              <span>Recurring</span>
             </label>
             <label class="segmented-option">
               <input type="radio" name="goal_type" value="target_date" data-goal-type />
               <span>Target Date</span>
-            </label>
-            <label class="segmented-option">
-              <input type="radio" name="goal_type" value="recurring" data-goal-type />
-              <span>Recurring</span>
             </label>
           </div>
 
@@ -455,7 +446,7 @@
             </div>
           </div>
 
-          <div data-goal-section="recurring" style="display: none;">
+          <div data-goal-section="recurring">
             <div class="form-grid form-grid--compact">
               <label class="form-field">
                 <span>Frequency</span>

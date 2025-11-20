@@ -242,7 +242,7 @@ class BudgetCategoryGroupDetail(BudgetCategoryGroupCommand):
 class BudgetCategoryCreateRequest(BudgetCategoryCommand):
     """Payload for creating a budget category."""
 
-    category_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the category.")
+    category_id: Optional[str] = Field(default=None, pattern=SLUG_PATTERN, description="Stable identifier for the category.")
 
 
 class BudgetCategoryUpdateRequest(BudgetCategoryCommand):
