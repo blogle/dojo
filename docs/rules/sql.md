@@ -31,6 +31,25 @@ Recommended layout:
 - sql/queries/<domain>/<name>.sql
 - sql/migrations/VYYYYMMDD__<slug>.sql
 - sql/etl/<job>/<step>.sql
+- sql/seeds/<scenario>.sql (dev/demo data only)
+- tests/fixtures/<feature>.sql (tiny deterministic fixtures)
+
+
+## Migrations vs Seed Data vs Test Fixtures
+
+Keep three explicit tracks for schema, human-friendly demo data, and automated test fixtures.
+
+- **Migrations (`sql/migrations/`)** define and evolve schema. They must stay idempotent, transactional, and production-safe. They may backfill or transform existing rows but must never ship demo data.
+- **Seed scripts (`sql/seeds/`)** exist for developers and demos. They insert realistic but fake accounts/categories so humans can click around. Keep them idempotent (INSERT .. ON CONFLICT) and never run them in production.
+- **Fixtures (`tests/fixtures/`)** back tests only. They should be tiny, deterministic datasets loaded during test setup. Never reuse dev/demo seeds here—tests deserve purpose-built data so failures are obvious.
+
+Workflow:
+
+1. Run migrations to create or upgrade a database.
+2. Optionally run one or more seed scripts locally/staging to populate fake data.
+3. During tests, apply migrations, then load only the minimal fixture files needed for that test suite.
+
+This separation prevents demo data from leaking into production, keeps tests fast, and makes it trivial to start with a clean slate.
 
 
 ## Parameterization & Composition

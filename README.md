@@ -39,7 +39,17 @@ The development shell installs Python, DuckDB, uv, and other pinned tooling. If 
 python -m dojo.core.migrate
 ```
 
-### 3. Run the API + SPA locally
+This leaves the ledger completely empty so you can start from a clean slate at any time by deleting `data/ledger.duckdb`, rerunning migrations, and skipping the next (optional) step.
+
+### 3. (Optional) Load dev/demo seed data
+
+```bash
+python -m dojo.core.seed
+```
+
+The seed scripts insert the `house_*` accounts and baseline categories so the SPA works immediately. Skip this step if you want to create every account/category yourself.
+
+### 4. Run the API + SPA locally
 
 ```bash
 uvicorn dojo.core.app:app --reload
@@ -48,7 +58,7 @@ uvicorn dojo.core.app:app --reload
 
 The landing page now behaves like a lightweight spreadsheet: the first row is an input line, arrow/tab keys move across cells, Enter submits, and the table below scrolls to show prior transactions.
 
-### 4. Execute the automated tests
+### 5. Execute the automated tests
 
 ```bash
 pytest
@@ -109,6 +119,7 @@ nix develop
 ### Configuration
 
 - **`DOJO_DB_PATH`**: Override the DuckDB ledger location (defaults to `data/ledger.duckdb`). Set this before running migrations or starting the API, e.g. `DOJO_DB_PATH=/tmp/ledger.duckdb python -m dojo.core.migrate`.
+- **Seed scripts**: Run `python -m dojo.core.seed` (optionally with `DOJO_DB_PATH` set) to populate dev/demo data. Skip it or delete the DuckDB file if you want a pristine ledger.
 - **`dojo_` prefixed env vars**: All settings inherited from `dojo.core.config.Settings` can be supplied via environment variables (e.g., `DOJO_DB_PATH`).
 - **Secrets**: The MVP stores only local household data and does not require external credentials yet. Do not commit secrets; once services require them, document the process in this section.
 

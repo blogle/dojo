@@ -1,0 +1,321 @@
+# Migrations, Seed Data, and Test Fixtures in a DuckDB/Python Project
+
+
+## Purpose
+
+This document defines best practices for managing schema migrations, development seed data, and test fixtures in a DuckDB + Python codebase. It explains the purpose of each, why they must be separated, how to structure files in a flat and understandable way, and how to use them in day-to-day workflows.
+
+The goal is simple:
+
+- Keep schema evolution safe, repeatable, and production-grade.
+- Give developers realistic but fake data to work with locally.
+- Give tests small, deterministic datasets that make failures obvious and fast.
+
+
+## Three Different Concerns
+
+There are three related but distinct concerns:
+
+1) Migrations  
+   These evolve the database schema and sometimes move existing data. They are applied in a specific order and must be safe to run exactly once in each environment.
+
+2) Seed data  
+   This is fake but realistic data used to populate a database for development or demo purposes so humans can click around, see charts, and debug.
+
+3) Test fixtures  
+   These are tiny, controlled datasets used by automated tests. Their job is to make tests deterministic, fast, and easy to reason about.
+
+Confusion and bugs often arise when these concerns are mixed. The rest of this document focuses on keeping them separate and clear.
+
+
+## Why Separation Matters
+
+Separating migrations, seeds, and fixtures is not cosmetic. It matters for several reasons:
+
+- Safety: Production databases must never accidentally receive dev/demo data. Migrations are allowed in production; seeds are not.
+- Determinism: Automated tests must not rely on large, changing demo datasets. Fixtures must be small and tightly controlled.
+- Debuggability: When tests fail, you want to inspect a tiny fixture dataset, not wade through thousands of seed records.
+- Evolution: As schemas evolve, the cost of updating one migration and a few small fixtures is much lower than maintaining a single huge SQL script that tries to do everything.
+- Performance: Migrations should be quick and precise. Seeds can be larger but are only applied in dev/demo environments. Fixtures should always stay small enough to load quickly in CI.
+
+In short: migrations define “what the database is,” seed data defines “what the app looks like for humans,” and fixtures define “what tests rely on.”
+
+
+## Flat Directory Structure
+
+To avoid deep hierarchies and keep things discoverable, a simple, flat structure is recommended:
+
+- sql/  
+  All project SQL lives here.
+
+Within that directory, use clear naming conventions instead of deeply nested folders:
+
+- sql/migrations/…  
+  Schema and data migrations, idempotent, ordered.
+
+- sql/seeds/…  
+  Dev and demo seed data, idempotent, human-oriented.
+
+- tests/fixtures/…  
+  Test fixtures (SQL or CSV), machine-oriented.
+
+Examples:
+
+- sql/migrations/V20250101__create_core_tables.sql  
+- sql/migrations/V20250115__add_invoices_table.sql  
+
+- sql/seeds/seed_core_demo.sql  
+- sql/seeds/seed_edge_cases.sql  
+- sql/seeds/seed_high_volume_example.sql  
+
+- tests/fixtures/payments_basic.sql  
+- tests/fixtures/user_configs_temporal.sql  
+
+The important idea is that the directory depth is shallow, and the purpose of each file is clear from its name and containing folder.
+
+
+## Migrations: What They Should and Should Not Do
+
+Migrations are the only SQL that is allowed to run in all environments, including production. They must be:
+
+- Idempotent (or safely re-runnable with a schema_migrations log).
+- Transactional.
+- Minimal and focused on structural changes and controlled data moves.
+
+Migrations should:
+
+- Create or alter tables, indexes, constraints.
+- Perform carefully controlled data backfills or transformations.
+- Use IF [NOT] EXISTS / IF EXISTS where safe.
+- Record their application in a schema_migrations table.
+
+Migrations should not:
+
+- Insert dev/demo data.
+- Depend on large, messy datasets.
+- Be used as a dumping ground for “one-off” bulk data loads that belong to ETL jobs.
+
+Example migration (schema-focused, idempotent):
+
+    BEGIN;
+
+    CREATE TABLE IF NOT EXISTS merchants (
+      merchant_id   INTEGER PRIMARY KEY,
+      name          VARCHAR NOT NULL,
+      created_at    TIMESTAMP NOT NULL,
+      updated_at    TIMESTAMP NOT NULL
+    );
+
+    ALTER TABLE merchants
+      ADD COLUMN IF NOT EXISTS status VARCHAR NOT NULL DEFAULT 'active';
+
+    INSERT INTO schema_migrations (version, applied_at)
+    SELECT '20250101_create_merchants', now()
+    WHERE NOT EXISTS (
+      SELECT 1 FROM schema_migrations WHERE version = '20250101_create_merchants'
+    );
+
+    COMMIT;
+
+By enforcing a clear boundary around migrations, you ensure that production databases remain clean and predictable.
+
+
+## Seed Data: Purpose and Best Practices
+
+Seed data is designed for humans, not tests. It populates a development or demo database with realistic (fake) data.
+
+Typical uses:
+
+- Giving developers a ready-made environment after running migrations.
+- Setting up demo/staging instances with meaningful data for product walkthroughs.
+- Exercising UI flows and dashboards without manual input.
+
+Seed scripts live in sql/seeds and follow these principles:
+
+- Idempotent: use INSERT OR IGNORE, UPSERT patterns, or checks to avoid duplication.
+- Layered: separate core seed data from scenario-specific seed data.
+- Safe: never intended to run in production.
+
+Example dev seed script:
+
+    -- sql/seeds/seed_core_demo.sql
+    INSERT OR IGNORE INTO merchants (merchant_id, name, created_at, updated_at)
+    VALUES
+      (1, 'Example Coffee', now(), now()),
+      (2, 'Example Grocer', now(), now());
+
+    INSERT OR IGNORE INTO users (user_id, email, created_at, updated_at)
+    VALUES
+      (1, 'alice@example.test', now(), now()),
+      (2, 'bob@example.test',   now(), now());
+
+    INSERT OR IGNORE INTO accounts (account_id, user_id, name, created_at, updated_at)
+    VALUES
+      (1, 1, 'Checking', now(), now()),
+      (2, 1, 'Savings',  now(), now());
+
+Optional scenario seeds can sit alongside:
+
+- sql/seeds/seed_high_volume_example.sql  
+- sql/seeds/seed_edge_cases.sql  
+
+These scripts can be run via a simple Python helper or CLI command that connects to DuckDB and executes seed files in order.
+
+Seed data is allowed to be “messier” and larger than fixtures. It can simulate real-world distributions and corner cases that help developers debug and understand how the system behaves with realistic volumes. However, its size and shape should never dictate how tests are written.
+
+
+## Test Fixtures: Purpose and Best Practices
+
+Test fixtures exist primarily for automated tests. Their main job is to make tests:
+
+- Deterministic.
+- Fast.
+- Easy to reason about.
+
+Fixtures live under tests/fixtures and should embody these principles:
+
+- Small: only as many rows as needed to express the scenario.
+- Focused: each fixture targets a specific behavior or set of related behaviors.
+- Stable: changes only when test semantics change.
+
+There are two common styles:
+
+1) Pure SQL fixtures  
+   These assume the schema is already created (either by running migrations or by a schema-only script) and then insert rows.
+
+2) CSV/Parquet fixtures  
+   These are loaded into tables at test setup. This can be convenient when fixtures are shared across languages or tools, but SQL fixtures remain easy to read and reason about.
+
+Example test fixture (tiny, focused):
+
+    -- tests/fixtures/payments_basic.sql
+
+    INSERT INTO merchants (merchant_id, name, created_at, updated_at)
+    VALUES
+      (1, 'Merchant A', '2024-01-01', '2024-01-01');
+
+    INSERT INTO payments (id, merchant_id, amount_cents, created_at, updated_at)
+    VALUES
+      (1, 1, 1000, '2024-01-02', '2024-01-02'),
+      (2, 1, 2500, '2024-01-03', '2024-01-03');
+
+Test code can then:
+
+- Create an in-memory DuckDB connection.
+- Apply the schema (via migrations or a schema-only SQL).
+- Execute one or more fixture files.
+- Run assertions on the resulting data.
+
+Example harness sketch in Python:
+
+    def setup_test_db(con):
+        schema_sql = Path("sql/migrations/schema_base.sql").read_text()
+        con.execute(schema_sql)
+        fixture_sql = Path("tests/fixtures/payments_basic.sql").read_text()
+        con.execute("BEGIN;")
+        con.execute(fixture_sql)
+        con.execute("COMMIT;")
+
+Fixtures are not meant to be “realistic”; they are meant to be clear. It is fine if they look contrived, as long as they make test behavior obvious.
+
+
+## Differences Between Seed Data and Test Fixtures
+
+Although both seeds and fixtures insert data, they serve different purposes and must be treated differently.
+
+Purpose:
+
+- Seed data is for human workflows (development, demos).
+- Fixtures are for automated testing.
+
+Location:
+
+- Seed data lives in sql/seeds.
+- Fixtures live in tests/fixtures.
+
+Size:
+
+- Seed datasets can be relatively large and varied to give a rich environment.
+- Fixtures should be minimal and targeted so tests run fast and are easy to debug.
+
+Life cycle:
+
+- Seed scripts may evolve as new flows or demo scenarios are added.
+- Fixtures should remain stable unless a test’s logic changes.
+
+Usage:
+
+- Seed scripts are applied sparingly (e.g., after setting up a dev DB or refreshing a demo DB).
+- Fixtures are applied automatically during test setup, often per test or per suite.
+
+Environments:
+
+- Seed scripts are applied in dev/staging/demo environments, but never in production.
+- Fixtures are applied in test environments (local test runs, CI) and are thrown away at the end of each run.
+
+It is tempting to reuse seed scripts for tests, but this generally leads to slow, fragile tests that depend on too much data. It is better to create specific fixtures for tests, even if they share some domain shape with seed data.
+
+
+## How to Use Migrations, Seeds, and Fixtures Together
+
+A typical workflow that respects these boundaries looks like this:
+
+Local development:
+
+- Run migrations: apply all sql/migrations in order to create or upgrade the local database schema.
+- Run seeds: execute a subset or all of the sql/seeds scripts to populate dev/demo data.
+- Start the application and use the seeded data for manual testing and exploration.
+
+Automated tests:
+
+- For each test run (or per test suite), create a fresh database (in-memory or temporary file).
+- Apply schema: run a baseline migration set or a schema-only SQL file.
+- Apply fixtures: execute one or more files from tests/fixtures relevant to the tests.
+- Run the tests and then discard the database.
+
+Production:
+
+- Run migrations only.
+- Never run sql/seeds.
+- Never rely on test fixtures.
+
+This pattern ensures that:
+
+- Production databases are only ever touched by well-defined migrations.
+- Developers always have a reproducible way to stand up a meaningful dev environment.
+- Tests are insulated from both production data and demo data and remain fast and predictable.
+
+
+## Anti-Patterns to Avoid
+
+A few practices commonly cause trouble:
+
+- Putting seed data inside migrations  
+  This risks dev/demo data accidentally landing in production, and it makes migrations heavier and harder to reason about.
+
+- Using dev/demo seeds as test fixtures  
+  This makes tests slow and brittle. Small changes to demo data can break tests unexpectedly. Tests should depend on minimal, targeted fixtures.
+
+- Housing fixtures in the same directory as migrations or seeds  
+  This blurs purpose and increases the chance of running test data loading scripts in the wrong environment.
+
+- Building ad hoc seed/fixture scripts in Python without corresponding SQL  
+  This makes it harder to see and review what data is being inserted. SQL should remain explicit and version-controlled.
+
+- Allowing large fixtures to accumulate  
+  Over time, tests get slower and harder to debug. Regularly prune and refactor fixtures to keep them minimal.
+
+
+## Summary
+
+The core best practices are:
+
+- Keep migrations, seed data, and test fixtures as three separate concepts with separate directories and responsibilities.
+- Use a flat structure under sql/ with sql/migrations and sql/seeds, and keep test fixtures under tests/fixtures.
+- Let migrations define and evolve schema; let seeds support human workflows; let fixtures support automated workflows.
+- Make migrations and seeds idempotent; make fixtures small and focused.
+- Never run seeds or fixtures in production; only run migrations there.
+- Keep all of this logic explicit, version-controlled, and easy to inspect.
+
+Following these practices makes the behavior of your DuckDB-backed application more predictable, your developer experience smoother, and your tests faster and more stable.
+

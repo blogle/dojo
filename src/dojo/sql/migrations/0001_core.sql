@@ -65,16 +65,3 @@ CREATE TABLE IF NOT EXISTS positions (
     FOREIGN KEY (account_id) REFERENCES accounts(account_id)
 );
 
-INSERT INTO accounts (account_id, name, account_type, current_balance_minor, currency, is_active)
-VALUES
-    ('house_checking', 'House Checking', 'asset', 500000, 'USD', TRUE),
-    ('house_savings', 'House Savings', 'asset', 1250000, 'USD', TRUE),
-    ('house_credit_card', 'House Credit Card', 'liability', 250000, 'USD', TRUE)
-ON CONFLICT (account_id) DO NOTHING;
-
-INSERT INTO budget_categories (category_id, name, is_active)
-VALUES
-    ('groceries', 'Groceries', TRUE),
-    ('income', 'Income', TRUE),
-    ('housing', 'Housing', TRUE)
-ON CONFLICT (category_id) DO NOTHING;

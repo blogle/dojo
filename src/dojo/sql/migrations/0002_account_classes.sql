@@ -11,7 +11,7 @@ WHERE account_type = 'asset';
 
 UPDATE accounts
 SET account_class = 'credit', account_role = 'on_budget'
-WHERE account_id = 'house_credit_card';
+WHERE account_type = 'liability';
 
 CREATE TABLE IF NOT EXISTS cash_account_details (
     detail_id UUID PRIMARY KEY,
@@ -93,14 +93,3 @@ CREATE TABLE IF NOT EXISTS tangible_asset_details (
     FOREIGN KEY (account_id) REFERENCES accounts(account_id)
 );
 
--- Seed example SCD-2 rows for the initial accounts.
-INSERT INTO cash_account_details (detail_id, account_id, interest_rate_apy)
-VALUES
-    ('00000000-0000-0000-0000-000000000010', 'house_checking', 0.01),
-    ('00000000-0000-0000-0000-000000000011', 'house_savings', 0.02)
-ON CONFLICT (detail_id) DO NOTHING;
-
-INSERT INTO credit_account_details (detail_id, account_id, apr, credit_limit_minor)
-VALUES
-    ('00000000-0000-0000-0000-000000000012', 'house_credit_card', 0.21, 500000)
-ON CONFLICT (detail_id) DO NOTHING;

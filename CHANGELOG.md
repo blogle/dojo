@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Envelope-budgeting MVP: transactions form with mode/unit toggles, budgets section with allocation form + category modal, categorized transfer UX with toast feedback, backend category-state joins (with `month` query), README guidance, and new Cypress scenarios for the three flows.
 - Transaction status tracking: DuckDB now stores pending/cleared states, the `/api/transactions` payloads include `status`, and the SPA ledger renders the true reconciliation state instead of inferring from dates.
 - Dedicated allocations ledger: DuckDB now persists `budget_allocations` rows with from/to metadata, `/api/budget/allocations` exposes guard rails plus a month summary endpoint, and the SPA ships a standalone `#/allocations` page with summary chips, ledger table, and Cypress coverage.
+- Dev/demo data loader: `python -m dojo.core.seed` executes `sql/seeds/*.sql`, and tests now rely on purpose-built fixtures under `tests/fixtures/`.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified the SPA currency UX to dollars-only, exposed a month-to-date budgeted hero card backed by allocation totals, and added a budget-month summary chip so the ledger and Ready-to-Assign math stay reconciled at a glance.
 - Rebuilt the Transactions UI with an inflow/outflow toggle, inline editable rows (no modal hops), and moved categorized transfers into their own page so single-leg ledger work stays focused.
 - Transactions ledger rows now enter inline edit mode on click with separate inflow/outflow columns and the compact StatusToggle badge, removing the redundant actions column and the old “quick edit” buttons.
+- Removed the hard-coded house accounts/categories from `0001_core.sql`; README now documents optional seed scripts so migrations stay production-safe by default.
 
 ### Deprecated
 

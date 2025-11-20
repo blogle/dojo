@@ -1,5 +1,6 @@
 """Property-based tests for net worth aggregation."""
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from importlib import resources
 from uuid import uuid4
@@ -12,7 +13,7 @@ from dojo.core.net_worth import current_snapshot
 
 
 @contextmanager
-def ledger_connection() -> duckdb.DuckDBPyConnection:
+def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     conn = duckdb.connect(database=":memory:")
     migrations_pkg = resources.files("dojo.sql.migrations")
     apply_migrations(conn, migrations_pkg)

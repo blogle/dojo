@@ -1,7 +1,5 @@
 """Ensure the E2E DuckDB database is migrated and seeded."""
 
-from __future__ import annotations
-
 import os
 from importlib import resources
 from pathlib import Path
@@ -9,6 +7,7 @@ from pathlib import Path
 import duckdb
 
 from dojo.core.migrate import apply_migrations
+from dojo.core.seed import apply_seeds
 
 DEFAULT_DB_PATH = Path("data/e2e-ledger.duckdb")
 
@@ -20,6 +19,8 @@ def main() -> None:
     try:
         migrations_pkg = resources.files("dojo.sql.migrations")
         apply_migrations(conn, migrations_pkg)
+        seeds_pkg = resources.files("dojo.sql.seeds")
+        apply_seeds(conn, seeds_pkg)
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM budget_category_monthly_state")
         conn.execute(

@@ -57,7 +57,9 @@
 * Never inline literals into SQL, Always bind parameters.
 * Never copy-paste complex/reused queries inline, Always promote them to .sql files.
 * Never bury DDL/DML in Python, Always keep migrations and write paths in .sql.
+* Never mix migrations, dev seeds, and fixtures, Always keep schema SQL under `sql/migrations`, dev/demo seeds under `sql/seeds`, and deterministic test fixtures under `tests/fixtures`.
 * Never write non-idempotent migrations, Always use IF [NOT] EXISTS and a schema_migrations log.
+* Never run dev seeds or fixtures in production, Always restrict them to local/demo/test flows and document the command that loads them.
 * Never skip transactions, Always wrap migrations/ETL in a transaction.
 * Never rewrite big tables in place, Always stage-then-swap with validation.
 * Never materialize views “just because,” Always materialize only for measured latency/SLA wins.

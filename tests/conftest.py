@@ -7,6 +7,7 @@ import duckdb
 import pytest
 
 from dojo.core.migrate import apply_migrations
+from dojo.testing.fixtures import apply_base_budgeting_fixture
 
 
 @pytest.fixture()
@@ -16,6 +17,7 @@ def in_memory_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     conn = duckdb.connect(database=":memory:")
     migrations_pkg = resources.files("dojo.sql.migrations")
     apply_migrations(conn, migrations_pkg)
+    apply_base_budgeting_fixture(conn)
     try:
         yield conn
     finally:
