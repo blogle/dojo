@@ -85,16 +85,17 @@ describe("Admin Pages", () => {
     cy.visit("/#/budgets");
     cy.get("[data-open-category-modal]").click();
     cy.get("[data-category-name]").clear().type(categoryName);
-    cy.get("[data-category-slug]").clear().type(categorySlug);
+    // Slug is auto-generated and hidden
     cy.get("[data-category-submit]").click();
     cy.get("#category-modal").should("have.attr", "aria-hidden", "true");
 
     cy.get("#budgets-ready-value").invoke("text").then((text) => {
       readyBefore = parseDisplay(text);
     });
-    cy.contains(".budget-card", categoryName, { timeout: 15000 })
-      .find(".budget-card__meta span")
-      .first()
+    
+    // Updated to use table row selector instead of card
+    cy.contains("tr", categoryName, { timeout: 15000 })
+      .find(".amount-cell").eq(2) // Available column (3rd amount cell)
       .invoke("text")
       .then((text) => {
         availableBefore = parseDisplay(text);
@@ -103,7 +104,10 @@ describe("Admin Pages", () => {
     cy.contains("a", "Allocations").click();
     cy.get("#allocations-page").should("have.class", "active");
     cy.get("[data-testid='allocation-form']").within(() => {
-      cy.get("[data-allocation-to]").select(categorySlug);
+      // Select by text content since value is dynamic slug
+      cy.get("[data-allocation-to]").contains(categoryName).then($option => {
+          cy.get("[data-allocation-to]").select($option.val());
+      });
       cy.get("input[name='amount']").clear().type(allocationAmount.toString());
       cy.get("input[name='memo']").clear().type("Cypress allocation");
       cy.get("input[name='allocation_date']").clear().type(todayISO());
@@ -116,9 +120,9 @@ describe("Admin Pages", () => {
     });
 
     cy.contains("a", "Budgets").click();
-    cy.contains(".budget-card", categoryName)
-      .find(".budget-card__meta span")
-      .first()
+    // Updated to use table row selector and scope to budgets body
+    cy.get("#budgets-body").contains("tr", categoryName)
+      .find(".amount-cell").eq(2) // Available column (3rd amount cell)
       .should(($span) => {
         const next = parseDisplay($span.text());
         expect(next).to.be.closeTo(availableBefore + allocationAmount, 0.01);
