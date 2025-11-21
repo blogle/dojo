@@ -7,7 +7,7 @@ from dojo.core.db import connection_dep
 from dojo.core.net_worth import NetWorthSnapshot, current_snapshot
 from dojo.core.schemas import NetWorthResponse
 
-router = APIRouter(prefix="/api", tags=["core"])
+router = APIRouter(tags=["core"])
 
 
 @router.get("/health")

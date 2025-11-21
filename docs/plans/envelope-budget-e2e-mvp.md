@@ -15,6 +15,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-19 17:20Z) Completed Milestone 3: replaced the budgets inline allocation form with the dedicated allocations ledger + summary chips so Ready-to-Assign guard rails live in one place before moving on to the hierarchical budgets table and modal workflows.
 - [x] (2025-11-19 19:30Z) Completed Milestone 4: implemented hierarchical budgets table, category groups, budget goals (recurring/target date), and detail modals with quick allocation logic. Refined UI based on feedback (compact forms, hidden slugs).
 - [x] (2025-11-20 10:00Z) Completed Milestone 5: extended Cypress coverage for advanced flows (inflows, status toggling, allocations, groups), added backend unit tests for monthly state invariants, fixed available funds rollover logic, and updated documentation with manual validation steps.
+- [ ] (2025-11-21 14:05Z) Began Milestone 6: implemented and unit-tested the backend API for resetting and seeding the database to support E2E test scaffolding.
 
 ## Surprises & Discoveries
 
@@ -130,8 +131,8 @@ Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enf
 
 - **Goal**: Replace the existing, insufficient E2E tests with a new suite of user-story-driven tests to ensure complete feature coverage and protect against regressions.
 - **Test Scaffolding**:
-    - Configure a `before:spec` hook in `cypress.config.cjs`. This hook will reset the database to a pristine state before each spec file runs. This can be accomplished by running a Python script to re-create the DuckDB database.
-    - Establish a convention for loading SQL fixtures. Specs requiring pre-populated data will load a corresponding `.sql` file after the database reset to ensure a predictable starting state.
+    - Configure a `before:spec` hook in `cypress.config.cjs`. This hook will call the new `/api/testing/reset_db` endpoint to reset the database to a pristine state before each spec file runs.
+    - Establish a convention for loading SQL fixtures. Specs requiring pre-populated data will call the new `/api/testing/seed_db` endpoint with a path to a corresponding `.sql` file after the database reset to ensure a predictable starting state.
 - **Test Implementation**:
     - Create a new directory `cypress/e2e/user-stories/` to house the new, granular test specs.
     - For each of the 14 "Canonical User Stories" defined in this plan, create a corresponding spec file (e.g., `01-payday-assignment.cy.js`, `02-covering-overspending.cy.js`).

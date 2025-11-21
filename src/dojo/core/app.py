@@ -43,6 +43,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(core_router)
     app.include_router(budgeting_router)
 
+    if settings.testing:
+        from dojo.testing.routers import router as testing_router
+
+        app.include_router(testing_router)
+
     static_dir = _static_directory()
     app.mount(
         "/",

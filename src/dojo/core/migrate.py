@@ -59,14 +59,19 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversabl
             raise
 
 
-def main() -> None:
+def migrate(db_path: "Path | str") -> None:
     """Entry point for `python -m dojo.core.migrate`."""
 
-    settings: Settings = get_settings()
     migrations_pkg = files("dojo.sql.migrations")
-    with get_connection(settings.db_path) as conn:
+    with get_connection(db_path) as conn:
         apply_migrations(conn, migrations_pkg)
-    logger.info("Migrations complete for %s", settings.db_path)
+    logger.info("Migrations complete for %s", db_path)
+
+
+def main() -> None:
+    """Entry point for `python -m dojo.core.migrate`."""
+    settings: Settings = get_settings()
+    migrate(settings.db_path)
 
 
 if __name__ == "__main__":
