@@ -126,6 +126,21 @@ Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enf
 - Document manual validation steps per journey: e.g., "Record outflow then edit to add a tip", "Allocate funds via quick buttons and observe error when exceeding RTA", "Create category group and confirm Uncategorized hides when empty".
 - Update README/architecture docs as needed to explain the new navigation sections and workflows.
 
+### Milestone 6: User-Story-Driven E2E Testing Overhaul
+
+- **Goal**: Replace the existing, insufficient E2E tests with a new suite of user-story-driven tests to ensure complete feature coverage and protect against regressions.
+- **Test Scaffolding**:
+    - Configure a `before:spec` hook in `cypress.config.cjs`. This hook will reset the database to a pristine state before each spec file runs. This can be accomplished by running a Python script to re-create the DuckDB database.
+    - Establish a convention for loading SQL fixtures. Specs requiring pre-populated data will load a corresponding `.sql` file after the database reset to ensure a predictable starting state.
+- **Test Implementation**:
+    - Create a new directory `cypress/e2e/user-stories/` to house the new, granular test specs.
+    - For each of the 14 "Canonical User Stories" defined in this plan, create a corresponding spec file (e.g., `01-payday-assignment.cy.js`, `02-covering-overspending.cy.js`).
+    - Implement the end-to-end tests for each user story within its dedicated spec file, ensuring all assertions are covered.
+- **Cleanup**:
+    - Once the new user-story-driven test suite is complete and passing, the legacy E2E tests (`cypress/e2e/admin_pages.cy.js`, `cypress/e2e/budgeting_advanced.cy.js`, `cypress/e2e/budgeting_flow.cy.js`, `cypress/e2e/transaction_flow.cy.js`) will be removed.
+- **Documentation**:
+    - Update `CONTRIBUTING.md` to document the new E2E testing strategy, guiding developers on how to create new user story tests and maintain the testing infrastructure.
+
 ## Concrete Steps
 
 1. Ensure the nix/direnv environment is active at the repo root:
@@ -209,7 +224,8 @@ Capture similar snippets for allocations and Cypress commands as the implementat
 - `src/dojo/frontend/static/styles.css`: extend table styles to support nested rows/groups, add editable-row affordances, modal layouts for the new forms, and alert styles for insufficient-funds messages while reusing existing typography tokens.
 - Backend budgeting stack (`src/dojo/budgeting/routers.py`, `services.py`, `schemas.py`, `sql.py`, and `src/dojo/sql/budgeting/*.sql`): ensure transactions store a `status` flag, allocations capture from/to metadata, and new read endpoints return the allocation ledger plus budget hierarchy aggregates. DuckDB queries must return month-to-date inflow/budgeted amounts to power the summary cards.
 - Documentation (`README.md`, `docs/architecture/budgets_and_transactions.md`, and SPA walkthrough sections): update to reflect the new navigation (Allocations page, hierarchical budgets, quick allocations) and note that currency always displays in dollars.
-- Tests: extend `cypress/e2e/admin_pages.cy.js` (or split into dedicated specs) plus backend unit/property tests (`tests/unit/budgeting/test_transactions.py`, etc.) to cover statuses, allocations, and derived monthly targets.
+- `cypress.config.cjs`: Modify to add a `before:spec` task that can execute a database reset script.
+- Tests: The existing E2E tests in `cypress/e2e/` will be replaced by a new suite of user-story-driven tests in `cypress/e2e/user-stories/`. Each spec file will correspond to a Canonical User Story, starting from a clean, and optionally fixture-loaded, database state. Backend unit/property tests (`tests/unit/budgeting/test_transactions.py`, etc.) remain essential for covering invariants.
 
 ## Revision Note
 
