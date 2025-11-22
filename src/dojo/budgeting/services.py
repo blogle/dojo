@@ -99,6 +99,14 @@ class TransactionEntryService:
                     [cmd.category_id, month_start, activity_delta, activity_delta],
                 )
 
+            if self._should_reserve_credit_payment(account_row, category_row, cmd.amount_minor):
+                self._record_credit_payment_reserve(
+                    conn,
+                    account_row,
+                    month_start,
+                    cmd.amount_minor,
+                )
+
             account_state = self._account_state_from_row(
                 self._fetch_account(conn, cmd.account_id)
             )
@@ -419,11 +427,68 @@ class TransactionEntryService:
             raise UnknownCategory(f"Category `{category_id}` is not active.")
         return row
 
+    def _fetch_category_optional_row(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        category_id: str,
+    ) -> Tuple[Any, ...] | None:
+        sql = load_sql("select_active_category.sql")
+        row = conn.execute(sql, [category_id]).fetchone()
+        if row is None:
+            return None
+        if len(row) >= 3 and not row[2]:
+            return None
+        return row
+
     @staticmethod
     def _is_system_category(category_row: Tuple[Any, ...]) -> bool:
         if len(category_row) < 4:
             return False
         return bool(category_row[3])
+
+    @staticmethod
+    def _payment_category_id(account_id: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "_", account_id.lower()).strip("_")
+        return f"payment_{normalized or 'account'}"
+
+    def _should_reserve_credit_payment(
+        self,
+        account_row: Tuple[Any, ...],
+        category_row: Tuple[Any, ...],
+        amount_minor: int,
+    ) -> bool:
+        if amount_minor == 0:
+            return False
+        if not account_row or len(account_row) < 4:
+            return False
+        if account_row[2] != "liability":
+            return False
+        if account_row[3] != "credit":
+            return False
+        if self._is_system_category(category_row):
+            return False
+        return True
+
+    def _record_credit_payment_reserve(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        account_row: Tuple[Any, ...],
+        month_start: date,
+        amount_minor: int,
+    ) -> None:
+        payment_category_id = self._payment_category_id(account_row[0])
+        payment_category = self._fetch_category_optional_row(conn, payment_category_id)
+        if payment_category is None:
+            return
+        delta = abs(amount_minor)
+        if delta == 0:
+            return
+        inflow_sql = load_sql("adjust_category_inflow.sql")
+        sign = 1 if amount_minor < 0 else -1
+        conn.execute(
+            inflow_sql,
+            [payment_category_id, month_start, sign * delta, sign * delta],
+        )
 
     def _fetch_category_month_state(
         self,

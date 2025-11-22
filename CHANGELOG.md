@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dedicated allocations ledger: DuckDB now persists `budget_allocations` rows with from/to metadata, `/api/budget/allocations` exposes guard rails plus a month summary endpoint, and the SPA ships a standalone `#/allocations` page with summary chips, ledger table, and Cypress coverage.
 - Dev/demo data loader: `python -m dojo.core.seed` executes `sql/seeds/*.sql`, and tests now rely on purpose-built fixtures under `tests/fixtures/`.
 - Payday assignment Cypress spec with dedicated SQL fixture plus per-spec database reset to validate user-story-driven budgeting flows.
+- Funded credit card spending flow now mirrors budgeted purchases into the matching payment envelope, adds a tailored SQL fixture, and ships a Cypress spec that verifies category balances, Ready-to-Assign integrity, and credit liability updates end to end.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.

@@ -1091,13 +1091,21 @@ const handleAddAccount = async () => {
 const refreshAccountsPage = async () => {
   try {
     await fetchAccounts();
-    await fetchNetWorth();
-    await fetchReadyToAssign();
-    updateAccountStats();
-    renderAccountGroups();
   } catch (error) {
-    console.error("Failed to refresh account data", error);
+    console.error("Failed to fetch accounts", error);
   }
+  try {
+    await fetchNetWorth();
+  } catch (error) {
+    console.warn("Net worth endpoint unavailable", error);
+  }
+  try {
+    await fetchReadyToAssign();
+  } catch (error) {
+    console.error("Failed to fetch Ready to Assign", error);
+  }
+  updateAccountStats();
+  renderAccountGroups();
 };
 
 const loadBudgetsData = async () => {

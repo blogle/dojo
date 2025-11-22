@@ -16,6 +16,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-19 19:30Z) Completed Milestone 4: implemented hierarchical budgets table, category groups, budget goals (recurring/target date), and detail modals with quick allocation logic. Refined UI based on feedback (compact forms, hidden slugs).
 - [x] (2025-11-20 10:00Z) Completed Milestone 5: extended Cypress coverage for advanced flows (inflows, status toggling, allocations, groups), added backend unit tests for monthly state invariants, fixed available funds rollover logic, and updated documentation with manual validation steps.
 - [ ] (2025-11-21 14:05Z) Began Milestone 6: implemented and unit-tested the backend API for resetting and seeding the database to support E2E test scaffolding.
+- [x] (2025-11-21 16:30Z) Landed User Story 03 (Funded Credit Card Spending): added payment-reserve ledger logic, a dedicated SQL fixture, and Cypress assertions covering Gas + Visa Signature Payment envelopes plus the liability balance.
 
 ## Surprises & Discoveries
 
@@ -72,17 +73,29 @@ Cypress end-to-end specs in `cypress/e2e/admin_pages.cy.js` currently assert acc
 
 1. **Payday Assignment (Income to envelopes)** — A paycheck of 3,000.00 deposited into Checking must immediately raise Ready-to-Assign to 3,000.00. Assigning 1,500.00 to Rent, 500.00 to Groceries, and 1,000.00 to Savings drops Ready-to-Assign to 0.00 while each category reflects the assigned value and the Checking balance stays 3,000.00. Attempting to assign beyond the available funds (e.g., an extra 100.00) must trigger a blocking error.
 2. **Rolling with the Punches (Covering overspending)** — Dining Out starts at 100.00 and Groceries at 500.00. Recording a 120.00 Dining Out debit transaction should show Dining Out at –20.00. A cover-overspending action that moves 20.00 from Groceries restores Dining Out to 0.00, reduces Groceries to 480.00, keeps Ready-to-Assign unchanged, and reflects the 120.00 cash outflow on the debit account.
-3. **Funded Credit Card Spending** — Gas has 100.00 budgeted. Recording a 60.00 gas purchase on the Visa Signature credit account must reduce Gas to 40.00, increase the Visa Signature Payment category by 60.00, and show the Visa Signature liability increasing by 60.00 while cash accounts remain unchanged (no money has left Checking yet).
-4. **Categorized Investment Transfer** — Future Home holds 1,000.00 budgeted. Transferring 1,000.00 from Checking to Brokerage, categorized as Future Home, must decrease the Future Home category by 1,000.00, reduce Checking by 1,000.00, and increase Brokerage by 1,000.00. The transfer counts as budget activity but should not be treated as an expense in net worth reporting.
+
+3. **Funded Credit Card Spending** — Gas has 100.00 budgeted. Recording a 60.00 gas purchase on the Visa Signature credit account must reduce Gas to 40.00, increase the Visa Signature Payment category (Credit cards automatically are assigned a category by the system)  by 60.00, and show the Visa Signature liability increasing by 60.00 while cash accounts remain unchanged (no money has left Checking yet).
+
+4. **Categorized Investment Transfer** — Future Home holds 1,000.00 budgeted. We report a categorized transfer with a two leg transaction, the first marks an outflow from the source account with the target category (Future Home) and the second is a pure account transfer moving the funds into the target account. The Future Home category by 1,000.00, reduce Checking by 1,000.00, and increase Brokerage by 1,000.00. The transfer counts as budget activity but should not reduce net worth reporting - since assets remain the same.
+
 5. **Manual Transaction Lifecycle (Pending → Cleared)** — A 50.00 debit transaction posts as Pending by default. Editing the ledger row to 62.00 and toggling status to Cleared must update the transaction row, category balance, and debit account balance to reflect the 62.00 outflow while Ready-to-Assign remains unchanged.
+
 6. **Editable Ledger Rows (Correcting data entry)** — An erroneous 300.00 utility payment can be edited down to 30.00. Success requires the category’s available balance to increase by 270.00, the account balance to reflect only the 30.00 outflow, and Ready-to-Assign to remain untouched. Every field (date, amount, category, account, memo, status) must be editable with immediate recalculation.
-7. **Budget Group Creation and Assignment Flow** — Adding a “Subscriptions” group via modal and selecting “Netflix” and “Spotify” must immediately show the group row with the two budgets nested beneath it, aggregated totals, and removal of those budgets from the Uncategorized list.
-8. **Creating a Budget (Recurring or Target Date)** — Creating a target-date “Vacation” budget six months out with a 1,200.00 goal must derive a 200.00 monthly plan, while adding a recurring “Car Insurance” budget quarterly at 300.00 must derive 100.00 monthly. Both appear as leaf budgets with derived targets and roll up into group and footer totals.
+
+7. **Budget Group Creation and Assignment Flow** — Adding a “Subscriptions” group, then editing “Netflix” and “Spotify” categories to have subscriptions as their parent, must immediately show the group row in the budgets list with the two budgets nested beneath it, aggregated totals, and removal of those budgets from the Uncategorized list.
+
+8. **Creating a Budget (Recurring or Target Date)** — Creating a target-date “Vacation” budget six months out with a 1,200.00 goal must derive a 200.00 monthly plan, while adding a recurring “Car Insurance” budget quarterly at 300.00 must derive 100.00 monthly. Both appear as leaf budgets in the table with derived targets and roll up into group and footer totals.
+
 9. **Quick Allocate Actions from Budget Modal** — Opening the “Netflix” budget modal and clicking “Budgeted last month: 15.00” when Ready-to-Assign is 200.00 must create a 15.00 allocation row, raise Netflix’s Available by 15.00, and drop Ready-to-Assign to 185.00. If the selected quick action exceeds Ready-to-Assign, the system must show an error and skip the allocation.
+
 10. **Group-Level Quick Allocation (Multi-budget allocation)** — From the “Subscriptions” group modal, clicking “Spent last month: 40.00” when Ready-to-Assign is 25.00 must display an insufficient-funds error and avoid partial allocations. When Ready-to-Assign is 100.00, the same action creates separate allocations per child, updates each Available amount, adjusts the group total, and reduces Ready-to-Assign by 40.00.
+
 11. **Categorized Allocation Ledger Functionality** — The allocations page must show “Inflow (this month)” and “Available to budget” cards plus an editable ledger with Date, Amount, From, To, and Memo. Editing an allocation from 50.00 to 75.00 must move 25.00 between the source and target categories while Ready-to-Assign stays flat.
+
 12. **Investment Transfers Treated as Spending** — Transferring 400.00 from Checking to Brokerage with category “Down Payment Fund” must lower that category by 400.00, update Checking/Brokerage balances accordingly, record the activity in budgeting reports (not net-worth expense), and keep the transfer UX distinct from allocation UX.
+
 13. **Correct Handling of Inflows in Ledger** — Entering a 200.00 refund on Checking must render as +200.00, increase the account balance by 200.00, and increase the assigned category’s activity by 200.00 without applying negative formatting. Ready-to-Assign only changes if the category type dictates it.
+
 14. **Display of Monthly Summary Cards Across Pages** — Transactions must show “Spent this month” and “Budgeted this month” cards while Budgets shows “Ready to Assign,” “Activity this month,” “Available to Budget,” and the current month label. Editing ledger or allocation entries must update all cards in real time when moving between pages.
 
 Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enforcing the invariants described above.
