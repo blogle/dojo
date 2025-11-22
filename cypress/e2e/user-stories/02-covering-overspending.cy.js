@@ -1,40 +1,11 @@
 /// <reference types="cypress" />
 
+import transactionPage from "../../support/pages/TransactionPage";
+import allocationPage from "../../support/pages/AllocationPage";
+import budgetPage from "../../support/pages/BudgetPage";
+import accountPage from "../../support/pages/AccountPage";
+
 const FIXTURE = "tests/fixtures/e2e_covering_overspending.sql";
-
-const submitDiningOutOutflow = (amountDollars) => {
-  cy.get("[data-transaction-account]").select("House Checking");
-  cy.get("[data-transaction-category]").select("Dining Out");
-  cy.get("#transaction-form input[name='amount']").clear().type(amountDollars);
-  cy.get("[data-transaction-submit]").click();
-  cy.get("[data-testid='transaction-error']").should("have.text", "");
-};
-
-const coverOverspending = (amountDollars) => {
-  cy.get("[data-allocation-from]").select("Groceries");
-  cy.get("[data-allocation-to]").select("Dining Out");
-  cy.get("[data-testid='allocation-form'] input[name='amount']").clear().type(amountDollars);
-  cy.get("[data-allocation-submit]").click();
-  cy.get("[data-testid='allocation-error']").should("have.text", "");
-};
-
-const expectBudgetRow = (label, value) => {
-  cy.contains("#budgets-body tr", label).should("contain", value);
-};
-
-const rememberReadyToAssign = () => {
-  cy.get("#budgets-ready-value")
-    .invoke("text")
-    .then((text) => cy.wrap(text.trim()).as("initialReady"));
-};
-
-const expectReadyToAssignUnchanged = () => {
-  cy.get("@initialReady").then((expected) => {
-    cy.get("#budgets-ready-value").should(($value) => {
-      expect($value.text().trim()).to.eq(expected);
-    });
-  });
-};
 
 describe("User Story 02 — Rolling with the Punches", () => {
   beforeEach(() => {
@@ -43,43 +14,39 @@ describe("User Story 02 — Rolling with the Punches", () => {
   });
 
   it("covers Dining Out overspending by reallocating Groceries funds", () => {
-    cy.visit("/#/budgets");
-    expectBudgetRow("Dining Out", "$100.00");
-    expectBudgetRow("Groceries", "$500.00");
-    rememberReadyToAssign();
+    budgetPage.visit();
+    budgetPage.verifyCategoryAmount("Dining Out", "$100.00");
+    budgetPage.verifyCategoryAmount("Groceries", "$500.00");
+    budgetPage.rememberReadyToAssign();
 
-    cy.visit("/#/transactions");
-    submitDiningOutOutflow("120");
+    transactionPage.visit();
+    transactionPage.createOutflowTransaction("House Checking", "Dining Out", "120");
+    transactionPage.verifyError("");
 
-    cy.get("#transactions-body tr").first().within(() => {
+    transactionPage.elements.transactionTableRows().first().within(() => {
       cy.contains("td", "House Checking").should("exist");
       cy.contains("td", "Dining Out").should("exist");
       cy.contains("td.amount-cell", "$120.00");
     });
 
-    cy.visit("/#/budgets");
-    expectBudgetRow("Dining Out", "-$20.00");
-    expectBudgetRow("Groceries", "$500.00");
-    expectReadyToAssignUnchanged();
+    budgetPage.visit();
+    budgetPage.verifyCategoryAmount("Dining Out", "-$20.00");
+    budgetPage.verifyCategoryAmount("Groceries", "$500.00");
+    budgetPage.expectReadyToAssignUnchanged();
 
-    cy.visit("/#/accounts");
-    cy.contains(".account-card__name", "House Checking")
-      .parents(".account-card")
-      .find(".account-card__balance")
-      .should("contain", "$880.00");
+    accountPage.visit();
+    accountPage.verifyAccountBalance("House Checking", "$880.00");
 
-    cy.visit("/#/allocations");
-    coverOverspending("20");
+    allocationPage.visit();
+    allocationPage.categoryTransfer("Groceries", "Dining Out", "20");
+    allocationPage.verifyError("");
 
-    cy.visit("/#/budgets");
-    expectBudgetRow("Dining Out", "$0.00");
-    expectBudgetRow("Groceries", "$480.00");
-    expectReadyToAssignUnchanged();
+    budgetPage.visit();
+    budgetPage.verifyCategoryAmount("Dining Out", "$0.00");
+    budgetPage.verifyCategoryAmount("Groceries", "$480.00");
+    budgetPage.expectReadyToAssignUnchanged();
 
-    cy.visit("/#/accounts");
-    cy.contains(".account-card__name", "House Checking")
-      .parents(".account-card")
-      .find(".account-card__balance")
-      .should("contain", "$880.00");
+    accountPage.visit();
+    accountPage.verifyAccountBalance("House Checking", "$880.00");
   });
 });

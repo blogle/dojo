@@ -137,7 +137,7 @@ module.exports = defineConfig({
   e2e: {
     baseUrl: SERVER_URL,
     specPattern: "cypress/e2e/**/*.cy.js",
-    supportFile: false,
+    supportFile: 'cypress/support/e2e.js',
     video: false,
     defaultCommandTimeout: 10000,
     setupNodeEvents(on, config) {
