@@ -65,12 +65,13 @@ const startServer = async () => {
     return;
   }
 
-  const command = `DOJO_DB_PATH="${E2E_DB_PATH}" uv run python -m tests.e2e.prepare_db && DOJO_DB_PATH="${E2E_DB_PATH}" uv run uvicorn dojo.core.app:app --host 127.0.0.1 --port 8765`;
+  const command = `DOJO_DB_PATH="${E2E_DB_PATH}" DOJO_TESTING="1" uv run python -m tests.e2e.prepare_db && DOJO_DB_PATH="${E2E_DB_PATH}" DOJO_TESTING="1" uv run uvicorn dojo.core.app:app --host 127.0.0.1 --port 8765`;
 
   serverProcess = spawn("bash", ["-lc", command], {
     env: {
       ...process.env,
       DOJO_DB_PATH: E2E_DB_PATH,
+      DOJO_TESTING: "1",
     },
     stdio: "inherit",
   });

@@ -335,14 +335,45 @@ const updateAccountSelects = () => {
 };
 
 const getCategoryOptions = ({ includeSystem = false } = {}) => {
-  const source = state.budgets.categories.length ? state.budgets.categories : state.reference.categories;
-  return [...source]
+  const merged = new Map();
+  const reference = Array.isArray(state.reference.categories) ? state.reference.categories : [];
+  const budgeted = Array.isArray(state.budgets.rawCategories) ? state.budgets.rawCategories : [];
+  reference.forEach((category) => {
+    if (!category || !category.category_id) {
+      return;
+    }
+    merged.set(category.category_id, category);
+  });
+  budgeted.forEach((category) => {
+    if (!category || !category.category_id) {
+      return;
+    }
+    const existing = merged.get(category.category_id) || {};
+    merged.set(category.category_id, { ...existing, ...category });
+  });
+  return Array.from(merged.values())
     .filter((category) => {
+      if (!category) {
+        return false;
+      }
       const isSystem = isSystemCategoryId(category.category_id);
       if (isSystem) {
         return includeSystem;
       }
       return category.is_active !== false;
+    })
+    .map((category) => {
+      if (!category) {
+        return category;
+      }
+      const isSystem = isSystemCategoryId(category.category_id);
+      if (isSystem) {
+        const label = SPECIAL_CATEGORY_LABELS[category.category_id] || category.name;
+        if (label && label !== category.name) {
+          return { ...category, name: label };
+        }
+      }
+      return category;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 };

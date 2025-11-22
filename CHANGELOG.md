@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Transaction status tracking: DuckDB now stores pending/cleared states, the `/api/transactions` payloads include `status`, and the SPA ledger renders the true reconciliation state instead of inferring from dates.
 - Dedicated allocations ledger: DuckDB now persists `budget_allocations` rows with from/to metadata, `/api/budget/allocations` exposes guard rails plus a month summary endpoint, and the SPA ships a standalone `#/allocations` page with summary chips, ledger table, and Cypress coverage.
 - Dev/demo data loader: `python -m dojo.core.seed` executes `sql/seeds/*.sql`, and tests now rely on purpose-built fixtures under `tests/fixtures/`.
+- Payday assignment Cypress spec with dedicated SQL fixture plus per-spec database reset to validate user-story-driven budgeting flows.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
