@@ -17,6 +17,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-20 10:00Z) Completed Milestone 5: extended Cypress coverage for advanced flows (inflows, status toggling, allocations, groups), added backend unit tests for monthly state invariants, fixed available funds rollover logic, and updated documentation with manual validation steps.
 - [ ] (2025-11-21 14:05Z) Began Milestone 6: implemented and unit-tested the backend API for resetting and seeding the database to support E2E test scaffolding.
 - [x] (2025-11-21 16:30Z) Landed User Story 03 (Funded Credit Card Spending): added payment-reserve ledger logic, a dedicated SQL fixture, Cypress assertions covering Gas + Visa Signature envelopes plus the liability balance, and bootstrapped the Credit Card Payments group with auto-created payment categories for every credit account.
+- [x] (2025-11-22 04:55Z) Landed User Story 02 (Rolling with the Punches): seeded Dining Out/Groceries balances, automated the overspend→cover Cypress spec, and verified allocations keep Ready-to-Assign flat while House Checking reflects the debit outflow.
 
 ## Surprises & Discoveries
 
