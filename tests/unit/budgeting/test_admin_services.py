@@ -34,6 +34,34 @@ def test_create_account_inserts_row(in_memory_db: duckdb.DuckDBPyConnection) -> 
     assert created.opened_on == date(2024, 1, 1)
 
 
+def test_credit_account_auto_creates_payment_category(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = AccountAdminService()
+    payload = AccountCreateRequest(
+        account_id="visa_signature",
+        name="Visa Signature",
+        account_type="liability",
+        account_class="credit",
+        current_balance_minor=0,
+        currency="usd",
+    )
+
+    service.create_account(in_memory_db, payload)
+
+    category_row = in_memory_db.execute(
+        "SELECT name, group_id FROM budget_categories WHERE category_id = 'payment_visa_signature'"
+    ).fetchone()
+    assert category_row is not None
+    assert category_row[0] == "Visa Signature"
+    assert category_row[1] == "credit_card_payments"
+
+    group_row = in_memory_db.execute(
+        "SELECT name, sort_order FROM budget_category_groups WHERE group_id = 'credit_card_payments'"
+    ).fetchone()
+    assert group_row is not None
+    assert group_row[0] == "Credit Card Payments"
+    assert group_row[1] == -1000
+
+
 def test_duplicate_account_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     service = AccountAdminService()
     payload = AccountCreateRequest(

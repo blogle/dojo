@@ -43,6 +43,22 @@ from dojo.budgeting.schemas import (
 from dojo.budgeting.sql import load_sql
 
 
+def derive_payment_category_id(account_id: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", account_id.lower())
+    trimmed = normalized.strip("_")
+    return f"payment_{trimmed or 'account'}"
+
+
+def derive_payment_category_name(account_name: str) -> str:
+    label = account_name.strip() if account_name else "Credit Card"
+    return label
+
+
+CREDIT_PAYMENT_GROUP_ID = "credit_card_payments"
+CREDIT_PAYMENT_GROUP_NAME = "Credit Card Payments"
+CREDIT_PAYMENT_GROUP_SORT_ORDER = -1000
+
+
 class TransactionEntryService:
     """Insert and manage ledger transactions."""
 
@@ -446,11 +462,6 @@ class TransactionEntryService:
             return False
         return bool(category_row[3])
 
-    @staticmethod
-    def _payment_category_id(account_id: str) -> str:
-        normalized = re.sub(r"[^a-z0-9]+", "_", account_id.lower()).strip("_")
-        return f"payment_{normalized or 'account'}"
-
     def _should_reserve_credit_payment(
         self,
         account_row: Tuple[Any, ...],
@@ -476,7 +487,7 @@ class TransactionEntryService:
         month_start: date,
         amount_minor: int,
     ) -> None:
-        payment_category_id = self._payment_category_id(account_row[0])
+        payment_category_id = derive_payment_category_id(account_row[0])
         payment_category = self._fetch_category_optional_row(conn, payment_category_id)
         if payment_category is None:
             return
@@ -548,6 +559,12 @@ class AccountAdminService:
                     payload.opened_on,
                 ],
             )
+            if self._should_create_payment_category(payload.account_type, payload.account_class):
+                self._ensure_credit_payment_category(
+                    conn,
+                    account_id=payload.account_id,
+                    account_name=payload.name,
+                )
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -579,6 +596,12 @@ class AccountAdminService:
                     account_id,
                 ],
             )
+            if self._should_create_payment_category(payload.account_type, payload.account_class):
+                self._ensure_credit_payment_category(
+                    conn,
+                    account_id=account_id,
+                    account_name=payload.name,
+                )
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -621,6 +644,47 @@ class AccountAdminService:
             opened_on=row[8],
             created_at=row[9],
             updated_at=row[10],
+        )
+
+    @staticmethod
+    def _should_create_payment_category(account_type: str, account_class: str) -> bool:
+        return account_type == "liability" and account_class == "credit"
+
+    def _ensure_credit_payment_group(self, conn: duckdb.DuckDBPyConnection) -> None:
+        conn.execute(
+            """
+            INSERT INTO budget_category_groups (group_id, name, sort_order)
+            VALUES (?, ?, ?)
+            ON CONFLICT (group_id) DO UPDATE
+            SET name = EXCLUDED.name,
+                sort_order = EXCLUDED.sort_order,
+                is_active = TRUE,
+                updated_at = NOW()
+            """,
+            [CREDIT_PAYMENT_GROUP_ID, CREDIT_PAYMENT_GROUP_NAME, CREDIT_PAYMENT_GROUP_SORT_ORDER],
+        )
+
+    def _ensure_credit_payment_category(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        account_id: str,
+        account_name: str,
+    ) -> None:
+        self._ensure_credit_payment_group(conn)
+        category_id = derive_payment_category_id(account_id)
+        category_name = derive_payment_category_name(account_name)
+        conn.execute(
+            """
+            INSERT INTO budget_categories (category_id, group_id, name, is_active, is_system)
+            VALUES (?, ?, ?, TRUE, FALSE)
+            ON CONFLICT (category_id) DO UPDATE
+            SET name = EXCLUDED.name,
+                group_id = EXCLUDED.group_id,
+                is_active = TRUE,
+                is_system = FALSE,
+                updated_at = NOW()
+            """,
+            [category_id, CREDIT_PAYMENT_GROUP_ID, category_name],
         )
 
 

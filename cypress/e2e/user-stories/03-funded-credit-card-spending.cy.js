@@ -29,7 +29,7 @@ describe("User Story 03 — Funded Credit Card Spending", () => {
 
     cy.visit("/#/budgets");
     cy.contains("#budgets-body tr", "Gas").should("contain", "$40.00");
-    cy.contains("#budgets-body tr", "Visa Signature Payment").should("contain", "$60.00");
+    cy.contains("#budgets-body tr", "Visa Signature").should("contain", "$60.00");
 
     cy.visit("/#/accounts");
     cy.get("#accounts-page").should("have.class", "active");

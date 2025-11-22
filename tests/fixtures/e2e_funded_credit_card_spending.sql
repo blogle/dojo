@@ -15,13 +15,22 @@ ON CONFLICT (account_id) DO UPDATE
         account_class = EXCLUDED.account_class,
         account_role = EXCLUDED.account_role;
 
--- Categories
-INSERT INTO budget_categories (category_id, name, is_active, is_system)
+-- Categories / Groups
+INSERT INTO budget_category_groups (group_id, name, sort_order)
+VALUES ('credit_card_payments', 'Credit Card Payments', -1000)
+ON CONFLICT (group_id) DO UPDATE
+    SET name = EXCLUDED.name,
+        sort_order = EXCLUDED.sort_order,
+        is_active = TRUE,
+        updated_at = NOW();
+
+INSERT INTO budget_categories (category_id, name, group_id, is_active, is_system)
 VALUES
-    ('gas', 'Gas', TRUE, FALSE),
-    ('payment_visa_signature', 'Visa Signature Payment', TRUE, FALSE)
+    ('gas', 'Gas', NULL, TRUE, FALSE),
+    ('payment_visa_signature', 'Visa Signature', 'credit_card_payments', TRUE, FALSE)
 ON CONFLICT (category_id) DO UPDATE
     SET name = EXCLUDED.name,
+        group_id = EXCLUDED.group_id,
         is_active = EXCLUDED.is_active,
         is_system = EXCLUDED.is_system;
 
@@ -60,7 +69,7 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 
 UPDATE accounts
 SET current_balance_minor = 500000,
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = NOW()
 WHERE account_id = 'house_checking';
 
 -- Ensure monthly state reflects $100 assigned to Gas and $0 to Payment.
