@@ -131,7 +131,7 @@ Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enf
 
 - **Goal**: Replace the existing, insufficient E2E tests with a new suite of user-story-driven tests to ensure complete feature coverage and protect against regressions.
 - **Test Scaffolding**:
-    - Configure a `before:spec` hook in `cypress.config.cjs`. This hook will call the new `/api/testing/reset_db` endpoint to reset the database to a pristine state before each spec file runs.
+    - Configure a `beforeEvent` hook in each test. This hook will call the new `/api/testing/reset_db` endpoint to reset the database to a pristine state before each spec file runs.
     - Establish a convention for loading SQL fixtures. Specs requiring pre-populated data will call the new `/api/testing/seed_db` endpoint with a path to a corresponding `.sql` file after the database reset to ensure a predictable starting state.
 - **Test Implementation**:
     - Create a new directory `cypress/e2e/user-stories/` to house the new, granular test specs.
@@ -141,6 +141,14 @@ Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enf
     - Once the new user-story-driven test suite is complete and passing, the legacy E2E tests (`cypress/e2e/admin_pages.cy.js`, `cypress/e2e/budgeting_advanced.cy.js`, `cypress/e2e/budgeting_flow.cy.js`, `cypress/e2e/transaction_flow.cy.js`) will be removed.
 - **Documentation**:
     - Update `CONTRIBUTING.md` to document the new E2E testing strategy, guiding developers on how to create new user story tests and maintain the testing infrastructure.
+- **Progress 2025-11-21**:
+    - Implemented the first canonical spec (`01-payday-assignment.cy.js`) plus a dedicated SQL fixture so each run posts a $3,000 paycheck, allocates envelopes, and asserts Ready-to-Assign/Available totals.
+    - Wired Cypress to call `/api/testing/reset_db` and `/api/testing/seed_db` inside every `beforeEach`, using the `DOJO_TESTING=1` env var to expose the testing router.
+    - Updated the SPA selects to merge reference and budgeting category sources so system categories (Opening Balance, Available to Budget, etc.) remain selectable in the ledger form.
+- **Next steps**:
+    - Repeat the fixture + spec pattern for the remaining 13 user stories, validating inflows/outflows, overspending coverage, category modal flows, and allocation safeguards.
+    - Backfill CONTRIBUTING/README guidance once at least one more story lands, then delete the legacy Cypress specs after parity.
+    - Evaluate whether additional seed helpers are needed (e.g., multi-account fixtures) before expanding the suite.
 
 ## Concrete Steps
 
@@ -225,7 +233,7 @@ Capture similar snippets for allocations and Cypress commands as the implementat
 - `src/dojo/frontend/static/styles.css`: extend table styles to support nested rows/groups, add editable-row affordances, modal layouts for the new forms, and alert styles for insufficient-funds messages while reusing existing typography tokens.
 - Backend budgeting stack (`src/dojo/budgeting/routers.py`, `services.py`, `schemas.py`, `sql.py`, and `src/dojo/sql/budgeting/*.sql`): ensure transactions store a `status` flag, allocations capture from/to metadata, and new read endpoints return the allocation ledger plus budget hierarchy aggregates. DuckDB queries must return month-to-date inflow/budgeted amounts to power the summary cards.
 - Documentation (`README.md`, `docs/architecture/budgets_and_transactions.md`, and SPA walkthrough sections): update to reflect the new navigation (Allocations page, hierarchical budgets, quick allocations) and note that currency always displays in dollars.
-- `cypress.config.cjs`: Modify to add a `before:spec` task that can execute a database reset script.
+- Before each test submit a request to the app to reset_db and optionally load a fixture spec to populate the data with the requisite data.
 - Tests: The existing E2E tests in `cypress/e2e/` will be replaced by a new suite of user-story-driven tests in `cypress/e2e/user-stories/`. Each spec file will correspond to a Canonical User Story, starting from a clean, and optionally fixture-loaded, database state. Backend unit/property tests (`tests/unit/budgeting/test_transactions.py`, etc.) remain essential for covering invariants.
 
 ## Revision Note
