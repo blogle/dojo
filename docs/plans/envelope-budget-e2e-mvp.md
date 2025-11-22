@@ -18,6 +18,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [ ] (2025-11-21 14:05Z) Began Milestone 6: implemented and unit-tested the backend API for resetting and seeding the database to support E2E test scaffolding.
 - [x] (2025-11-21 16:30Z) Landed User Story 03 (Funded Credit Card Spending): added payment-reserve ledger logic, a dedicated SQL fixture, Cypress assertions covering Gas + Visa Signature envelopes plus the liability balance, and bootstrapped the Credit Card Payments group with auto-created payment categories for every credit account.
 - [x] (2025-11-22 04:55Z) Landed User Story 02 (Rolling with the Punches): seeded Dining Out/Groceries balances, automated the overspend→cover Cypress spec, and verified allocations keep Ready-to-Assign flat while House Checking reflects the debit outflow.
+- [x] (2025-11-22 05:30Z) Landed User Story 04 (Categorized Investment Transfer): added a brokerage transfer fixture, scripted the Cypress flow for a categorized transfer, and asserted Future Home availability plus both account balances shift by exactly $1,000 without disturbing Ready-to-Assign.
 
 ## Surprises & Discoveries
 

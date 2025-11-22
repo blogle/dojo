@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Funded credit card spending flow now mirrors budgeted purchases into the matching payment envelope, adds a tailored SQL fixture, and ships a Cypress spec that verifies category balances, Ready-to-Assign integrity, and credit liability updates end to end.
 - Credit accounts now auto-provision payment envelopes (grouped under "Credit Card Payments") and a migration backfills both the group and per-account envelopes so budgets consistently show the dedicated section at the top.
 - Rolling with the Punches Cypress spec + SQL fixture validate Dining Out overspending, Groceries-to-Dining reallocations via the allocations ledger, Ready-to-Assign stability, and the cash impact on House Checking.
+- Categorized investment transfer Cypress spec + fixture prove Future Home allocations drop correctly while Checking decreases, Brokerage increases, and Ready-to-Assign stays consistent when moving funds between on-budget accounts.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
