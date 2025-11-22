@@ -83,6 +83,9 @@ class TransactionEntryService:
             track_budget_activity = not self._is_system_category(category_row)
 
             if cmd.concept_id is not None:
+                previous_transaction = self._fetch_active_transaction(conn, cmd.concept_id)
+                if previous_transaction is not None:
+                    self._reverse_transaction_effects(conn, previous_transaction)
                 close_sql = load_sql("close_active_transaction.sql")
                 conn.execute(
                     close_sql,
@@ -500,6 +503,54 @@ class TransactionEntryService:
             inflow_sql,
             [payment_category_id, month_start, sign * delta, sign * delta],
         )
+
+    def _fetch_active_transaction(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        concept_id: UUID | str,
+    ) -> Tuple[Any, ...] | None:
+        sql = load_sql("select_active_transaction.sql")
+        row = conn.execute(sql, [str(concept_id)]).fetchone()
+        return row
+
+    def _reverse_transaction_effects(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        transaction_row: Tuple[Any, ...],
+    ) -> None:
+        if not transaction_row:
+            return
+        (
+            _version_id,
+            account_id,
+            category_id,
+            transaction_date,
+            amount_minor,
+            _status,
+        ) = transaction_row
+        month_start = transaction_date.replace(day=1)
+        amount_minor = int(amount_minor)
+        update_account_sql = load_sql("update_account_balance.sql")
+        conn.execute(
+            update_account_sql,
+            [-amount_minor, -amount_minor, account_id],
+        )
+        category_row = self._fetch_category_optional_row(conn, category_id)
+        if category_row and not self._is_system_category(category_row):
+            upsert_category_sql = load_sql("upsert_category_monthly_state.sql")
+            conn.execute(
+                upsert_category_sql,
+                [category_id, month_start, amount_minor, amount_minor],
+            )
+        if category_row:
+            account_row = self._fetch_account(conn, account_id)
+            if self._should_reserve_credit_payment(account_row, category_row, amount_minor):
+                self._record_credit_payment_reserve(
+                    conn,
+                    account_row,
+                    month_start,
+                    -amount_minor,
+                )
 
     def _fetch_category_month_state(
         self,

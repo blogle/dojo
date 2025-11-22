@@ -23,9 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Credit accounts now auto-provision payment envelopes (grouped under "Credit Card Payments") and a migration backfills both the group and per-account envelopes so budgets consistently show the dedicated section at the top.
 - Rolling with the Punches Cypress spec + SQL fixture validate Dining Out overspending, Groceries-to-Dining reallocations via the allocations ledger, Ready-to-Assign stability, and the cash impact on House Checking.
 - Categorized investment transfer Cypress spec + fixture prove Future Home allocations drop correctly while Checking decreases, Brokerage increases, and Ready-to-Assign stays consistent when moving funds between on-budget accounts.
+- Manual transaction lifecycle Cypress spec + fixture walk a pending debit through edit → cleared while asserting category availability, Ready-to-Assign, and account balances stay in sync.
 
 ### Changed
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
+- Transaction editing now reverses the previous ledger effects (account balances, category month state, credit-payment reserves) before applying the updated amount so pending→cleared edits keep envelopes and Ready-to-Assign accurate.
 - Repositioned the dashboard stats into a single no-wrap card row, right-justified the navigation links, and removed the redundant pre-content copy so the ledger cards sit immediately below the hero metrics.
 - Rebuilt the Accounts view into an Assets & Liabilities workspace with grouped cards, navigation filters, stats, and a guided add-account modal for new holdings.
 - Updated architecture domain docs for Assets & Liabilities, Budgeting & Transactions, Net Worth, and Overview to formalize cash-only Ready to Assign, off-budget Accessible Assets, ledger-driven loan balances, and the unified net worth formula (ledger + positions + tangibles).

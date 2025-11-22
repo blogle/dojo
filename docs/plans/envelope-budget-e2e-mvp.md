@@ -19,6 +19,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-21 16:30Z) Landed User Story 03 (Funded Credit Card Spending): added payment-reserve ledger logic, a dedicated SQL fixture, Cypress assertions covering Gas + Visa Signature envelopes plus the liability balance, and bootstrapped the Credit Card Payments group with auto-created payment categories for every credit account.
 - [x] (2025-11-22 04:55Z) Landed User Story 02 (Rolling with the Punches): seeded Dining Out/Groceries balances, automated the overspend→cover Cypress spec, and verified allocations keep Ready-to-Assign flat while House Checking reflects the debit outflow.
 - [x] (2025-11-22 05:30Z) Landed User Story 04 (Categorized Investment Transfer): added a brokerage transfer fixture, scripted the Cypress flow for a categorized transfer, and asserted Future Home availability plus both account balances shift by exactly $1,000 without disturbing Ready-to-Assign.
+- [x] (2025-11-22 06:30Z) Landed User Story 05 (Manual Transaction Lifecycle): built a lifecycle fixture, fixed backend editing semantics to keep accounts/envelopes consistent, and authored the Cypress spec that posts a pending outflow, edits it to $62 cleared, and validates budgets + Ready-to-Assign stay accurate.
 
 ## Surprises & Discoveries
 
@@ -97,10 +98,12 @@ Cypress end-to-end specs in `cypress/e2e/admin_pages.cy.js` currently assert acc
 12. **Investment Transfers Treated as Spending** — Transferring 400.00 from Checking to Brokerage with category “Down Payment Fund” must lower that category by 400.00, update Checking/Brokerage balances accordingly, record the activity in budgeting reports (not net-worth expense), and keep the transfer UX distinct from allocation UX.
 
 13. **Correct Handling of Inflows in Ledger** — Entering a 200.00 refund on Checking must render as +200.00, increase the account balance by 200.00, and increase the assigned category’s activity by 200.00 without applying negative formatting. Ready-to-Assign only changes if the category type dictates it.
-
 14. **Display of Monthly Summary Cards Across Pages** — Transactions must show “Spent this month” and “Budgeted this month” cards while Budgets shows “Ready to Assign,” “Activity this month,” “Available to Budget,” and the current month label. Editing ledger or allocation entries must update all cards in real time when moving between pages.
+15. **Account Onboarding Ledger Integrity** — Walk through the add-account modal for a checking account and a credit card, provide non-zero opening balances, and verify: (a) each account’s opening balance appears as a ledger entry, (b) the modal/Accounts page displays the same value, and (c) the assets, liabilities, and net-worth hero cards reconcile to those openings immediately.
+16. **Credit Transaction Correction Workflow** — Record a purchase for a budget category on the wrong credit account, confirm the Budgets page reflects the activity, then edit the transaction in the ledger to change the account. After saving, re-open the Budgets and Assets & Liabilities pages to ensure category, Ready-to-Assign, and account totals refresh to the corrected values.
 
 Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enforcing the invariants described above.
+
 
 ## Plan of Work
 
