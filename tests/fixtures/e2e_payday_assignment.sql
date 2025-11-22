@@ -21,3 +21,33 @@ ON CONFLICT (category_id) DO UPDATE
     SET name = EXCLUDED.name,
         is_active = EXCLUDED.is_active,
         is_system = EXCLUDED.is_system;
+
+INSERT INTO transactions (
+    transaction_version_id,
+    concept_id,
+    account_id,
+    category_id,
+    transaction_date,
+    amount_minor,
+    memo,
+    status,
+    recorded_at,
+    valid_from,
+    valid_to,
+    is_active,
+    source
+) VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000001',
+    'house_checking',
+    'opening_balance',
+    DATE '2025-11-01',
+    0,
+    'Seeded opening balance',
+    'cleared',
+    TIMESTAMP '2025-11-01 00:00:00',
+    TIMESTAMP '2025-11-01 00:00:00',
+    TIMESTAMP '9999-12-31 00:00:00',
+    TRUE,
+    'seed'
+);
