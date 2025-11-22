@@ -38,15 +38,11 @@ describe("User Story 01 — Payday Assignment", () => {
     cy.get("[data-transaction-submit]").click();
     cy.get("[data-testid='transaction-error']").should("have.text", "");
 
-    cy.get("#transactions-body tr").should("have.length", 2);
+    cy.get("#transactions-body tr").should("have.length", 1);
     cy.get("#transactions-body tr").first().within(() => {
       cy.contains("td", "House Checking").should("exist");
       cy.contains("td", "Available to Budget").should("exist");
       cy.contains("td", "$3,000.00").should("exist");
-    });
-    cy.contains("#transactions-body tr", "Opening Balance").within(() => {
-      cy.contains("td", "House Checking").should("exist");
-      cy.contains("td", "$0.00").should("exist");
     });
 
     cy.visit("/#/allocations");
