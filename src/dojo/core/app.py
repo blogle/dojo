@@ -40,13 +40,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.account_admin_service = AccountAdminService()
     app.state.budget_category_admin_service = BudgetCategoryAdminService()
 
-    app.include_router(core_router)
-    app.include_router(budgeting_router)
+    app.include_router(core_router, prefix="/api")
+    app.include_router(budgeting_router, prefix="/api")
 
     if settings.testing:
         from dojo.testing.routers import router as testing_router
 
-        app.include_router(testing_router)
+        app.include_router(testing_router, prefix="/api")
 
     static_dir = _static_directory()
     app.mount(

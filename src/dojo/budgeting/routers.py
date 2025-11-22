@@ -48,7 +48,7 @@ from dojo.budgeting.services import (
 )
 from dojo.core.db import connection_dep
 
-router = APIRouter(prefix="/api", tags=["budgeting"])
+router = APIRouter(tags=["budgeting"])
 
 ServiceT = TypeVar("ServiceT")
 

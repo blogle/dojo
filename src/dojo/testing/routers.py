@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from ..core.config import Settings, get_settings
 from . import services
 
-router = APIRouter(prefix="/api", tags=["testing"])
+router = APIRouter(tags=["testing"])
 
 
 class SeedRequest(BaseModel):
