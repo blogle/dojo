@@ -22,6 +22,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-22 06:30Z) Landed User Story 05 (Manual Transaction Lifecycle): built a lifecycle fixture, fixed backend editing semantics to keep accounts/envelopes consistent, and authored the Cypress spec that posts a pending outflow, edits it to $62 cleared, and validates budgets + Ready-to-Assign stay accurate.
 - [x] (2025-11-23 13:15Z) Landed User Story 06 (Editable Ledger Rows): added a utilities fixture, expanded the Transaction page object for inline editors, and wrote the Cypress spec that corrects a $300 utility payment down to $30 while verifying category, account, and Ready-to-Assign recalculations.
 - [x] (2025-11-23 14:45Z) Landed User Story 07 (Budget Group Creation): built a Netflix/Spotify uncategorized fixture, scripted the group creation + assignment Cypress flow with network waits, and asserted the envelopes move out of Uncategorized immediately.
+- [x] (2025-11-23 15:25Z) Landed User Story 08 (Create Budget Goals): added a lightweight fixture, scripted recurring vs target-date modal submissions, and checked that new budgets render in the hierarchy with zero budgeted dollars until allocations occur.
 - [x] (2025-11-23 15:40Z) Landed User Story 09 (Quick Allocate Modal): authored sufficient/insufficient Ready-to-Assign fixtures, updated the Budget page object for reliable modal + quick-button interaction, and added the Cypress spec that validates happy-path allocations plus the insufficient funds guard rail.
 
 ## Surprises & Discoveries
