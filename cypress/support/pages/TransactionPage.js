@@ -56,8 +56,28 @@ class TransactionPage {
         this.elements.transactionTableRows().eq(rowIndex).click();
     }
 
-    editOutflowAmount(amount) {
+    setInlineDate(dateString) {
+        cy.get("[data-inline-date]").clear().type(dateString);
+    }
+
+    selectInlineAccount(accountName) {
+        cy.get("[data-inline-account]").select(accountName);
+    }
+
+    selectInlineCategory(categoryName) {
+        cy.get("[data-inline-category]").select(categoryName);
+    }
+
+    setInlineMemo(memo) {
+        cy.get("[data-inline-memo]").clear().type(memo);
+    }
+
+    setInlineOutflow(amount) {
         cy.get("[data-inline-outflow]").clear().type(amount);
+    }
+
+    editOutflowAmount(amount) {
+        this.setInlineOutflow(amount);
     }
 
     toggleTransactionStatus() {
@@ -77,6 +97,32 @@ class TransactionPage {
     verifyTransactionRowAmount(rowIndex, amount) {
         this.elements.transactionTableRows().eq(rowIndex).within(() => {
             cy.contains("td.amount-cell", amount).should("exist");
+        });
+    }
+
+    verifyTransactionMemo(rowIndex, memo) {
+        this.elements.transactionTableRows().eq(rowIndex).within(() => {
+            cy.contains("td", memo).should("exist");
+        });
+    }
+
+    verifyTransactionDate(rowIndex, dateString) {
+        this.elements.transactionTableRows().eq(rowIndex).within(() => {
+            cy.contains("td", dateString).should("exist");
+        });
+    }
+
+    verifyTransactionRowByMemo(memoText, { amount, date, status } = {}) {
+        cy.contains("#transactions-body tr", memoText).within(() => {
+            if (date) {
+                cy.contains("td", date).should("exist");
+            }
+            if (amount) {
+                cy.contains("td.amount-cell", amount).should("exist");
+            }
+            if (status) {
+                cy.get("[data-status-display]").should("have.attr", "data-state", status);
+            }
         });
     }
 

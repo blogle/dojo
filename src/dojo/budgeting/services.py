@@ -755,7 +755,16 @@ class BudgetCategoryAdminService:
             prev_month = date(month.year, month.month - 1, 1)
             
         sql = load_sql("select_budget_categories_admin.sql")
-        rows = conn.execute(sql, [month, month, prev_month]).fetchall()
+        placeholder_count = sql.count("?")
+        if placeholder_count == 3:
+            params = [month, month, prev_month]
+        elif placeholder_count == 2:
+            params = [month, prev_month]
+        else:
+            raise RuntimeError(
+                "select_budget_categories_admin.sql must expose either 2 or 3 placeholders"
+            )
+        rows = conn.execute(sql, params).fetchall()
         return [self._row_to_category(row) for row in rows]
 
     def create_category(

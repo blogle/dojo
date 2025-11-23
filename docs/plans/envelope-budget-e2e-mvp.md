@@ -20,6 +20,7 @@ Deliver a complete envelope-budgeting slice so a household can stand up the SPA,
 - [x] (2025-11-22 04:55Z) Landed User Story 02 (Rolling with the Punches): seeded Dining Out/Groceries balances, automated the overspend→cover Cypress spec, and verified allocations keep Ready-to-Assign flat while House Checking reflects the debit outflow.
 - [x] (2025-11-22 05:30Z) Landed User Story 04 (Categorized Investment Transfer): added a brokerage transfer fixture, scripted the Cypress flow for a categorized transfer, and asserted Future Home availability plus both account balances shift by exactly $1,000 without disturbing Ready-to-Assign.
 - [x] (2025-11-22 06:30Z) Landed User Story 05 (Manual Transaction Lifecycle): built a lifecycle fixture, fixed backend editing semantics to keep accounts/envelopes consistent, and authored the Cypress spec that posts a pending outflow, edits it to $62 cleared, and validates budgets + Ready-to-Assign stay accurate.
+- [x] (2025-11-23 13:15Z) Landed User Story 06 (Editable Ledger Rows): added a utilities fixture, expanded the Transaction page object for inline editors, and wrote the Cypress spec that corrects a $300 utility payment down to $30 while verifying category, account, and Ready-to-Assign recalculations.
 
 ## Surprises & Discoveries
 
