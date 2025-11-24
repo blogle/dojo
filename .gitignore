@@ -1,9 +1,10 @@
-artifacts/
 __pycache__/
 .direnv/*
-*.pyc
 .envrc
 .hypothesis/
-data/*.duckdb
 .uv-cache/
+.xdg/*
+*.pyc
+artifacts/
+data/*.duckdb
 src/dojo.egg-info/
