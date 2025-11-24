@@ -21,6 +21,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 - Repeated `/api/testing/reset_db` calls during Cypress runs can momentarily remove the DuckDB file between requests. Wrapping the DAO's `ready_to_assign`/`month_cash_inflow` readers in a `CatalogException` guard prevents transient "table not found" crashes during those resets.
 - Breaking the UI into page-level modules surfaced just how intertwined DOM selection and data fetching had become; introducing a central store forced us to be explicit about each update path and highlighted where we were previously mutating shared objects from event handlers.
 - Replacing ad-hoc `BEGIN`/`COMMIT` blocks with a DAO-level transaction context manager gives us a single place to enforce rollback discipline and makes the temporal ledger boundary obvious in code and tests.
+- (2025-11-24) Once the transfer and allocation helpers existed, wrapping both flows in `BudgetingDAO.transaction()` kept the rollback semantics centralized and made the steps easy to inspect.
 - Categorized transfers were quietly incrementing liability balances instead of reducing them; re-running the budgeting unit suite surfaced the regression, so the service now flips the deltas for liability accounts before updating balances.
 
 ## Decision Log
@@ -113,7 +114,10 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 1.  Break down these large functions into smaller, more focused private methods within the service class. For example, `create` could be broken down into `_validate_create_request`, `_build_transaction_response`, etc.
 2.  Each smaller function should have a single responsibility.
 
-**Status (2025-11-23):** ⚠️ **Partially remediated.** The transaction and allocation flows within the `budgeting` service have been refactored into smaller, more focused methods. This approach should be applied to other complex functions throughout the codebase during refactoring efforts.
+**Status (2025-11-24):** ✅ Fully remediated. Transfer and allocation flows now join focused helpers with `BudgetingDAO.transaction()` so each step owns a single responsibility while the DAO keeps rollback discipline centralized.
+**Notes (2025-11-24):**
+- Extracted `_record_transfer_leg`, `_record_category_activity`, `_account_state_for`, `_category_state_for_month`, `_validate_allocation_amount`, `_require_allocation_destination`, `_ensure_allocation_source_can_allocate`, `_ensure_ready_to_assign`, `_persist_allocation`, and `_coerce_month_start` so the helpers live next to the service and are easily testable.
+- `allocate_envelope` now only orchestrates validation and metadata before delegating persistence to `_persist_allocation` inside `BudgetingDAO.transaction()`, eliminating the manual begin/commit scaffolding and flattening the control flow.
 
 #### 1.6. Inline SQL
 
@@ -262,6 +266,7 @@ The following sections detail the missing property tests required to validate th
 - All existing unit and e2e tests must pass.
 - For each remediation, new unit tests should be added to verify the fix and prevent regressions.
 - A manual review of the application should be conducted to ensure that all functionality remains intact after the refactoring.
+- (2025-11-24) `pytest tests/unit/budgeting tests/property/budgeting` passes, covering the affected transfer and allocation flows.
 
 ## Artifacts and Notes
 

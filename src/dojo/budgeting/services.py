@@ -3,7 +3,7 @@
 import re
 from datetime import date, datetime, timezone
 from typing import Any, Literal, Optional, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import duckdb
 
@@ -151,63 +151,49 @@ class TransactionEntryService:
         concept_id = cmd.concept_id or uuid4()
         recorded_at = datetime.now(timezone.utc)
         month_start = cmd.transaction_date.replace(day=1)
+        budget_leg_id = uuid4()
+        transfer_leg_id = uuid4()
 
-        dao.begin()
-        try:
+        with dao.transaction():
             source_account = self._require_active_account(dao, cmd.source_account_id)
             destination_account = self._require_active_account(dao, cmd.destination_account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
             track_budget_activity = self._should_track_budget_activity(category_record)
+
             source_amount = self._transfer_delta(cmd.amount_minor, source_account, "outgoing")
             destination_amount = self._transfer_delta(cmd.amount_minor, destination_account, "incoming")
 
-            budget_leg_id = uuid4()
-            transfer_leg_id = uuid4()
-
-            dao.insert_transaction(
-                transaction_version_id=budget_leg_id,
-                concept_id=concept_id,
-                account_id=cmd.source_account_id,
-                category_id=cmd.category_id,
-                transaction_date=cmd.transaction_date,
-                amount_minor=source_amount,
-                memo=cmd.memo,
-                status="cleared",
-                recorded_at=recorded_at,
-                source=self.SOURCE,
+            self._record_transfer_leg(
+                dao,
+                budget_leg_id,
+                concept_id,
+                cmd.source_account_id,
+                cmd.category_id,
+                cmd.transaction_date,
+                source_amount,
+                cmd.memo,
+                "cleared",
+                recorded_at,
             )
-            dao.update_account_balance(cmd.source_account_id, source_amount)
-
-            dao.insert_transaction(
-                transaction_version_id=transfer_leg_id,
-                concept_id=concept_id,
-                account_id=cmd.destination_account_id,
-                category_id=self.TRANSFER_CATEGORY_ID,
-                transaction_date=cmd.transaction_date,
-                amount_minor=destination_amount,
-                memo=cmd.memo,
-                status="cleared",
-                recorded_at=recorded_at,
-                source=self.SOURCE,
+            self._record_transfer_leg(
+                dao,
+                transfer_leg_id,
+                concept_id,
+                cmd.destination_account_id,
+                self.TRANSFER_CATEGORY_ID,
+                cmd.transaction_date,
+                destination_amount,
+                cmd.memo,
+                "cleared",
+                recorded_at,
             )
-            dao.update_account_balance(cmd.destination_account_id, destination_amount)
 
             if track_budget_activity:
-                dao.upsert_category_activity(cmd.category_id, month_start, cmd.amount_minor)
+                self._record_category_activity(dao, cmd.category_id, month_start, cmd.amount_minor)
 
-            source_state = self._account_state_from_record(self._require_active_account(dao, cmd.source_account_id))
-            destination_state = self._account_state_from_record(
-                self._require_active_account(dao, cmd.destination_account_id)
-            )
-            category_state = self._category_state_from_month(
-                dao.get_category_month_state(cmd.category_id, month_start),
-                cmd.category_id,
-            )
-
-            dao.commit()
-        except Exception:
-            dao.rollback()
-            raise
+            source_state = self._account_state_for(dao, cmd.source_account_id)
+            destination_state = self._account_state_for(dao, cmd.destination_account_id)
+            category_state = self._category_state_for_month(dao, cmd.category_id, month_start)
 
         return CategorizedTransferResponse(
             concept_id=concept_id,
@@ -241,65 +227,38 @@ class TransactionEntryService:
         memo: str | None = None,
         allocation_date: date | None = None,
     ) -> CategoryState:
-        if amount_minor <= 0:
-            raise InvalidTransaction("amount_minor must be positive for allocations.")
-        destination_category_id = category_id
-        if not destination_category_id:
-            raise InvalidTransaction("to_category_id is required for allocations.")
-        if from_category_id and from_category_id == destination_category_id:
-            raise InvalidTransaction("Source and destination categories must differ.")
-
-        dao = BudgetingDAO(conn)
+        self._validate_allocation_amount(amount_minor)
+        destination_category_id = self._require_allocation_destination(category_id, from_category_id)
         allocation_day = allocation_date or date.today()
-        month = (month_start or allocation_day).replace(day=1)
+        month = self._coerce_month_start(month_start or allocation_day)
         memo_value = memo.strip() if memo else None
 
+        dao = BudgetingDAO(conn)
         destination_category = self._require_active_category(dao, destination_category_id)
-        if destination_category.is_system:
-            raise InvalidTransaction("System categories cannot receive allocations.")
+        self._assert_destination_category_can_receive_allocations(destination_category)
 
-        source_state: CategoryState | None = None
         if from_category_id:
-            source_category = self._require_active_category(dao, from_category_id)
-            if source_category.is_system:
-                raise InvalidTransaction("System categories cannot provide allocations.")
-            source_state = self._category_state_from_month(
-                dao.get_category_month_state(from_category_id, month),
-                from_category_id,
-            )
-            if source_state.available_minor < amount_minor:
-                raise InvalidTransaction("Source category does not have enough available funds.")
+            self._ensure_allocation_source_can_allocate(dao, from_category_id, month, amount_minor)
         else:
-            ready_minor = self.ready_to_assign(conn, month)
-            if ready_minor < amount_minor:
-                raise InvalidTransaction("Ready-to-Assign is insufficient for this allocation.")
+            self._ensure_ready_to_assign(dao, month, amount_minor)
 
         allocation_id = uuid4()
-        dao.begin()
-        try:
-            dao.insert_budget_allocation(
-                allocation_id=allocation_id,
-                allocation_date=allocation_day,
-                month_start=month,
-                from_category_id=from_category_id,
-                to_category_id=destination_category_id,
-                amount_minor=amount_minor,
-                memo=memo_value,
-            )
-            dao.adjust_category_allocation(destination_category_id, month, amount_minor, amount_minor)
-            if from_category_id:
-                dao.adjust_category_allocation(from_category_id, month, -amount_minor, -amount_minor)
-            category_state = self._category_state_from_month(
-                dao.get_category_month_state(destination_category_id, month),
+        with dao.transaction():
+            self._persist_allocation(
+                dao,
+                allocation_id,
+                allocation_day,
+                month,
+                from_category_id,
                 destination_category_id,
+                amount_minor,
+                memo_value,
             )
-            dao.commit()
-        except Exception:
-            dao.rollback()
-            raise
+            category_state = self._category_state_for_month(dao, destination_category_id, month)
         return category_state
 
     def list_recent(
+
         self,
         conn: duckdb.DuckDBPyConnection,
         limit: int,
@@ -345,6 +304,119 @@ class TransactionEntryService:
             "to_category_name": record.to_category_name,
             "created_at": record.created_at,
         }
+
+    def _record_transfer_leg(
+        self,
+        dao: BudgetingDAO,
+        transaction_version_id: UUID,
+        concept_id: UUID,
+        account_id: str,
+        category_id: str,
+        transaction_date: date,
+        amount_minor: int,
+        memo: str | None,
+        status: Literal["pending", "cleared"],
+        recorded_at: datetime,
+    ) -> None:
+        dao.insert_transaction(
+            transaction_version_id=transaction_version_id,
+            concept_id=concept_id,
+            account_id=account_id,
+            category_id=category_id,
+            transaction_date=transaction_date,
+            amount_minor=amount_minor,
+            memo=memo,
+            status=status,
+            recorded_at=recorded_at,
+            source=self.SOURCE,
+        )
+        dao.update_account_balance(account_id, amount_minor)
+
+    def _record_category_activity(
+        self,
+        dao: BudgetingDAO,
+        category_id: str,
+        month_start: date,
+        activity_delta: int,
+    ) -> None:
+        dao.upsert_category_activity(category_id, month_start, activity_delta)
+
+    def _account_state_for(self, dao: BudgetingDAO, account_id: str) -> AccountState:
+        return self._account_state_from_record(self._require_active_account(dao, account_id))
+
+    def _category_state_for_month(self, dao: BudgetingDAO, category_id: str, month_start: date) -> CategoryState:
+        record = dao.get_category_month_state(category_id, month_start)
+        return self._category_state_from_month(record, category_id)
+
+    def _validate_allocation_amount(self, amount_minor: int) -> None:
+        if amount_minor <= 0:
+            raise InvalidTransaction("amount_minor must be positive for allocations.")
+
+    def _require_allocation_destination(
+        self,
+        destination_category_id: str,
+        from_category_id: str | None,
+    ) -> str:
+        if not destination_category_id:
+            raise InvalidTransaction("to_category_id is required for allocations.")
+        if from_category_id and from_category_id == destination_category_id:
+            raise InvalidTransaction("Source and destination categories must differ.")
+        return destination_category_id
+
+    def _assert_destination_category_can_receive_allocations(self, category_record: CategoryRecord) -> None:
+        if category_record.is_system:
+            raise InvalidTransaction("System categories cannot receive allocations.")
+
+    def _ensure_allocation_source_can_allocate(
+        self,
+        dao: BudgetingDAO,
+        from_category_id: str,
+        month_start: date,
+        amount_minor: int,
+    ) -> None:
+        source_category = self._require_active_category(dao, from_category_id)
+        if source_category.is_system:
+            raise InvalidTransaction("System categories cannot provide allocations.")
+        source_state = self._category_state_from_month(
+            dao.get_category_month_state(from_category_id, month_start),
+            from_category_id,
+        )
+        if source_state.available_minor < amount_minor:
+            raise InvalidTransaction("Source category does not have enough available funds.")
+
+    def _ensure_ready_to_assign(self, dao: BudgetingDAO, month_start: date, amount_minor: int) -> None:
+        ready_minor = dao.ready_to_assign(month_start)
+        if ready_minor < amount_minor:
+            raise InvalidTransaction("Ready-to-Assign is insufficient for this allocation.")
+
+    def _persist_allocation(
+        self,
+        dao: BudgetingDAO,
+        allocation_id: UUID,
+        allocation_date: date,
+        month_start: date,
+        from_category_id: str | None,
+        destination_category_id: str,
+        amount_minor: int,
+        memo: str | None,
+    ) -> None:
+        dao.insert_budget_allocation(
+            allocation_id=allocation_id,
+            allocation_date=allocation_date,
+            month_start=month_start,
+            from_category_id=from_category_id,
+            to_category_id=destination_category_id,
+            amount_minor=amount_minor,
+            memo=memo,
+        )
+        dao.adjust_category_allocation(destination_category_id, month_start, amount_minor, amount_minor)
+        if from_category_id:
+            dao.adjust_category_allocation(from_category_id, month_start, -amount_minor, -amount_minor)
+
+    @staticmethod
+    def _coerce_month_start(month_start: date | None) -> date:
+        reference = month_start or date.today()
+        return reference.replace(day=1)
 
     def _validate_payload(self, cmd: NewTransactionRequest) -> None:
         if cmd.amount_minor == 0:
