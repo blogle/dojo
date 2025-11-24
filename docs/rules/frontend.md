@@ -10,21 +10,29 @@ This guide establishes the standards and best practices for developing the front
 
 ## Code Organization
 
-- **Domain-Driven Structure**: Organize files by feature or domain, not by file type. Each feature should have its own directory containing the HTML, CSS, and JavaScript for that feature.
+- **Domain-Driven Structure**: Organize files by feature or domain, not by file type. Each page/component owns its DOM bindings, styles, and tests. The current layout under `src/dojo/frontend/static/` is the reference implementation:
 
   ```
-  /src/frontend/
-  ├───components/
-  │   ├───button/
-  │   │   ├───button.js
-  │   │   └───button.css
-  │   └───modal/
-  │       ├───modal.js
-  │       └───modal.css
-  ├───services/
-  │   ├───api.js
-  │   └───state.js
-  └───app.js
+  src/dojo/frontend/static/
+  ├── index.html
+  ├── main.js               # composition root + router registration
+  ├── store.js              # shared immutable state container
+  ├── services/
+  │   ├── api.js           # fetch wrappers
+  │   ├── dom.js           # DOM query helpers
+  │   └── format.js        # currency + date helpers
+  ├── components/
+  │   ├── transactions/
+  │   ├── accounts/
+  │   ├── budgets/
+  │   ├── allocations/
+  │   └── transfers/
+  └── styles/
+      ├── base.css
+      ├── forms.css
+      ├── layout.css
+      ├── ledger.css
+      └── components/*.css
   ```
 
 - **Component-Based Architecture**: Even without a framework, we will build the UI using a component-based approach. Each component is a self-contained module with its own logic, template, and styles.
@@ -34,9 +42,9 @@ This guide establishes the standards and best practices for developing the front
 - **ES Modules**: Use ES Modules (`import`/`export`) for all JavaScript files.
 - **Pure Functions**: Write pure functions whenever possible. Avoid side effects.
 - **State Management**:
-    - Centralized State: A global state object should hold the application state.
-    - Immutable Updates: Never mutate the state directly. Always return a new state object.
-    - State Changes: State changes should be triggered by events and handled by a dedicated state management module.
+    - Centralized State: `store.js` is the only writable store. Modules read via `getState()` and update via `setState`/`patchState` helpers imported from the store.
+    - Immutable Updates: Never mutate state slices in place—always spread/clone to produce a new tree before notifying subscribers.
+    - State Changes: Events bubble up to the page module, which delegates to the store (optionally via helpers exported from `services/state.js`). Bindings react to store subscriptions instead of ad-hoc globals.
 - **Asynchronous Code**: Use `async/await` for all asynchronous operations.
 - **DOM Manipulation**:
     - **Vanilla JS**: Use standard DOM APIs for all DOM manipulation.

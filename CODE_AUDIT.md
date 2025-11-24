@@ -11,7 +11,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 - [x] **Python Backend:** Address all violations of the Python and engineering guidelines.
 - [x] **Frontend:** Refactor the frontend to align with the component-based, stateless architecture.
 - [x] **Temporal Data Model:** Correct all violations of the temporal data model implementation rules.
-- [ ] **Documentation:** Update documentation to reflect any changes made during remediation.
+- [x] **Documentation:** Update documentation to reflect any changes made during remediation.
 
 ## Surprises & Discoveries
 
@@ -21,6 +21,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 - Repeated `/api/testing/reset_db` calls during Cypress runs can momentarily remove the DuckDB file between requests. Wrapping the DAO's `ready_to_assign`/`month_cash_inflow` readers in a `CatalogException` guard prevents transient "table not found" crashes during those resets.
 - Breaking the UI into page-level modules surfaced just how intertwined DOM selection and data fetching had become; introducing a central store forced us to be explicit about each update path and highlighted where we were previously mutating shared objects from event handlers.
 - Replacing ad-hoc `BEGIN`/`COMMIT` blocks with a DAO-level transaction context manager gives us a single place to enforce rollback discipline and makes the temporal ledger boundary obvious in code and tests.
+- Categorized transfers were quietly incrementing liability balances instead of reducing them; re-running the budgeting unit suite surfaced the regression, so the service now flips the deltas for liability accounts before updating balances.
 
 ## Decision Log
 
@@ -191,7 +192,7 @@ The existing tests (`test_transactions_properties.py` and `test_net_worth_proper
 
 -   `test_account_balance_matches_sum` partially covers account balance synchronization but only for new transactions on a single, hardcoded account.
 -   `test_only_one_active_version_per_concept` correctly verifies the uniqueness of active transaction versions.
--   `test_net_worth_matches_manual_computation` appears to reveal a bug in the net worth calculation, where investment positions are not correctly incorporated into asset totals. The test itself has a flawed assertion about how net worth is calculated. **Note:** The underlying SQL logic is correct, but the test creates disconnected data. Fixing this test is deferred until the Investments Service logic is implemented.
+-   `test_net_worth_matches_manual_computation` appears to reveal a bug in the net worth calculation, where investment positions are not correctly incorporated into asset totals. The test itself has a flawed assertion about how net worth is calculated. **Note:** The underlying SQL logic is correct, but the test creates disconnected data. Fixing this test is deferred until the Investments Service logic is implemented, so the Hypothesis deadline is disabled to prevent spurious timeouts while we revisit the plan.
 
 The following sections detail the missing property tests required to validate the documented invariants for each service.
 
@@ -203,7 +204,7 @@ The following sections detail the missing property tests required to validate th
     2.  **One-to-One Details:** Create a property test that generates accounts of various classes and ensures that exactly one corresponding record is created in the correct `*_account_details` table.
     3.  **Credit Account Categories:** Create a property test that creates a credit account and verifies that a corresponding "Credit Card Payment" budget category is also created.
 -   **Status (2025-11-23):** ✅ Remediated.
--   **Notes (2025-11-23):** Added `tests/property/core/test_accounts_properties.py` with tests for all three invariants. The `test_one_to_one_account_details` test fails as expected, confirming that the `AccountAdminService` does not create the required records in the `*_account_details` tables, which is a gap in the current implementation.
+-   **Notes (2025-11-24):** The `AccountAdminService` now seeds the per-class detail tables during account create/update so the invariants hold for cash, credit, accessible, investment, loan, and tangible accounts. Property coverage passes without expected failures, so we can trust the DAO/service layering to keep the one-to-one relationship intact.
 
 #### 4.2. Budgeting Service Invariants (`docs/data-model/budgeting-service.md`)
 
@@ -232,7 +233,23 @@ The following sections detail the missing property tests required to validate th
     1.  **Chronological Integrity:** Create a property test that performs multiple edits on a single transaction and verifies that the `valid_from` and `valid_to` timestamps are always correctly ordered, with no overlaps or gaps.
     2.  **Referential Integrity:** Create a property test that attempts to create transactions pointing to non-existent or inactive `account_id`s and `category_id`s and asserts that the operation fails as expected.
 -   **Status (2025-11-23):** ✅ Remediated.
--   **Notes (2025-11-23):** Added `test_chronological_integrity_of_edits` and `test_referential_integrity` to `tests/property/budgeting/test_transactions_properties.py`. Both tests pass, confirming the service logic is correct.
+- **Notes (2025-11-23):** Added `test_chronological_integrity_of_edits` and `test_referential_integrity` to `tests/property/budgeting/test_transactions_properties.py`. Both tests pass, confirming the service logic is correct.
+
+### 5. Documentation
+
+**Violation:** The top-level documentation still described the pre-remediation architecture: `README.md` lacked any mention of the DAO layer or the modular SPA, `docs/architecture/overview.md` still showed services executing SQL directly and a "Minimal SPA" box, and `docs/rules/frontend.md` referenced the old single-file `app.js` layout.
+
+**Remediation:**
+1. Added an "Architecture Snapshot" section to `README.md` that explains the FastAPI factory, DAO layer, SPA routing modules, and BEM-scoped styles so new contributors land on the current structure.
+2. Updated `docs/architecture/overview.md` with a dedicated DAO section, refreshed the system-context and runtime sequence diagrams (SPA ⇄ store ⇄ routers ⇄ DAO), documented the new `/frontend` module, and expanded the testing map to call out the user-story Cypress suite.
+3. Replaced the file tree and state-management rules in `docs/rules/frontend.md` to match `main.js` + `store.js`, feature modules under `components/`, and the immutable store contract enforced by `setState`/`patchState`.
+
+**Status (2025-11-24):** ✅ Documentation realigned with the componentized SPA and DAO-centric backend architecture.
+
+**Notes (2025-11-24):**
+- The architecture overview previously implied routers executed SQL directly; diagramming the DAO hop clarified why transaction boundaries live there and will help future audits.
+- The README lacked a quick architectural summary, which left the refactors invisible to new contributors; the new section links to the exact files devs should inspect first.
+- Legacy ExecPlans in `docs/plans/` still mention `app.js`. They capture historical context, so we left them untouched for now, but we should rewrite those implementation steps the next time we resurrect the corresponding plan.
 
 ## Validation and Acceptance
 

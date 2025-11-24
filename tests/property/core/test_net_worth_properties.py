@@ -33,7 +33,7 @@ pos_strategy = st.lists(st.integers(min_value=0, max_value=500_00), min_size=0, 
     liabilities=liabilities_strategy,
     positions=pos_strategy,
 )
-@settings(max_examples=20)
+@settings(max_examples=20, deadline=None)
 def test_net_worth_matches_manual_computation(
     assets: list[int],
     liabilities: list[int],

@@ -91,6 +91,7 @@ class TransactionEntryService:
             account_record = self._require_active_account(dao, cmd.account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
             track_budget_activity = self._should_track_budget_activity(category_record)
+            balance_delta = self._account_balance_delta(cmd.amount_minor, account_record)
 
             if cmd.concept_id is not None:
                 previous_transaction = dao.get_active_transaction(cmd.concept_id)
@@ -110,7 +111,7 @@ class TransactionEntryService:
                 recorded_at=recorded_at,
                 source=self.SOURCE,
             )
-            dao.update_account_balance(cmd.account_id, cmd.amount_minor)
+            dao.update_account_balance(cmd.account_id, balance_delta)
 
             if track_budget_activity:
                 dao.upsert_category_activity(cmd.category_id, month_start, activity_delta)
@@ -150,15 +151,15 @@ class TransactionEntryService:
         concept_id = cmd.concept_id or uuid4()
         recorded_at = datetime.now(timezone.utc)
         month_start = cmd.transaction_date.replace(day=1)
-        source_amount = -cmd.amount_minor
-        destination_amount = cmd.amount_minor
 
         dao.begin()
         try:
-            self._require_active_account(dao, cmd.source_account_id)
-            self._require_active_account(dao, cmd.destination_account_id)
+            source_account = self._require_active_account(dao, cmd.source_account_id)
+            destination_account = self._require_active_account(dao, cmd.destination_account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
             track_budget_activity = self._should_track_budget_activity(category_record)
+            source_amount = self._transfer_delta(cmd.amount_minor, source_account, "outgoing")
+            destination_amount = self._transfer_delta(cmd.amount_minor, destination_account, "incoming")
 
             budget_leg_id = uuid4()
             transfer_leg_id = uuid4()
@@ -192,8 +193,7 @@ class TransactionEntryService:
             dao.update_account_balance(cmd.destination_account_id, destination_amount)
 
             if track_budget_activity:
-                activity_delta = -source_amount
-                dao.upsert_category_activity(cmd.category_id, month_start, activity_delta)
+                dao.upsert_category_activity(cmd.category_id, month_start, cmd.amount_minor)
 
             source_state = self._account_state_from_record(self._require_active_account(dao, cmd.source_account_id))
             destination_state = self._account_state_from_record(
@@ -362,6 +362,22 @@ class TransactionEntryService:
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
             )
 
+    def _transfer_delta(
+        self,
+        amount_minor: int,
+        account: AccountRecord,
+        direction: Literal["incoming", "outgoing"],
+    ) -> int:
+        sign = 1 if direction == "incoming" else -1
+        if account.account_type == "liability":
+            sign *= -1
+        return amount_minor * sign
+
+    def _account_balance_delta(self, amount_minor: int, account: AccountRecord) -> int:
+        if account.account_type == "liability":
+            return -amount_minor
+        return amount_minor
+
     def _require_active_account(self, dao: BudgetingDAO, account_id: str) -> AccountRecord:
         record = dao.get_active_account(account_id)
         if record is None or not record.is_active:
@@ -412,7 +428,9 @@ class TransactionEntryService:
         transaction: TransactionVersionRecord,
     ) -> None:
         month_start = transaction.transaction_date.replace(day=1)
-        dao.update_account_balance(transaction.account_id, -transaction.amount_minor)
+        account_record = self._require_active_account(dao, transaction.account_id)
+        balance_delta = self._account_balance_delta(transaction.amount_minor, account_record)
+        dao.update_account_balance(transaction.account_id, -balance_delta)
         category_record = dao.get_category_optional(transaction.category_id)
         if category_record and not category_record.is_system:
             dao.upsert_category_activity(transaction.category_id, month_start, transaction.amount_minor)
@@ -511,6 +529,7 @@ class AccountAdminService:
                 is_active=payload.is_active,
                 opened_on=payload.opened_on,
             )
+            dao.insert_account_detail(payload.account_class, payload.account_id)
             if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
                     dao,
@@ -545,6 +564,7 @@ class AccountAdminService:
                 opened_on=payload.opened_on,
                 is_active=payload.is_active,
             )
+            dao.insert_account_detail(payload.account_class, account_id)
             if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
                     dao,

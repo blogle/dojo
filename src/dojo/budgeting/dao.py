@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
 from typing import Any, Generator, Literal, Sequence, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import duckdb
 
@@ -34,16 +34,16 @@ class AccountRecord:
 
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "AccountRecord":
-        opened_on = row[8] if len(row) > 8 else None
-        created_at = row[9] if len(row) > 9 else None
-        updated_at = row[10] if len(row) > 10 else None
-        currency_value = row[6] if len(row) > 6 and row[6] else "USD"
+        opened_on = row[8] if len(row) > 8 and row[8] is not None else None
+        created_at = row[9] if len(row) > 9 and row[9] is not None else None
+        updated_at = row[10] if len(row) > 10 and row[10] is not None else None
+        currency_value = row[6] if len(row) > 6 and row[6] is not None else "USD"
         return cls(
-            account_id=row[0],
-            name=row[1],
-            account_type=cast(Literal["asset", "liability"], row[2]),
-            account_class=cast(AccountClass, row[3]),
-            account_role=cast(AccountRole, row[4]),
+            account_id=str(row[0]),
+            name=str(row[1]),
+            account_type=cast(Literal["asset", "liability"], str(row[2])),
+            account_class=cast(AccountClass, str(row[3])),
+            account_role=cast(AccountRole, str(row[4])),
             current_balance_minor=int(row[5]),
             currency=str(currency_value),
             is_active=bool(row[7]),
@@ -69,17 +69,27 @@ class ReferenceAccountRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "ReferenceAccountRecord":
         return cls(
-            account_id=row[0],
-            name=row[1],
-            account_type=cast(Literal["asset", "liability"], row[2]),
-            account_class=cast(AccountClass, row[3]),
-            account_role=cast(AccountRole, row[4]),
+            account_id=str(row[0]),
+            name=str(row[1]),
+            account_type=cast(Literal["asset", "liability"], str(row[2])),
+            account_class=cast(AccountClass, str(row[3])),
+            account_role=cast(AccountRole, str(row[4])),
             current_balance_minor=int(row[5]),
         )
 
     @property
     def is_credit_liability(self) -> bool:
         return self.account_type == "liability" and self.account_class == "credit"
+
+
+ACCOUNT_DETAIL_INSERTS: dict[AccountClass, str] = {
+    "cash": "insert_cash_account_detail.sql",
+    "credit": "insert_credit_account_detail.sql",
+    "investment": "insert_investment_account_detail.sql",
+    "loan": "insert_loan_account_detail.sql",
+    "accessible": "insert_accessible_asset_detail.sql",
+    "tangible": "insert_tangible_asset_detail.sql",
+}
 
 
 @dataclass(frozen=True)
@@ -92,10 +102,10 @@ class CategoryRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "CategoryRecord":
         return cls(
-            category_id=row[0],
-            name=row[1],
+            category_id=str(row[0]),
+            name=str(row[1]),
             is_active=bool(row[2]),
-            is_system=bool(row[3]) if len(row) > 3 else False,
+            is_system=bool(row[3]) if len(row) > 3 and row[3] is not None else False,
         )
 
 
@@ -108,8 +118,8 @@ class ReferenceCategoryRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "ReferenceCategoryRecord":
         return cls(
-            category_id=row[0],
-            name=row[1],
+            category_id=str(row[0]),
+            name=str(row[1]),
             available_minor=int(row[2]),
         )
 
@@ -124,8 +134,8 @@ class CategoryMonthStateRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "CategoryMonthStateRecord":
         return cls(
-            category_id=row[0],
-            name=row[1],
+            category_id=str(row[0]),
+            name=str(row[1]),
             available_minor=int(row[2]),
             activity_minor=int(row[3]),
         )
@@ -152,20 +162,20 @@ class BudgetCategoryDetailRecord:
 
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "BudgetCategoryDetailRecord":
-        last_month_allocated = int(row[13]) if len(row) >= 15 else 0
-        last_month_activity = int(row[14]) if len(row) >= 15 else 0
-        last_month_available = int(row[15]) if len(row) >= 16 else 0
+        last_month_allocated = int(row[13]) if len(row) > 13 and row[13] is not None else 0
+        last_month_activity = int(row[14]) if len(row) > 14 and row[14] is not None else 0
+        last_month_available = int(row[15]) if len(row) > 15 and row[15] is not None else 0
         return cls(
-            category_id=row[0],
-            group_id=row[1],
-            name=row[2],
+            category_id=str(row[0]),
+            group_id=str(row[1]) if row[1] is not None else None,
+            name=str(row[2]),
             is_active=bool(row[3]),
             created_at=row[4],
             updated_at=row[5],
-            goal_type=row[6],
+            goal_type=str(row[6]) if row[6] is not None else None,
             goal_amount_minor=int(row[7]) if row[7] is not None else None,
-            goal_target_date=row[8],
-            goal_frequency=row[9],
+            goal_target_date=row[8] if row[8] is not None else None,
+            goal_frequency=str(row[9]) if row[9] is not None else None,
             available_minor=int(row[10]),
             activity_minor=int(row[11]),
             allocated_minor=int(row[12]),
@@ -187,8 +197,8 @@ class BudgetCategoryGroupRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "BudgetCategoryGroupRecord":
         return cls(
-            group_id=row[0],
-            name=row[1],
+            group_id=str(row[0]),
+            name=str(row[1]),
             sort_order=int(row[2]),
             is_active=bool(row[3]),
             created_at=row[4],
@@ -208,12 +218,12 @@ class TransactionVersionRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "TransactionVersionRecord":
         return cls(
-            transaction_version_id=row[0],
-            account_id=row[1],
-            category_id=row[2],
+            transaction_version_id=UUID(str(row[0])),
+            account_id=str(row[1]),
+            category_id=str(row[2]),
             transaction_date=row[3],
             amount_minor=int(row[4]),
-            status=row[5],
+            status=str(row[5]),
         )
 
 
@@ -234,16 +244,16 @@ class TransactionListRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "TransactionListRecord":
         return cls(
-            transaction_version_id=row[0],
-            concept_id=row[1],
+            transaction_version_id=UUID(str(row[0])),
+            concept_id=UUID(str(row[1])),
             transaction_date=row[2],
-            account_id=row[3],
-            account_name=row[4],
-            category_id=row[5],
-            category_name=row[6],
+            account_id=str(row[3]),
+            account_name=str(row[4]),
+            category_id=str(row[5]),
+            category_name=str(row[6]),
             amount_minor=int(row[7]),
-            status=row[8],
-            memo=row[9],
+            status=str(row[8]),
+            memo=str(row[9]) if row[9] is not None else None,
             recorded_at=row[10],
         )
 
@@ -263,14 +273,14 @@ class BudgetAllocationRecord:
     @classmethod
     def from_row(cls, row: Sequence[Any]) -> "BudgetAllocationRecord":
         return cls(
-            allocation_id=row[0],
+            allocation_id=UUID(str(row[0])),
             allocation_date=row[1],
             amount_minor=int(row[2]),
-            memo=row[3],
-            from_category_id=row[4],
-            from_category_name=row[5],
-            to_category_id=row[6],
-            to_category_name=row[7],
+            memo=str(row[3]) if row[3] is not None else None,
+            from_category_id=str(row[4]) if row[4] is not None else None,
+            from_category_name=str(row[5]) if row[5] is not None else None,
+            to_category_id=str(row[6]),
+            to_category_name=str(row[7]),
             created_at=row[8],
         )
 
@@ -353,6 +363,16 @@ class BudgetingDAO:
             ],
         )
 
+    def insert_account_detail(self, account_class: AccountClass, account_id: str) -> str:
+        try:
+            sql_name = ACCOUNT_DETAIL_INSERTS[account_class]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported account_class `{account_class}` for detail insert.") from exc
+        detail_id = str(uuid4())
+        sql = _sql(sql_name)
+        self._conn.execute(sql, [detail_id, account_id, account_id])
+        return detail_id
+
     def update_account(
         self,
         account_id: str,
@@ -415,13 +435,7 @@ class BudgetingDAO:
 
     def list_budget_categories(self, month: date, previous_month: date) -> list[BudgetCategoryDetailRecord]:
         sql = _sql("select_budget_categories_admin.sql")
-        placeholder_count = sql.count("?")
-        if placeholder_count == 3:
-            params = [month, month, previous_month]
-        elif placeholder_count == 2:
-            params = [month, previous_month]
-        else:
-            raise RuntimeError("select_budget_categories_admin.sql must contain 2 or 3 placeholders")
+        params = [month, previous_month]
         rows = self._conn.execute(sql, params).fetchall()
         return [BudgetCategoryDetailRecord.from_row(row) for row in rows]
 
@@ -518,6 +532,13 @@ class BudgetingDAO:
     def deactivate_budget_category_group(self, group_id: str) -> None:
         self._conn.execute(_sql("deactivate_budget_category_group.sql"), [group_id])
 
+    def get_budget_category_group(self, group_id: str) -> BudgetCategoryGroupRecord | None:
+        sql = _sql("select_budget_category_group.sql")
+        row = self._conn.execute(sql, [group_id]).fetchone()
+        if row is None:
+            return None
+        return BudgetCategoryGroupRecord.from_row(row)
+
     # Transactions --------------------------------------------------------
     def get_active_transaction(self, concept_id: UUID | str) -> TransactionVersionRecord | None:
         sql = _sql("select_active_transaction.sql")
@@ -563,7 +584,7 @@ class BudgetingDAO:
 
     def update_account_balance(self, account_id: str, amount_minor: int) -> None:
         sql = _sql("update_account_balance.sql")
-        self._conn.execute(sql, [amount_minor, amount_minor, account_id])
+        self._conn.execute(sql, [amount_minor, account_id])
 
     def upsert_category_activity(self, category_id: str, month_start: date, activity_delta: int) -> None:
         sql = _sql("upsert_category_monthly_state.sql")

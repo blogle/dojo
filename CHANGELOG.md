@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `docs/rules/sql.md` to recommend storing SQL files inside the application source (`src/dojo/sql/`) to align with the established practice of packaging data files within the Python namespace.
 
 ### Changed
+- Documented the DAO-backed backend layering and componentized SPA by updating `README.md`, `docs/architecture/overview.md`, and `docs/rules/frontend.md`, including refreshed diagrams and guidance so contributors land on the current structure.
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
 - Transaction editing now reverses the previous ledger effects (account balances, category month state, credit-payment reserves) before applying the updated amount so pending→cleared edits keep envelopes and Ready-to-Assign accurate.
 - Repositioned the dashboard stats into a single no-wrap card row, right-justified the navigation links, and removed the redundant pre-content copy so the ledger cards sit immediately below the hero metrics.
@@ -45,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+- Account administration now seeds and backfills the per-class `*_account_details` tables so every account owns a detail row and the property suite no longer needs expected failures.
+- Categorized transfers flip the deltas for liability accounts so paying a loan or credit balance reduces the liability instead of increasing it.
 - Corrected the dashboard hero layout so the date, month-to-date spend, and net worth stay in a single card row and the page links pin to the top-right without stray pre-content text.
 - Wrapped transaction edits in the new `BudgetingDAO.transaction()` context manager, added a regression test that forces a failure mid-edit to prove rollback behavior, and documented that `accounts` and `budget_category_monthly_state` are mutable caches (not temporal tables) so in-place updates remain compliant.
 - Testing reset/seed endpoints now route fixture SQL through `TestingDAO` so layer boundaries stay intact and every DuckDB call uses the serialized connection helper.

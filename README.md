@@ -67,6 +67,13 @@ npx cypress run --e2e --browser <browser> [--headed]
 
 The Cypress run spins up a dedicated DuckDB database (`data/e2e-ledger.duckdb`) and launches the FastAPI server automatically via `cypress.config.cjs`, so no additional setup is required.
 
+## Architecture Snapshot
+
+- **FastAPI Monolith**: `dojo.core.app:create_app` is the sole entry point. It wires routers from each domain package (budgeting, core, investments, etc.) and builds dependencies through `build_container` so every request receives a scoped DuckDB connection and typed services.
+- **DAO Layer**: All SQL lives under `src/dojo/sql/**` and is loaded through DAO classes (`src/dojo/*/dao.py`). Services only consume typed dataclasses returned by the DAO methods, which keeps business rules pure Python and ensures the temporal ledger constraints stay centralized.
+- **SPA Composition**: `src/dojo/frontend/static/main.js` bootstraps hash-based routing, registers each page module (`components/{transactions,accounts,budgets,allocations,transfers}/index.js`), and integrates the shared `store.js`. State updates are immutable (`store.setState`/`patchState`) and all DOM fetches go through `services/api.js` + `services/dom.js` helpers.
+- **Styles & Assets**: Styles are broken into global primitives (`styles/base.css`, `styles/forms.css`, `styles/layout.css`, `styles/ledger.css`) plus feature-scoped bundles in `styles/components/*.css` that follow the documented BEM conventions.
+
 ## Status
 
 - **What it does today**: [List of current features]

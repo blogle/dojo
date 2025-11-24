@@ -15,7 +15,7 @@ The application’s architecture is driven by four primary goals, ensuring it me
 
 ### Monolithic Structure
 
-The entire application is deployed as a single, cohesive monolith. It is built using Python's FastAPI, which serves as both the backend API and the file server for the single-page application (SPA) frontend. This design enforces low-latency interaction between the business logic and the data store.
+The entire application ships as a single FastAPI process created by `dojo.core.app:create_app`. The factory wires routers from every domain module, builds the dependency container (settings, DAO instances, transaction helpers), and mounts the compiled SPA assets from `src/dojo/frontend/static/`. This keeps request routing, DuckDB access, and frontend asset serving in one process and maintains the low-latency coupling between business logic and persistence.
 
 ### Single-Store Data Model
 
@@ -36,6 +36,10 @@ Instead of performing destructive `UPDATE` or `DELETE` operations, any modificat
 -   A completely new row, containing the corrected or updated data, is inserted. This new row is marked `is_active = TRUE` and tagged with a system-generated `recorded_at` timestamp and the ID of the individual who performed the action.
 
 This ensures that the current state is always readily available, but the entire history of changes is preserved. This robust history is the foundation for the reconciliation process, allowing the system to accurately determine the account balance as it was recorded at any historical point in time.
+
+### Data Access Layer
+
+Every domain module owns a `dao.py` file that encapsulates SQL access. DAO methods load statements from `src/dojo/sql/**`, translate results into typed dataclasses, and expose helpers such as `BudgetingDAO.transaction()` so the services never execute inline SQL. This separation makes the service layer responsible solely for orchestration and validation while DAO classes enforce DuckDB transaction boundaries and shared invariants.
 
 ## Code Structure
 
@@ -65,24 +69,33 @@ This module acts as the investment advisory layer. It consumes the optimal portf
 
 This module contains the quantitative evaluation harness, referred to as the `BacktestEngine`. It is responsible for the reproducible and statistically rigorous assessment of investment strategies against historical and synthetically augmented market data.
 
+### `/frontend`
+
+The frontend lives under `src/dojo/frontend/static/`. `index.html` provides the mounting points, `main.js` composes hash-based routing plus feature modules (accounts, allocations, budgets, transactions, transfers, reference data), and `store.js` centralizes immutable application state. Supporting modules under `services/` wrap fetch, DOM helpers, and formatting, while `components/**/index.js` files own the DOM bindings and view updates for each page. Styles are split into shared primitives and feature-specific bundles that follow the BEM convention so Cypress selectors and layout rules remain isolated per component.
+
 ## System Context
 
 ```mermaid
 graph LR
     subgraph Browser
-        SPA[Minimal SPA]
+        SPA[Componentized SPA]
+        Store[store.js]
     end
     subgraph FastAPI Monolith
         API[FastAPI Routers]
         Services[Domain Services]
+        DAO[DAO Layer]
     end
     subgraph Data
         DuckDB[(DuckDB Ledger)]
     end
 
+    SPA -->|dispatch| Store
+    Store -->|render| SPA
     SPA -->|JSON fetch| API
     API --> Services
-    Services --> DuckDB
+    Services --> DAO
+    DAO --> DuckDB
 ```
 
 - **Trust Boundary**: Browser ⇄ FastAPI (HTTPS termination point). DuckDB lives on the same host; we enforce a single-writer rule via request-scoped connections.
@@ -96,25 +109,29 @@ sequenceDiagram
     participant SPA as SPA (Fetch API)
     participant API as FastAPI Router
     participant Service as TransactionEntryService
+    participant DAO as BudgetingDAO
     participant DB as DuckDB
 
     User->>SPA: Submit form
     SPA->>API: POST /api/transactions
     API->>Service: Validate & call create()
-    Service->>DB: BEGIN
-    Service->>DB: select_active_account/category
-    Service->>DB: insert_transaction + update balances
-    Service->>DB: upsert_category_monthly_state
-    Service->>DB: COMMIT
-    Service-->>API: TransactionResponse
+    Service->>DAO: transaction()
+    DAO->>DB: BEGIN
+    DAO->>DB: select_active_account/category
+    DAO->>DB: insert_transaction + update balances
+    DAO->>DB: upsert_category_monthly_state
+    DAO->>DB: COMMIT
+    DAO-->>Service: Transaction row
+    Service-->>API: TransactionResponse + DTOs
     API-->>SPA: 201 + account/category state
     SPA->>API: GET /api/net-worth/current
-    API->>DB: Query accounts + positions
+    API->>DAO: load net worth snapshot
+    DAO->>DB: Query accounts + positions
     API-->>SPA: Net worth snapshot
     SPA-->>User: Updated card
 ```
 
-**Failure branch**: If any SQL statement raises, the service issues `ROLLBACK` before surfacing a structured 400 (domain validation) or 500 (unexpected) response. The SPA renders inline errors using FastAPI's validation payload.
+**Failure branch**: If any DAO call raises, the context manager issues `ROLLBACK` before surfacing a structured 400 (domain validation) or 500 (unexpected) response. The SPA renders inline errors using FastAPI's validation payload while the store keeps the last known good state.
 
 ## Module Interaction Diagram
 
@@ -182,8 +199,8 @@ Only `core` may depend on DuckDB adapters and shared config. Domain modules may 
 ## Testing Map
 
 - **Unit tests**: `tests/unit/budgeting` (service contract), `tests/unit/core` (net worth aggregation).
-- **Property tests**: `tests/property/budgeting` (temporal invariants) and `tests/property/core` (net worth equation).
-- **E2E**: Cypress spec (`cypress/e2e/transaction_flow.cy.js`) runs via `npx cypress run --e2e --browser <browser> [--headed]` from an activated dev shell, seeding `data/e2e-ledger.duckdb` and exercising the SPA transaction flow end to end.
+- **Property tests**: `tests/property/budgeting` (temporal invariants), `tests/property/core` (net worth equation), and `tests/property/investments` (position constraints).
+- **E2E**: Cypress user-story specs (`cypress/e2e/user-stories/*.cy.js`) run via `npx cypress run --e2e --browser <browser> [--headed]`. Each spec provisions its own DuckDB fixture through `tests/e2e/prepare_db.py` so budgeting, transfer, and editing flows all run against realistic data.
 
 ## Glossary
 
