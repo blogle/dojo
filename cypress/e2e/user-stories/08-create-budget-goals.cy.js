@@ -22,7 +22,7 @@ describe("User Story 08 — Creating a Budget (Recurring or Target Date)", () =>
     cy.wait("@createBudget").its("response.statusCode").should("eq", 201);
     cy.wait("@fetchBudgets");
 
-    budgetPage.elements
+    budgetPage
       .categoryRow(budgetName)
       .should("be.visible")
       .find("td.amount-cell:nth-child(2)")
@@ -40,7 +40,7 @@ describe("User Story 08 — Creating a Budget (Recurring or Target Date)", () =>
     cy.wait("@createBudget").its("response.statusCode").should("eq", 201);
     cy.wait("@fetchBudgets");
 
-    budgetPage.elements
+    budgetPage
       .categoryRow(budgetName)
       .should("be.visible")
       .find("td.amount-cell:nth-child(2)")

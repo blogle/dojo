@@ -25,8 +25,8 @@ describe("User Story 03 — Funded Credit Card Spending", () => {
     });
 
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Gas", "$40.00");
-    budgetPage.verifyCategoryAmount("Visa Signature", "$60.00");
+            budgetPage.verifyAvailableAmount('Gas', '$40.00');
+    budgetPage.verifyAvailableAmount("Visa Signature", "$60.00");
 
     accountPage.visit();
     accountPage.verifyAccountBalance("Visa Signature", "-$60.00");

@@ -4,7 +4,7 @@ const SUFFICIENT_FIXTURE = "tests/fixtures/e2e_quick_allocate_budget_sufficient.
 const INSUFFICIENT_FIXTURE = "tests/fixtures/e2e_quick_allocate_budget_insufficient.sql";
 
 const openBudgetModal = (categoryName) => {
-  cy.contains('[data-testid="budget-category-row"]', categoryName)
+  cy.contains('#budgets-body tr[data-category-id]', categoryName)
     .scrollIntoView()
     .click({ force: true });
   cy.get("#budget-detail-modal")

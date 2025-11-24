@@ -1204,10 +1204,21 @@ const renderBudgetsPage = () => {
     groupRow.className = "group-row";
     groupRow.style.cursor = "pointer";
     groupRow.dataset.groupId = group.group_id;
+    if (group.group_id === "uncategorized") {
+      groupRow.dataset.testid = "budget-group-uncategorized";
+    } else {
+      groupRow.dataset.testid = "budget-group-row";
+    }
     groupRow.innerHTML = `
       <td colspan="4" class="group-cell" style="background-color: var(--stone-50); font-weight: 600;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span>${group.name}</span>
+          <button type="button" class="icon-button" data-edit-group-id="${group.group_id}" data-testid="edit-group-btn" aria-label="Edit group">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
         </div>
       </td>
     `;
@@ -1217,6 +1228,8 @@ const renderBudgetsPage = () => {
       const row = document.createElement("tr");
       row.style.cursor = "pointer";
       row.dataset.categoryId = cat.category_id;
+      row.dataset.groupId = cat.group_id || "uncategorized";
+      row.dataset.testid = "budget-category-row";
       
       let goalText = "";
       if (cat.goal_type === "target_date" && cat.goal_amount_minor) {
@@ -1233,6 +1246,12 @@ const renderBudgetsPage = () => {
               <span>${cat.name}</span>
               ${goalText}
             </div>
+            <button type="button" class="icon-button" data-edit-category-id="${cat.category_id}" data-testid="edit-category-btn" aria-label="Edit category">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
           </div>
         </td>
         <td class="amount-cell">${formatBudgetDisplay(cat.allocated_minor)}</td>
@@ -1261,6 +1280,15 @@ const renderBudgetsPage = () => {
         if (group) openGroupDetailModal(grouped[gid]);
       }
     });
+    const editButton = row.querySelector('[data-edit-group-id]');
+    if (editButton) {
+      editButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const gid = editButton.dataset.editGroupId;
+        const group = state.budgets.groups.find((g) => g.group_id === gid);
+        if (group) openGroupModal(group);
+      });
+    }
   });
 
   body.querySelectorAll("tr[data-category-id]").forEach((row) => {
@@ -1269,6 +1297,15 @@ const renderBudgetsPage = () => {
       const cat = state.budgets.categories.find((c) => c.category_id === cid);
       if (cat) openBudgetDetailModal(cat);
     });
+    const editButton = row.querySelector('[data-edit-category-id]');
+    if (editButton) {
+      editButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const cid = editButton.dataset.editCategoryId;
+        const cat = state.budgets.categories.find((c) => c.category_id === cid);
+        if (cat) openCategoryModal(cat);
+      });
+    }
   });
 };
 
@@ -1610,41 +1647,43 @@ const initBudgetDetailModal = () => {
   });
 };
 
-const handleGroupQuickAllocation = async (group, totalNeeded) => {
+const handleGroupQuickAllocation = async (allocations, label) => {
+  const totalNeeded = allocations.reduce((sum, alloc) => sum + alloc.amount_minor, 0);
+  if (totalNeeded <= 0) {
+    alert("Nothing to allocate for this action.");
+    return;
+  }
   if (state.budgets.readyToAssignMinor < totalNeeded) {
     alert("Not enough Ready to Assign funds.");
     return;
   }
 
   try {
-    // Execute sequentially
-    for (const cat of group.items) {
-      const needed = Math.max(0, (cat.goal_amount_minor || 0) - cat.available_minor);
-      if (needed > 0) {
-        await fetchJSON("/api/budget/allocations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to_category_id: cat.category_id,
-            amount_minor: needed,
-            allocation_date: todayISO(),
-            memo: "Group quick allocation",
-          }),
-        });
-      }
+    for (const alloc of allocations) {
+      await fetchJSON("/api/budget/allocations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_category_id: alloc.category_id,
+          amount_minor: alloc.amount_minor,
+          allocation_date: todayISO(),
+          memo: alloc.memo,
+        }),
+      });
     }
     closeGroupDetailModal();
     await Promise.all([loadBudgetsData(), loadAllocationsData(), refreshAccountsPage()]);
     renderBudgetsPage();
     renderAllocationsPage();
-    showToast(`Funded group ${group.name} with ${formatAmount(totalNeeded)}`);
+    showToast(`${label} (${formatAmount(totalNeeded)})`);
   } catch (error) {
     console.error(error);
-    alert("Partial failure during group allocation.");
+    alert(error.message || "Partial failure during group allocation.");
     await loadBudgetsData();
     renderBudgetsPage();
   }
 };
+
 
 const openGroupDetailModal = (group) => {
   const modal = document.querySelector(selectors.groupDetailModal);
@@ -1656,19 +1695,15 @@ const openGroupDetailModal = (group) => {
   let totalBudgeted = 0;
   let totalActivity = 0;
   let totalAvailable = 0;
-  let totalNeeded = 0;
-
+ 
   group.items.forEach((cat) => {
     const leftover = cat.available_minor - cat.allocated_minor - cat.activity_minor;
     totalLeftover += leftover;
     totalBudgeted += cat.allocated_minor;
     totalActivity += cat.activity_minor;
     totalAvailable += cat.available_minor;
-    
-    if (cat.goal_amount_minor && cat.goal_amount_minor > 0) {
-        totalNeeded += Math.max(0, cat.goal_amount_minor - cat.available_minor);
-    }
   });
+
 
   document.querySelector(selectors.groupDetailLeftover).textContent = formatAmount(totalLeftover);
   document.querySelector(selectors.groupDetailBudgeted).textContent = formatAmount(totalBudgeted);
@@ -1678,18 +1713,65 @@ const openGroupDetailModal = (group) => {
   const actionsContainer = document.querySelector(selectors.groupDetailQuickActions);
   actionsContainer.innerHTML = "";
 
-  if (totalNeeded > 0) {
+  const fundAllocations = [];
+  const budgetedAllocations = [];
+  const spentAllocations = [];
+
+  group.items.forEach((cat) => {
+    if (cat.goal_amount_minor && cat.goal_amount_minor > 0) {
+      const needed = Math.max(0, cat.goal_amount_minor - cat.available_minor);
+      if (needed > 0) {
+        fundAllocations.push({
+          category_id: cat.category_id,
+          amount_minor: needed,
+          memo: "Group quick allocation - Fund Goal",
+        });
+      }
+    }
+
+    if (cat.last_month_allocated_minor && cat.last_month_allocated_minor > 0) {
+      budgetedAllocations.push({
+        category_id: cat.category_id,
+        amount_minor: cat.last_month_allocated_minor,
+        memo: "Group quick allocation - Budgeted Last Month",
+      });
+    }
+
+    const spentLastMonth = Math.max(0, -1 * cat.last_month_activity_minor);
+    if (spentLastMonth > 0) {
+      spentAllocations.push({
+        category_id: cat.category_id,
+        amount_minor: spentLastMonth,
+        memo: "Group quick allocation - Spent Last Month",
+      });
+    }
+  });
+
+  const renderGroupAction = (label, allocations) => {
+    const total = allocations.reduce((sum, alloc) => sum + alloc.amount_minor, 0);
+    if (total <= 0) {
+      return false;
+    }
     const btn = document.createElement("button");
     btn.className = "secondary";
-    btn.textContent = `Fund Underfunded: ${formatAmount(totalNeeded)}`;
-    btn.onclick = () => handleGroupQuickAllocation(group, totalNeeded);
+    btn.textContent = `${label}: ${formatAmount(total)}`;
+    btn.onclick = () => handleGroupQuickAllocation(allocations, label);
     actionsContainer.appendChild(btn);
-  } else {
+    return true;
+  };
+
+  let renderedAction = false;
+  renderedAction = renderGroupAction("Fund Underfunded", fundAllocations) || renderedAction;
+  renderedAction = renderGroupAction("Budgeted Last Month", budgetedAllocations) || renderedAction;
+  renderedAction = renderGroupAction("Spent Last Month", spentAllocations) || renderedAction;
+
+  if (!renderedAction) {
     const p = document.createElement("p");
     p.className = "muted small-note";
-    p.textContent = "All goals in this group are fully funded.";
+    p.textContent = "No quick allocations available for this group.";
     actionsContainer.appendChild(p);
   }
+
 
   const editBtn = document.querySelector(selectors.groupDetailEdit);
   editBtn.onclick = () => {

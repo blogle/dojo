@@ -17,7 +17,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 
     budgetPage.visit();
     cy.wait("@fetchBudgets");
-    budgetPage.verifyCategoryAmount("Dining Out", "$200.00");
+    budgetPage.verifyAvailableAmount("Dining Out", "$200.00");
     budgetPage.rememberReadyToAssign();
 
     accountPage.visit();
@@ -36,7 +36,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 
     budgetPage.visit();
     cy.wait("@fetchBudgets");
-    budgetPage.verifyCategoryAmount("Dining Out", "$150.00");
+    budgetPage.verifyAvailableAmount("Dining Out", "$150.00");
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();
@@ -58,7 +58,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
     });
 
     cy.get("[data-route-link='budgets']").click(); // Navigating via UI for budgets page
-    budgetPage.verifyCategoryAmount("Dining Out", "$138.00");
+    budgetPage.verifyAvailableAmount("Dining Out", "$138.00");
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();

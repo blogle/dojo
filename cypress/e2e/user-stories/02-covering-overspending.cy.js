@@ -15,8 +15,8 @@ describe("User Story 02 — Rolling with the Punches", () => {
 
   it("covers Dining Out overspending by reallocating Groceries funds", () => {
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Dining Out", "$100.00");
-    budgetPage.verifyCategoryAmount("Groceries", "$500.00");
+    budgetPage.verifyAvailableAmount("Dining Out", "$100.00");
+    budgetPage.verifyAvailableAmount("Groceries", "$500.00");
     budgetPage.rememberReadyToAssign();
 
     transactionPage.visit();
@@ -30,8 +30,8 @@ describe("User Story 02 — Rolling with the Punches", () => {
     });
 
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Dining Out", "-$20.00");
-    budgetPage.verifyCategoryAmount("Groceries", "$500.00");
+            budgetPage.verifyAvailableAmount('Dining Out', '-$20.00');
+    budgetPage.verifyAvailableAmount("Groceries", "$500.00");
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();
@@ -42,8 +42,8 @@ describe("User Story 02 — Rolling with the Punches", () => {
     allocationPage.verifyError("");
 
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Dining Out", "$0.00");
-    budgetPage.verifyCategoryAmount("Groceries", "$480.00");
+    budgetPage.verifyAvailableAmount("Dining Out", "$0.00");
+    budgetPage.verifyAvailableAmount("Groceries", "$480.00");
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();

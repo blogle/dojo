@@ -14,7 +14,7 @@ describe("User Story 04 — Categorized Investment Transfer", () => {
 
   it("moves funds from checking into brokerage while tagging Future Home", () => {
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Future Home", "$1,000.00");
+    budgetPage.verifyAvailableAmount("Future Home", "$1,000.00");
 
     accountPage.visit();
     accountPage.verifyAccountBalance("House Checking", "$50,000.00");
@@ -25,7 +25,7 @@ describe("User Story 04 — Categorized Investment Transfer", () => {
     transferPage.verifyError("");
 
     budgetPage.visit();
-    budgetPage.verifyCategoryAmount("Future Home", "$0.00");
+    budgetPage.verifyAvailableAmount("Future Home", "$0.00");
 
     accountPage.visit();
     accountPage.verifyAccountBalance("House Checking", "$49,000.00");

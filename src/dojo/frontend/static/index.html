@@ -292,8 +292,8 @@
               <p class="muted small-note">Allocate Ready-to-Assign into envelopes.</p>
             </div>
             <div class="budgets-header__actions">
-              <button type="button" class="secondary" data-open-group-modal>+ Add group</button>
-              <button type="button" class="primary" data-open-category-modal>+ Add budget</button>
+              <button type="button" class="secondary" data-open-group-modal data-testid="create-group-btn">+ Add group</button>
+              <button type="button" class="primary" data-open-category-modal data-testid="add-budget-button">+ Add budget</button>
             </div>
           </header>
           <div class="summary-bar" role="region" aria-label="Budget summary">
@@ -411,12 +411,12 @@
         <form class="modal-form" data-category-form>
           <label>
             Display name
-            <input type="text" name="name" data-category-name required />
+            <input type="text" name="name" data-category-name required data-testid="category-name-input" />
           </label>
           <input type="hidden" name="slug" data-category-slug />
           <label>
             Group
-            <select name="group_id" data-category-group>
+            <select name="group_id" data-category-group data-testid="category-group-select">
               <option value="">Uncategorized</option>
             </select>
           </label>
@@ -424,11 +424,11 @@
           <div class="segmented-control" role="group" aria-label="Goal type">
             <span class="segmented-label">Goal</span>
             <label class="segmented-option">
-              <input type="radio" name="goal_type" value="recurring" checked data-goal-type />
+              <input type="radio" name="goal_type" value="recurring" checked data-goal-type data-testid="goal-type-recurring" />
               <span>Recurring</span>
             </label>
             <label class="segmented-option">
-              <input type="radio" name="goal_type" value="target_date" data-goal-type />
+              <input type="radio" name="goal_type" value="target_date" data-goal-type data-testid="goal-type-target-date" />
               <span>Target Date</span>
             </label>
           </div>
@@ -437,11 +437,11 @@
             <div class="form-grid form-grid--compact">
               <label class="form-field">
                 <span>Target Date</span>
-                <input type="date" name="target_date_dt" />
+                <input type="date" name="target_date_dt" data-testid="target-date-input" />
               </label>
               <label class="form-field amount-field">
                 <span>Target Amount</span>
-                <input type="number" name="target_amount" step="0.01" placeholder="0.00" />
+                <input type="number" name="target_amount" step="0.01" placeholder="0.00" data-testid="target-amount-input" />
               </label>
             </div>
           </div>
@@ -450,7 +450,7 @@
             <div class="form-grid form-grid--compact">
               <label class="form-field">
                 <span>Frequency</span>
-                <select name="frequency">
+                <select name="frequency" data-testid="frequency-select">
                   <option value="monthly">Monthly</option>
                   <option value="quarterly">Quarterly</option>
                   <option value="yearly">Yearly</option>
@@ -458,18 +458,18 @@
               </label>
               <label class="form-field">
                 <span>Next Due Date</span>
-                <input type="date" name="recurring_date_dt" />
+                <input type="date" name="recurring_date_dt" data-testid="recurring-date-input" />
               </label>
               <label class="form-field amount-field">
                 <span>Amount</span>
-                <input type="number" name="recurring_amount" step="0.01" placeholder="0.00" />
+                <input type="number" name="recurring_amount" step="0.01" placeholder="0.00" data-testid="recurring-amount-input" />
               </label>
             </div>
           </div>
 
           <p class="form-error" data-category-error aria-live="polite"></p>
           <div class="form-actions">
-            <button type="submit" class="primary" data-category-submit>Save budget</button>
+            <button type="submit" class="primary" data-category-submit data-testid="save-category-btn">Save budget</button>
           </div>
         </form>
       </div>
@@ -487,7 +487,7 @@
         <form class="modal-form" data-group-form>
           <label>
             Group Name
-            <input type="text" name="name" required />
+            <input type="text" name="name" required data-testid="group-name-input" />
           </label>
           <label>
             Sort Order
@@ -495,7 +495,7 @@
           </label>
           <p class="form-error" data-group-error aria-live="polite"></p>
           <div class="form-actions">
-            <button type="submit" class="primary" data-group-submit>Save group</button>
+            <button type="submit" class="primary" data-group-submit data-testid="save-group-btn">Save group</button>
           </div>
         </form>
       </div>

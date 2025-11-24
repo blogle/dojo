@@ -25,6 +25,7 @@ describe("User Story 07 — Budget Group Creation and Assignment Flow", () => {
       expect([200, 201]).to.include(statusCode);
     });
     cy.wait("@fetchBudgets");
+    cy.wait("@fetchGroups");
 
     categories.forEach((category) => {
       budgetPage.assignCategoryToGroup(category, groupName);
