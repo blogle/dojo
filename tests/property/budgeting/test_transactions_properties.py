@@ -91,3 +91,109 @@ def test_only_one_active_version_per_concept(
             """
         ).fetchall()
         assert all(row[1] == 1 for row in rows)
+
+
+import pytest
+from dojo.budgeting.errors import UnknownAccount, UnknownCategory
+
+
+edit_chain_strategy = st.lists(amount_strategy, min_size=2, max_size=5)
+
+@given(edits=edit_chain_strategy)
+@settings(max_examples=10, deadline=None)
+def test_chronological_integrity_of_edits(edits):
+    """
+    Verify that performing multiple edits on a single transaction
+    maintains that `valid_from` and `valid_to` timestamps are always
+    correctly ordered, with no overlaps or gaps.
+    """
+    with ledger_connection() as conn:
+        service = build_service()
+
+        # Create the initial transaction
+        initial_result = service.create(
+            conn,
+            NewTransactionRequest(
+                transaction_date=date.today(),
+                account_id="house_checking",
+                category_id="groceries",
+                amount_minor=edits[0],
+            ),
+        )
+        concept_id = initial_result.concept_id
+
+        # Perform the edits
+        for amount in edits[1:]:
+            service.create(
+                conn,
+                NewTransactionRequest(
+                    concept_id=concept_id,
+                    transaction_date=date.today(),
+                    account_id="house_checking",
+                    category_id="groceries",
+                    amount_minor=amount,
+                ),
+            )
+            
+        # Verify the chain of validity
+        versions = conn.execute(
+            "SELECT valid_from, valid_to FROM transactions WHERE concept_id = ? ORDER BY valid_from",
+            [str(concept_id)],
+        ).fetchall()
+
+        assert len(versions) == len(edits)
+
+        for i in range(len(versions) - 1):
+            assert versions[i][1] == versions[i+1][0], f"Gap or overlap found at version {i}"
+
+        # Check that the last version is open-ended
+        last_valid_to = versions[-1][1]
+        assert last_valid_to.year == 9999
+        assert last_valid_to.month == 12
+        assert last_valid_to.day == 31
+
+
+def test_referential_integrity():
+    """
+    Verify that creating transactions pointing to non-existent or inactive
+    `account_id`s and `category_id`s fails as expected.
+    """
+    with ledger_connection() as conn:
+        service = build_service()
+
+        # Test with non-existent account
+        with pytest.raises(UnknownAccount):
+            service.create(
+                conn,
+                NewTransactionRequest(
+                    transaction_date=date.today(),
+                    account_id="non_existent_account",
+                    category_id="groceries",
+                    amount_minor=100,
+                ),
+            )
+
+        # Test with non-existent category
+        with pytest.raises(UnknownCategory):
+            service.create(
+                conn,
+                NewTransactionRequest(
+                    transaction_date=date.today(),
+                    account_id="house_checking",
+                    category_id="non_existent_category",
+                    amount_minor=100,
+                ),
+            )
+            
+        # Test with inactive account
+        conn.execute("UPDATE accounts SET is_active = FALSE WHERE account_id = 'house_checking'")
+        with pytest.raises(UnknownAccount):
+            service.create(
+                conn,
+                NewTransactionRequest(
+                    transaction_date=date.today(),
+                    account_id="house_checking",
+                    category_id="groceries",
+                    amount_minor=100,
+                ),
+            )
