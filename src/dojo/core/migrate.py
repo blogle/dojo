@@ -1,6 +1,7 @@
 """Simple DuckDB migration runner."""
 
 import logging
+from pathlib import Path
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from typing import Iterable
@@ -59,13 +60,14 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversabl
             raise
 
 
-def migrate(db_path: "Path | str") -> None:
+def migrate(db_path: Path | str) -> None:
     """Entry point for `python -m dojo.core.migrate`."""
 
     migrations_pkg = files("dojo.sql.migrations")
-    with get_connection(db_path) as conn:
+    path: Path = db_path if isinstance(db_path, Path) else Path(db_path)
+    with get_connection(path) as conn:
         apply_migrations(conn, migrations_pkg)
-    logger.info("Migrations complete for %s", db_path)
+    logger.info("Migrations complete for %s", path)
 
 
 def main() -> None:

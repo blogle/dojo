@@ -3,7 +3,7 @@
 from importlib import resources
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from dojo.budgeting.routers import router as budgeting_router
@@ -47,6 +47,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from dojo.testing.routers import router as testing_router
 
         app.include_router(testing_router, prefix="/api")
+    else:
+        @app.api_route(
+            "/api/testing/{path:path}",
+            methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+            include_in_schema=False,
+        )
+        def _testing_routes_disabled(path: str) -> None:  # pragma: no cover - simple guard
+            raise HTTPException(status_code=404, detail="Testing routes disabled")
 
     static_dir = _static_directory()
     app.mount(
@@ -56,5 +64,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     return app
 
-
-app = create_app()

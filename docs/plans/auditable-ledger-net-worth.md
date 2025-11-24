@@ -66,7 +66,7 @@ Update docs once behavior exists: amend `README.md` Quick Start (add instruction
 
 5. Implement `src/dojo/core/config.py`, `src/dojo/core/db.py`, and `src/dojo/core/app.py` (FastAPI factory as `build_container`, dependency wiring, router registration, static files, SPA mount). Verify the app starts with
 
-        uv run uvicorn dojo.core.app:app --reload
+        uv run uvicorn dojo.core.app:create_app --factory --reload
 
 6. Implement the budgeting SQL helpers, schemas, and transaction service/routers, including the reference-data endpoint. SQL helpers must read from `src/dojo/sql/budgeting`. Add behavior-driven unit tests plus Hypothesis property suites:
 
@@ -97,7 +97,7 @@ Acceptance requires observable behavior:
 1. `uv run python -m dojo.core.migrate` creates `data/ledger.duckdb` and reports the applied migration.
 2. `pytest` (which includes both deterministic and Hypothesis property suites) passes.
 3. `npx cypress run --e2e --browser <browser> [--headed]` passes, running the automated SPA flow.
-4. `uv run uvicorn dojo.core.app:app --reload` starts FastAPI, serves the SPA at `http://localhost:8000/`, and the browser console shows successful fetches for reference data and net worth.
+4. `uv run uvicorn dojo.core.app:create_app --factory --reload` starts FastAPI, serves the SPA at `http://localhost:8000/`, and the browser console shows successful fetches for reference data and net worth.
 5. Submitting the SPA form inserts a transaction, immediately updates the displayed net worth, and a subsequent GET `/api/net-worth/current` via `curl` matches the UI.
 6. `CHANGELOG.md` under `[Unreleased]` states that the Auditable Ledger and Net Worth MVP landed, and docs describe how to use it.
 

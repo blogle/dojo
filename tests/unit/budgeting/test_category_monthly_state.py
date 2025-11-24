@@ -3,12 +3,10 @@
 from datetime import date, timedelta
 
 import duckdb
-import pytest
 
 from dojo.budgeting.schemas import (
     BudgetCategoryCreateRequest,
     NewTransactionRequest,
-    BudgetAllocationRequest,
 )
 from dojo.budgeting.services import (
     BudgetCategoryAdminService,
@@ -118,11 +116,9 @@ def test_last_month_state_aggregates(in_memory_db: duckdb.DuckDBPyConnection) ->
     assert dining.last_month_allocated_minor == 10000
     # Activity is positive for spending
     assert dining.last_month_activity_minor == 4000
-    # Available rolls over? 
+    # Available from last month should be surfaced for quick actions.
     # Last month available = 10000 - 4000 = 6000.
-    # This month allocated = 0, activity = 0.
-    # So available should be 6000.
-    assert dining.available_minor == 6000
+    assert dining.last_month_available_minor == 6000
 
 
 def test_goal_metadata_persistence(in_memory_db: duckdb.DuckDBPyConnection) -> None:

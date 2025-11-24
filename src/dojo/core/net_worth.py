@@ -31,7 +31,7 @@ def current_snapshot(conn: duckdb.DuckDBPyConnection) -> NetWorthSnapshot:
     sql = load_sql("net_worth_current.sql")
     row = conn.execute(sql).fetchone()
     if row is None:
-        return NetWorthSnapshot(0, 0, 0, 0)
+        return NetWorthSnapshot(0, 0, 0, 0, 0)
     assets, liabilities, positions, tangibles, net_worth = row
     return NetWorthSnapshot(
         assets_minor=int(assets),

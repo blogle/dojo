@@ -182,7 +182,7 @@ Each story maps to an end-to-end Cypress scenario plus backend/unit coverage enf
 
 2. While developing the frontend, run the FastAPI server from the repo root so the SPA hits live endpoints:
 
-        uvicorn dojo.core.app:app --reload
+        uvicorn dojo.core.app:create_app --factory --reload
 
 3. In a separate terminal, build/test iteratively:
 

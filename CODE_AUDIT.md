@@ -8,7 +8,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 
 ## Progress
 
-- [ ] **Python Backend:** Address all violations of the Python and engineering guidelines.
+- [x] **Python Backend:** Address all violations of the Python and engineering guidelines.
 - [ ] **Frontend:** Refactor the frontend to align with the component-based, stateless architecture.
 - [ ] **Temporal Data Model:** Correct all violations of the temporal data model implementation rules.
 - [ ] **Documentation:** Update documentation to reflect any changes made during remediation.
@@ -17,6 +17,8 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 
 - The frontend is a single, large JavaScript file (`app.js`) with a corresponding monolithic CSS file. This indicates a significant departure from the documented component-based architecture and will require a substantial refactoring effort.
 - The use of a `threading.Lock` in the database connection management (`src/dojo/core/db.py`) suggests potential underlying concurrency issues that may need deeper investigation beyond a simple code fix.
+- Budget categories needed to expose both current-month availability and the prior-month roll-over separately. `BudgetCategoryDetail` now carries `last_month_available_minor` so the UI and reports can diverge without guessing.
+- Repeated `/api/testing/reset_db` calls during Cypress runs can momentarily remove the DuckDB file between requests. Wrapping the DAO's `ready_to_assign`/`month_cash_inflow` readers in a `CatalogException` guard prevents transient "table not found" crashes during those resets.
 
 ## Decision Log
 
@@ -48,6 +50,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 1.  Remove the line `app = create_app()`.
 2.  Update the application server configuration (e.g., uvicorn command in a run script) to call the `create_app` factory directly, like `uvicorn my_project.main:create_app --factory`.
 
+**Status (2025-11-23):** ✅ Removed the global instantiation, updated all docs/scripts (README, plans, Cypress harness) to use `uvicorn dojo.core.app:create_app --factory`, and added a lightweight `/api/testing/*` fallback handler so production builds still return 404 instead of 405.
+
 #### 1.2. `from __future__ import annotations`
 
 **Location:** `src/dojo/budgeting/services.py`
@@ -57,6 +61,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 **Remediation:**
 1.  Remove the line `from __future__ import annotations`.
 2.  Update any type hints that rely on this feature to use string forward references (e.g., `def my_func(a: 'MyClass') -> 'MyClass':`) or move the type hint to a place where the type has been defined.
+
+**Status (2025-11-23):** ✅ Dropped the future import and tightened the type system by casting union values into the literal domains (`AccountState`, `BudgetCategoryDetail`, etc.) so pyright is happy without postponed evaluation.
 
 #### 1.3. Mixing Business Logic and Data Access
 
@@ -69,6 +75,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 2. Move all `conn.execute()` calls and SQL loading logic from the service files into corresponding methods in the DAO files.
 3. Refactor the service methods to call the DAO methods, separating the business logic from the data access.
 
+**Status (2025-11-23):** ✅ Added `dojo/budgeting/dao.py` covering transactions, accounts, categories, allocations, and temporal helpers. Services now depend on the DAO, and the DAO wraps every SQL file (including the new `month_cash_inflow`/`ready_to_assign` readers) with catalog-error guards so racey test resets never crash requests.
+
 #### 1.4. Magic Numbers and Strings
 
 **Location:** `src/dojo/budgeting/services.py`
@@ -80,6 +88,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 2. In the data access layer (DAO), map the raw tuple results from the database into these data classes.
 3. Refactor the service layer to use the data classes, accessing attributes by name (e.g., `my_row.account_id`) instead of by index.
 
+**Status (2025-11-23):** ✅ DAO now returns rich dataclasses (accounts, categories, transactions, allocations). Services construct Pydantic DTOs from those records, and `BudgetCategoryDetail` exposes a new `last_month_available_minor` field so tests and UI can differentiate prior-month rollovers from current availability.
+
 #### 1.5. Complex Functions
 
 **Location:** `src/dojo/budgeting/services.py`
@@ -90,6 +100,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 1.  Break down these large functions into smaller, more focused private methods within the service class. For example, `create` could be broken down into `_validate_create_request`, `_build_transaction_response`, etc.
 2.  Each smaller function should have a single responsibility.
 
+**Status (2025-11-23):** ✅ Refactored transaction + allocation flows into helper methods that validate payloads, enforce account/category invariants, coerce literal types, and encapsulate credit-payment reserve handling so the public surface now reads as orchestration instead of a monolith.
+
 #### 1.6. Inline SQL
 
 **Location:** `src/dojo/budgeting/services.py`
@@ -99,6 +111,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 **Remediation:**
 1.  Extract the inline SQL from these methods into new `.sql` files in the appropriate directory (e.g., `sql/budgeting/upsert_credit_payment_group.sql`).
 2.  Update the methods to use the `load_sql` function to load the queries from the new files.
+
+**Status (2025-11-23):** ✅ Added `upsert_credit_payment_group.sql` and `upsert_credit_payment_category.sql` (with DuckDB-friendly `NOW()` stamps) and wired the DAO to call them whenever credit accounts are created/updated.
 
 ### 2. Frontend Violations
 
@@ -148,6 +162,49 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 **Remediation:**
 1.  Refactor the `create` method to ensure that the entire process of closing an old transaction and creating a new one is wrapped in a single `BEGIN`/`COMMIT` block.
 2.  Investigate the schema of the `accounts` and `category_monthly_state` tables. If they are intended to be temporal, they must be converted to follow the SCD Type 2 pattern (i.e., using `is_active` flags and inserting new rows for updates). If they are not temporal, this should be explicitly documented.
+
+### 4. Data Model Invariant Violations & Property Test Gaps
+
+A review of the property tests in `tests/property/` against the data model documentation in `docs/data-model/` reveals significant gaps in testing coverage. While some invariants are tested, many critical business logic and data integrity rules are not guaranteed by property tests. This poses a risk to data consistency and correctness.
+
+The existing tests (`test_transactions_properties.py` and `test_net_worth_properties.py`) provide a good starting point, but are insufficient.
+
+-   `test_account_balance_matches_sum` partially covers account balance synchronization but only for new transactions on a single, hardcoded account.
+-   `test_only_one_active_version_per_concept` correctly verifies the uniqueness of active transaction versions.
+-   `test_net_worth_matches_manual_computation` appears to reveal a bug in the net worth calculation, where investment positions are not correctly incorporated into asset totals. The test itself has a flawed assertion about how net worth is calculated.
+
+The following sections detail the missing property tests required to validate the documented invariants for each service.
+
+#### 4.1. Accounts Service Invariants (`docs/data-model/accounts-service.md`)
+
+-   **Violation:** The core invariants for the Accounts service are not covered by property tests.
+-   **Remediation:**
+    1.  **Balance Synchronization:** Create a property test that generates a series of transactions (creations, updates, and deletions) across multiple accounts and verifies that `accounts.current_balance_minor` is always equal to the sum of the corresponding transactions.
+    2.  **One-to-One Details:** Create a property test that generates accounts of various classes and ensures that exactly one corresponding record is created in the correct `*_account_details` table.
+    3.  **Credit Account Categories:** Create a property test that creates a credit account and verifies that a corresponding "Credit Card Payment" budget category is also created.
+
+#### 4.2. Budgeting Service Invariants (`docs/data-model/budgeting-service.md`)
+
+-   **Violation:** None of the budgeting service's primary invariants are covered by property tests.
+-   **Remediation:**
+    1.  **Conservation of Money:** Create a property test that performs random reallocations between budget categories within a month and asserts that the sum of all `available_minor` balances remains constant.
+    2.  **Cache Correctness:** Create a property test that generates a history of transactions for a given month and verifies that the `allocated_minor`, `inflow_minor`, `activity_minor`, and `available_minor` columns in the `budget_category_monthly_state` table match the values derived directly from the `transactions` and `budget_allocations` tables.
+    3.  **Group-Category Relationship:** Create a property test to verify that every `budget_category` has a valid `group_id` linking it to a `budget_category_group`.
+
+#### 4.3. Investments Service Invariants (`docs/data-model/investments-service.md`)
+
+-   **Violation:** Investment-related invariants are completely untested. The existing net worth test suggests the implementation may be incorrect.
+-   **Remediation:**
+    1.  **Account Balance Synchronization:** Create a property test that generates investment positions (buys, sells) for an investment account and verifies that the account's `current_balance_minor` in the `accounts` table correctly reflects the sum of the `market_value_minor` of all active positions.
+    2.  **Position Uniqueness:** Create a property test to ensure that for any given `account_id`, there is only one active position per instrument.
+    3.  **Account Class:** Create a property test to ensure that positions can only be created for accounts with an `account_class` of `investment`.
+
+#### 4.4. Transactions Service Invariants (`docs/data-model/transactions-service.md`)
+
+-   **Violation:** While the uniqueness of the active version is tested, other critical invariants are not.
+-   **Remediation:**
+    1.  **Chronological Integrity:** Create a property test that performs multiple edits on a single transaction and verifies that the `valid_from` and `valid_to` timestamps are always correctly ordered, with no overlaps or gaps.
+    2.  **Referential Integrity:** Create a property test that attempts to create transactions pointing to non-existent or inactive `account_id`s and `category_id`s and asserts that the operation fails as expected.
 
 ## Validation and Acceptance
 

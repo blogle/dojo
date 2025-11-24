@@ -41,7 +41,7 @@ Playwright-based SPA tests cannot run inside the current Nix + sandbox environme
 2. Add `cypress.config.cjs` at the repo root:
        - Import `defineConfig` from `cypress` plus Node `child_process`, `path`, and `http`.
        - Compute `const e2eDbPath = path.join(__dirname, "data", "e2e-ledger.duckdb")`.
-       - Implement `startServer()` that spawns `bash -lc 'DOJO_DB_PATH="..." uv run python -m tests.e2e.prepare_db && DOJO_DB_PATH="..." uv run uvicorn dojo.core.app:app --host 127.0.0.1 --port 8765'` with inherited stdio and merged env. Resolve once an HTTP probe to `/api/health` (or `/api/net-worth/current` if no health route) succeeds; reject after a timeout with cleanup.
+       - Implement `startServer()` that spawns `bash -lc 'DOJO_DB_PATH="..." uv run python -m tests.e2e.prepare_db && DOJO_DB_PATH="..." uv run uvicorn dojo.core.app:create_app --factory --host 127.0.0.1 --port 8765'` with inherited stdio and merged env. Resolve once an HTTP probe to `/api/health` (or `/api/net-worth/current` if no health route) succeeds; reject after a timeout with cleanup.
        - Implement `stopServer()` that sends `SIGTERM` and waits for exit (force `SIGKILL` after a grace period).
        - In `setupNodeEvents`, register `on("before:run", async () => { await startServer(); })` and `on("after:run", async () => { await stopServer(); })`, plus `process.on("exit", ...)`/`SIGINT` guards to kill the child.
        - Configure `e2e: { baseUrl: "http://127.0.0.1:8765", specPattern: "cypress/e2e/**/*.cy.js", supportFile: false, video: false, defaultCommandTimeout: 10000 }`.

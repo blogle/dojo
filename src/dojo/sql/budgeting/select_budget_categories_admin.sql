@@ -13,7 +13,8 @@ SELECT
     COALESCE(s.activity_minor, 0) AS activity_minor,
     COALESCE(s.allocated_minor, 0) AS allocated_minor,
     COALESCE(prev.allocated_minor, 0) AS last_month_allocated_minor,
-    COALESCE(prev.activity_minor, 0) AS last_month_activity_minor
+    COALESCE(prev.activity_minor, 0) AS last_month_activity_minor,
+    COALESCE(prev.available_minor, 0) AS last_month_available_minor
 FROM budget_categories AS c
 LEFT JOIN budget_category_monthly_state AS s
     ON s.category_id = c.category_id

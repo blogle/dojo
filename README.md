@@ -52,7 +52,7 @@ The seed scripts insert the `house_*` accounts and baseline categories so the SP
 ### 4. Run the API + SPA locally
 
 ```bash
-uvicorn dojo.core.app:app --reload
+uvicorn dojo.core.app:create_app --factory --reload
 # open http://127.0.0.1:8000/ in your browser
 ```
 

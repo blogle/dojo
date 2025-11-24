@@ -153,7 +153,7 @@ All existing tests must continue to pass, and new tests introduced in this plan 
 Second, exercise end-to-end scenarios manually once the backend and SPA changes are in place. Start the API and SPA with:
 
     python -m dojo.core.migrate
-    uvicorn dojo.core.app:app --reload
+    uvicorn dojo.core.app:create_app --factory --reload
 
 Then, in a browser, perform the following checks: create or confirm a cash account, an investment account, an accessible asset account, and a loan account; record a contribution from cash to the investment account using a budgeted category and verify that the cash balance decreases, the investment balance increases, the category balance decreases, and Ready to Assign decreases; record a payment from cash to the loan account and verify that the loan balance decreases, the payment category balance decreases, and Ready to Assign remains unchanged; and confirm that the net worth widget reflects these flows correctly. If tangibles are implemented, add a tangible with a fair value and check that net worth increases accordingly without changing any ledger balances.
 
