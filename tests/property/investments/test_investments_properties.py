@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from hypothesis import given, settings, strategies as st
 
-from dojo.budgeting.schemas import AccountCreateRequest, AccountClass
+from dojo.budgeting.schemas import AccountClass
 from dojo.budgeting.services import AccountAdminService
 from dojo.core.migrate import apply_migrations
 from dojo.testing.fixtures import apply_base_budgeting_fixture
