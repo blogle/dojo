@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `docs/rules/sql.md` to recommend storing SQL files inside the application source (`src/dojo/sql/`) to align with the established practice of packaging data files within the Python namespace.
 
 ### Changed
+- Normalized budgeting schema limits, pagination guardrails, net worth rounding precision, and API host/port configuration behind named constants so the statics-over-dynamics rule holds for these knobs.
 - Documented the DAO-backed backend layering and componentized SPA by updating `README.md`, `docs/architecture/overview.md`, and `docs/rules/frontend.md`, including refreshed diagrams and guidance so contributors land on the current structure.
 - Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
 - Transaction editing now reverses the previous ledger effects (account balances, category month state, credit-payment reserves) before applying the updated amount so pending→cleared edits keep envelopes and Ready-to-Assign accurate.

@@ -8,6 +8,11 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+NAME_MAX_LENGTH = 120
+CURRENCY_CODE_LENGTH = 3
+DEFAULT_CURRENCY_CODE = "USD"
+
+
 class NewTransactionRequest(BaseModel):
     """Incoming transaction payload from the SPA."""
 
@@ -166,7 +171,7 @@ class BudgetAllocationsResponse(BaseModel):
 class AccountCommand(BaseModel):
     """Shared fields for account create/update operations with class metadata."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
     account_type: Literal["asset", "liability"]
     account_class: AccountClass = Field(
         default="cash",
@@ -177,7 +182,7 @@ class AccountCommand(BaseModel):
         description="Indicates whether the account contributes to the budget or is tracking-only.",
     )
     current_balance_minor: int = Field(description="Current balance in minor units.")
-    currency: str = Field(default="USD", min_length=3, max_length=3)
+    currency: str = Field(default=DEFAULT_CURRENCY_CODE, min_length=CURRENCY_CODE_LENGTH, max_length=CURRENCY_CODE_LENGTH)
     opened_on: Optional[date] = Field(default=None, description="Optional account open date.")
     is_active: bool = Field(default=True, description="Marks whether the account can be used for new transactions.")
 
@@ -203,7 +208,7 @@ class AccountDetail(AccountCommand):
 class BudgetCategoryCommand(BaseModel):
     """Shared fields for budget category mutations."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
     group_id: Optional[str] = Field(default=None, description="Parent category group ID.")
     is_active: bool = Field(default=True)
     goal_type: Optional[Literal["target_date", "recurring"]] = Field(default=None)
@@ -215,7 +220,7 @@ class BudgetCategoryCommand(BaseModel):
 class BudgetCategoryGroupCommand(BaseModel):
     """Shared fields for budget category group mutations."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
     sort_order: int = Field(default=0)
     is_active: bool = Field(default=True)
 

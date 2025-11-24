@@ -34,6 +34,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Dojo", version="0.1.0")
     app.state.settings = settings
+    app.state.api_host = settings.api_host
+    app.state.api_port = settings.api_port
 
     # Application-scoped services
     app.state.transaction_service = TransactionEntryService()

@@ -7,7 +7,12 @@ import duckdb
 
 from .dao import CoreDAO
 
-getcontext().prec = 28
+DECIMAL_PRECISION = 28
+NET_WORTH_DECIMAL_SCALE = -2
+NET_WORTH_QUANTIZE = Decimal("0.01")
+NET_WORTH_ROUNDING = ROUND_HALF_UP
+
+getcontext().prec = DECIMAL_PRECISION
 
 
 @dataclass(frozen=True)
@@ -22,7 +27,11 @@ class NetWorthSnapshot:
 
     @property
     def net_worth_decimal(self) -> Decimal:
-        return Decimal(self.net_worth_minor).scaleb(-2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return (
+            Decimal(self.net_worth_minor)
+            .scaleb(NET_WORTH_DECIMAL_SCALE)
+            .quantize(NET_WORTH_QUANTIZE, rounding=NET_WORTH_ROUNDING)
+        )
 
 
 def current_snapshot(conn: duckdb.DuckDBPyConnection) -> NetWorthSnapshot:

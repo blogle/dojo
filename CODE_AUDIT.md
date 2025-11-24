@@ -100,6 +100,7 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 
 **Notes (2025-11-24):**
 - Added `_fetchone_namespace`/`_fetchall_namespaces` helpers inside `BudgetingDAO` so every SELECT result is transformed into a `SimpleNamespace` before dataclasses consume it; no service or test reaches into tuple positions anymore.
+- Introduced module-level constants for schema field limits, query pagination defaults, decimal precision/quantization, and API host/port configuration so these tuned knobs live in a single place instead of spread literal values.
 - Updated the budgeting/admin/investments property suites plus unit tests to use lightweight namespace/named-row helpers so invariants assert against named attributes rather than `row[1]`-style magic numbers.
 
 #### 1.5. Complex Functions

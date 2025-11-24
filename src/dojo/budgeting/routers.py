@@ -50,6 +50,11 @@ from dojo.core.db import connection_dep
 
 router = APIRouter(tags=["budgeting"])
 
+TRANSACTION_LIMIT_DEFAULT = 50
+TRANSACTION_LIMIT_MAX = 500
+ALLOCATIONS_LIMIT_DEFAULT = 100
+ALLOCATIONS_LIMIT_MAX = 500
+
 ServiceT = TypeVar("ServiceT")
 
 
@@ -106,7 +111,7 @@ def create_transaction(
 
 @router.get("/transactions", response_model=list[TransactionListItem])
 def list_transactions(
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(TRANSACTION_LIMIT_DEFAULT, ge=1, le=TRANSACTION_LIMIT_MAX),
     conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
     service: TransactionEntryService = Depends(transaction_service_dep),
 ) -> list[TransactionListItem]:
@@ -380,7 +385,7 @@ def allocate_budget(
 @router.get("/budget/allocations", response_model=BudgetAllocationsResponse)
 def list_allocations(
     month: date | None = Query(None, description="Month start (YYYY-MM-01)."),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(ALLOCATIONS_LIMIT_DEFAULT, ge=1, le=ALLOCATIONS_LIMIT_MAX),
     conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
     service: TransactionEntryService = Depends(transaction_service_dep),
 ) -> BudgetAllocationsResponse:
