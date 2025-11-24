@@ -70,6 +70,7 @@
               cypress
               duckdb
               nodejs
+              mermaid-cli
               python312
               ruff
               uv
