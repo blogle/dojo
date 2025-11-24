@@ -1,5 +1,5 @@
 export const initRouter = ({ onBudgetsRefresh, onBudgetsRender, onAllocationsRefresh, onAllocationsRender } = {}) => {
-  const pageNodes = document.querySelectorAll(".page");
+  const pageNodes = document.querySelectorAll(".route-page");
   const routeLinks = document.querySelectorAll("[data-route-link]");
 
   const activateRoute = (route) => {

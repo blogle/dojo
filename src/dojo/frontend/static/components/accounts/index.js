@@ -241,9 +241,6 @@ const handleAddAccount = async () => {
   }
 };
 
-const refreshReferenceData = async () => {};
-const refreshBudgetsData = async () => {};
-const renderBudgetsPage = () => {};
 
 const refreshAccountsPage = async () => {
   try {
