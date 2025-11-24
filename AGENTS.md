@@ -60,7 +60,7 @@ When investigating new algorithms, conducting experiments, or validating theoret
 ## Documentation Standards
 
 ### [ARCHITECTURE.md](./ARCHITECTURE.md)
-This document is the artifact resulting from applying our CHARTER to findings resulting from ExecResearch and ExecPlan implementation work.
+This document is the artifact resulting from applying our CHARTER to findings resulting from ExecResearch and ExecPlan implementation work. For a detailed breakdown of the SQL schema, see the [Data Model](./docs/data-model/overview.md) documentation. For finer-level domain documentation, see the documents in [`./docs/architecture`](./docs/architecture).
 Purpose & scope (one screen): State what this repo is, the problem it solves, who it serves, and the non-goals. Make clear what this doc covers vs. what lives elsewhere.
 Core theory (≤10 files): Link the 5–10 “brains” of the system; for each, 1–2 lines on role, key collaborators, why it’s core, and owner.
 System context (Mermaid): One diagram of actors, upstream/downstream deps, repo boundary vs. external; mark trust/network boundaries.
@@ -88,6 +88,21 @@ Glossary: Short, authoritative definitions for domain terms and ubiquitous langu
 * Never make invariants informal; always write them as testable statements and link to tests that enforce them.
 * Never leave onboarding implicit; always explain how a new engineer should read the code via the critical-files tour.
 * Never freeze the design; always include a change playbook and ADR supersession path.
+
+### [Data Model](./docs/data-model/overview.md)
+The data model documentation provides a detailed, developer-focused view of the SQL schema. It is derived directly from the codebase and serves as the canonical reference for understanding tables, columns, relationships, and invariants. It is structured into a top-level overview and a set of service-specific documents.
+
+*   **Top-Level Overview:** A single document that describes the entire schema, global relationships, and how different services partition the model.
+*   **Service-Level Docs:** One document per service, detailing the tables it owns, its core data-flow operations, and local invariants.
+
+*   Always derive the data model from the actual schema (migrations, DDL) and application code, not from idealized designs.
+*   Always include Mermaid ER diagrams to visually represent relationships.
+*   Always keep the overview and service-level documents interlinked and consistent.
+*   Always describe the "grain" of each table (what one row represents).
+*   Always explain how caches and derived tables are populated and kept consistent.
+*   Never invent tables or columns that are not present in the code.
+*   Never describe data flows in the abstract; use concrete table and column names.
+*   Never forget to document ownership—which service is the source of truth for which table.
 
 ### [README.md](./README.md)
 Clear scope & status. What it does today, what’s out of scope, stability (alpha/beta/GA), and a changelog link.
