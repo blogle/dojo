@@ -1,0 +1,55 @@
+.budgets-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.budgets-page__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.budgets-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.group-row .group-cell {
+  background-color: var(--stone-50);
+  font-weight: 600;
+}
+
+.group-cell__content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.icon-button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.quick-allocations {
+  margin-top: 1rem;
+}
+
+.quick-allocations__actions {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

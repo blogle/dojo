@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <title>Dojo | Transactions</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/layout.css" />
+    <link rel="stylesheet" href="./styles/forms.css" />
+    <link rel="stylesheet" href="./styles/ledger.css" />
+    <link rel="stylesheet" href="./styles/components/transactions.css" />
+    <link rel="stylesheet" href="./styles/components/transfers.css" />
+    <link rel="stylesheet" href="./styles/components/accounts.css" />
+    <link rel="stylesheet" href="./styles/components/allocations.css" />
+    <link rel="stylesheet" href="./styles/components/budgets.css" />
+    <link rel="stylesheet" href="./styles/components/modals.css" />
+    <link rel="stylesheet" href="./styles/components/toast.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,83 +24,81 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="main-header">
-        <a href="/" class="logo">DOJO</a>
-        <nav class="main-nav" aria-label="Primary">
-          <a href="#/transactions" class="nav-link active" data-route-link="transactions">Transactions</a>
-          <a href="#/transfers" class="nav-link" data-route-link="transfers">Transfers</a>
-          <a href="#/allocations" class="nav-link" data-route-link="allocations">Allocations</a>
-          <a href="#/accounts" class="nav-link" data-route-link="accounts">Assets &amp; Liabilities</a>
-          <a href="#/budgets" class="nav-link" data-route-link="budgets">Budgets</a>
-          <noscript><span class="muted">Enable JavaScript for navigation.</span></noscript>
+      <header class="app-header">
+        <a href="/" class="app-header__logo">DOJO</a>
+        <nav class="app-header__nav" aria-label="Primary">
+          <a href="#/transactions" class="app-header__link app-header__link--active" data-route-link="transactions">Transactions</a>
+          <a href="#/transfers" class="app-header__link" data-route-link="transfers">Transfers</a>
+          <a href="#/allocations" class="app-header__link" data-route-link="allocations">Allocations</a>
+          <a href="#/accounts" class="app-header__link" data-route-link="accounts">Assets &amp; Liabilities</a>
+          <a href="#/budgets" class="app-header__link" data-route-link="budgets">Budgets</a>
+          <noscript><span class="u-muted">Enable JavaScript for navigation.</span></noscript>
         </nav>
       </header>
 
-      <main class="page-container" id="page-container">
-        <!-- Transaction Page -->
-        <section class="page active" id="transactions-page" data-route="transactions">
-          <header class="transaction-header">
-            <div class="stat-card">
-              <span class="stat-label">Spent This Month</span>
-              <span id="month-spend" class="stat-value">$0.00</span>
-              <p class="muted small-note">Month-to-date spending from posted ledger activity.</p>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Budgeted This Month</span>
-              <span id="month-budgeted" class="stat-value">$0.00</span>
-              <p class="muted small-note">Allocations applied to envelopes this month.</p>
-            </div>
+      <main class="app-shell__content" id="page-container">
+        <section class="route-page route-page--active transactions-page" id="transactions-page" data-route="transactions">
+          <header class="transactions-page__stats">
+            <article class="stat-card">
+              <span class="stat-card__label">Spent This Month</span>
+              <span id="month-spend" class="stat-card__value">$0.00</span>
+              <p class="u-muted u-small-note">Month-to-date spending from posted ledger activity.</p>
+            </article>
+            <article class="stat-card">
+              <span class="stat-card__label">Budgeted This Month</span>
+              <span id="month-budgeted" class="stat-card__value">$0.00</span>
+              <p class="u-muted u-small-note">Allocations applied to envelopes this month.</p>
+            </article>
           </header>
 
-          <section class="form-card">
+          <section class="form-panel transactions-page__form">
             <form id="transaction-form" data-testid="transaction-form" aria-describedby="transaction-form-hint">
               <div class="segmented-control" role="group" aria-label="Transaction type">
-                <span class="segmented-label">Type</span>
-                <label class="segmented-option">
+                <span class="segmented-control__label">Type</span>
+                <label class="segmented-control__option">
                   <input type="radio" name="transaction-flow" value="outflow" checked data-transaction-flow />
                   <span>Outflow</span>
                 </label>
-                <label class="segmented-option">
+                <label class="segmented-control__option">
                   <input type="radio" name="transaction-flow" value="inflow" data-transaction-flow />
                   <span>Inflow</span>
                 </label>
               </div>
-              <div class="form-grid form-grid--compact">
-                <label class="form-field">
+              <div class="form-panel__grid form-panel__grid--compact">
+                <label class="form-panel__field">
                   <span>Date</span>
                   <input type="date" name="transaction_date" required />
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Account</span>
                   <select name="account_id" required data-transaction-account>
                     <option value="" disabled selected>Select account</option>
                   </select>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Category</span>
                   <select name="category_id" required data-transaction-category>
                     <option value="" disabled selected>Select category</option>
                   </select>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Memo</span>
                   <input type="text" name="memo" placeholder="e.g. Grocery run" />
                 </label>
-                <label class="form-field amount-field">
+                <label class="form-panel__field form-panel__field--amount">
                   <span>Amount</span>
                   <input type="number" name="amount" step="0.01" inputmode="decimal" placeholder="0.00" required />
                 </label>
               </div>
-              <div class="form-actions">
-                <button type="submit" class="primary" data-transaction-submit>Save transaction</button>
+              <div class="form-panel__actions">
+                <button type="submit" class="button button--primary" data-transaction-submit>Save transaction</button>
               </div>
             </form>
-            <p id="transaction-form-hint" class="muted small-note">Record single-leg inflows or outflows. Status defaults to pending until you reconcile.</p>
-            <p class="form-error" data-testid="transaction-error" aria-live="polite"></p>
+            <p id="transaction-form-hint" class="u-muted u-small-note">Record single-leg inflows or outflows. Status defaults to pending until you reconcile.</p>
+            <p class="form-panel__error" data-testid="transaction-error" aria-live="polite"></p>
           </section>
 
-
-          <div class="ledger-wrapper">
+          <div class="ledger-card">
             <table class="ledger-table">
               <thead>
                 <tr>
@@ -98,178 +106,171 @@
                   <th>Account</th>
                   <th>Category</th>
                   <th>Memo</th>
-                  <th class="amount-cell">Outflow</th>
-                  <th class="amount-cell">Inflow</th>
+                  <th class="ledger-table__amount">Outflow</th>
+                  <th class="ledger-table__amount">Inflow</th>
                   <th>Status</th>
                 </tr>
               </thead>
-              <tbody id="transactions-body">
-                <!-- Rows will be inserted by JavaScript -->
-              </tbody>
+              <tbody id="transactions-body"></tbody>
             </table>
           </div>
         </section>
 
-        <!-- Transfers Page -->
-        <section class="page" id="transfers-page" data-route="transfers">
-          <header class="transfers-header">
+        <section class="route-page transfers-page" id="transfers-page" data-route="transfers">
+          <header class="transfers-page__header">
             <div>
               <p class="page-label">Categorized transfers</p>
-              <p class="muted small-note">Move money between accounts while tagging the budget leg.</p>
+              <p class="u-muted u-small-note">Move money between accounts while tagging the budget leg.</p>
             </div>
           </header>
-          <section class="form-card">
+          <section class="form-panel transfers-page__form">
             <form id="transfer-form" data-testid="transfer-form">
-              <div class="form-grid">
-                <label class="form-field">
+              <div class="form-panel__grid">
+                <label class="form-panel__field">
                   <span>Date</span>
                   <input type="date" name="transaction_date" required />
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Source account</span>
                   <select name="source_account_id" required data-transfer-source>
                     <option value="" disabled selected>Select source</option>
                   </select>
-                  <p class="form-helper" data-validation="source" aria-live="polite"></p>
+                  <p class="form-panel__helper" data-validation="source" aria-live="polite"></p>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Destination account</span>
                   <select name="destination_account_id" required data-transfer-destination>
                     <option value="" disabled selected>Select destination</option>
                   </select>
-                  <p class="form-helper" data-validation="destination" aria-live="polite"></p>
+                  <p class="form-panel__helper" data-validation="destination" aria-live="polite"></p>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Category</span>
                   <select name="category_id" required data-transfer-category>
                     <option value="" disabled selected>Select category</option>
                   </select>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Memo</span>
                   <input type="text" name="memo" placeholder="Optional context" />
                 </label>
-                <label class="form-field amount-field">
+                <label class="form-panel__field form-panel__field--amount">
                   <span>Amount</span>
                   <input type="number" name="amount" step="0.01" inputmode="decimal" placeholder="0.00" required />
                 </label>
               </div>
-              <div class="form-actions">
-                <button type="submit" class="primary" data-transfer-submit disabled>Post transfer</button>
+              <div class="form-panel__actions">
+                <button type="submit" class="button button--primary" data-transfer-submit disabled>Post transfer</button>
               </div>
             </form>
-            <p class="form-error" data-testid="transfer-error" aria-live="polite"></p>
+            <p class="form-panel__error" data-testid="transfer-error" aria-live="polite"></p>
           </section>
         </section>
 
-        <!-- Accounts / Assets & Liabilities Page -->
-        <section class="page" id="accounts-page" data-route="accounts">
-          <header class="accounts-page-header">
-            <div class="accounts-page-header__nav">
+        <section class="route-page accounts-page" id="accounts-page" data-route="accounts">
+          <header class="accounts-page__header">
+            <div class="accounts-page__nav">
               <p class="page-label">Assets &amp; Liabilities</p>
-              <nav class="accounts-subnav" aria-label="Accounts navigation">
-                <button type="button" class="subnav-link is-active" data-account-section="all">All</button>
-                <button type="button" class="subnav-link" data-account-section="assets">Assets</button>
-                <button type="button" class="subnav-link" data-account-section="liabilities">Liabilities</button>
+              <nav class="accounts-page__filter" aria-label="Accounts navigation">
+                <button type="button" class="accounts-page__filter-button accounts-page__filter-button--active" data-account-section="all">All</button>
+                <button type="button" class="accounts-page__filter-button" data-account-section="assets">Assets</button>
+                <button type="button" class="accounts-page__filter-button" data-account-section="liabilities">Liabilities</button>
               </nav>
             </div>
-            <button class="primary add-account-btn" data-add-account-button>+ Add account</button>
+            <button class="button button--primary" data-add-account-button>+ Add account</button>
           </header>
 
-          <div class="accounts-stat-grid">
-            <div class="stat-card">
-              <span class="stat-label">Total Assets</span>
-              <span id="assets-total" class="stat-value">—</span>
-              <span class="muted small-note">Includes cash, investments, property.</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Total Liabilities</span>
-              <span id="liabilities-total" class="stat-value">—</span>
-              <span class="muted small-note">Mortgages, loans &amp; lines of credit.</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Net Worth</span>
-              <span id="net-worth" class="stat-value">—</span>
-              <span class="muted small-note">Assets minus liabilities.</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Ready to Assign</span>
-              <span id="ready-to-assign" class="stat-value">—</span>
-              <span class="muted small-note">Unallocated cash available to budget.</span>
-            </div>
+          <div class="accounts-page__stats">
+            <article class="stat-card">
+              <span class="stat-card__label">Total Assets</span>
+              <span id="assets-total" class="stat-card__value">—</span>
+              <span class="u-muted u-small-note">Includes cash, investments, property.</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-card__label">Total Liabilities</span>
+              <span id="liabilities-total" class="stat-card__value">—</span>
+              <span class="u-muted u-small-note">Mortgages, loans &amp; lines of credit.</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-card__label">Net Worth</span>
+              <span id="net-worth" class="stat-card__value">—</span>
+              <span class="u-muted u-small-note">Assets minus liabilities.</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-card__label">Ready to Assign</span>
+              <span id="ready-to-assign" class="stat-card__value">—</span>
+              <span class="u-muted u-small-note">Unallocated cash available to budget.</span>
+            </article>
           </div>
 
-          <div class="account-groups" id="account-groups">
-            <!-- Account group cards injected here -->
-          </div>
+          <div class="accounts-groups" id="account-groups"></div>
         </section>
 
-        <!-- Allocations Page -->
-        <section class="page" id="allocations-page" data-route="allocations">
-          <header class="allocations-header">
+        <section class="route-page allocations-page" id="allocations-page" data-route="allocations">
+          <header class="allocations-page__header">
             <div>
               <p class="page-label">Allocations</p>
-              <p class="muted small-note">Move Ready-to-Assign between envelopes and track the ledger.</p>
+              <p class="u-muted u-small-note">Move Ready-to-Assign between envelopes and track the ledger.</p>
             </div>
             <article class="summary-chip summary-chip--muted">
-              <span class="summary-label">Budget month</span>
+              <span class="summary-chip__label">Budget month</span>
               <strong id="allocations-month-label">—</strong>
             </article>
           </header>
-          <div class="allocations-summary-grid">
+          <div class="allocations-page__summary">
             <article class="stat-card">
-              <span class="stat-label">Inflow (this month)</span>
-              <span id="allocations-inflow-value" class="stat-value">$0.00</span>
-              <p class="muted small-note">Cash entering on-budget accounts this month.</p>
+              <span class="stat-card__label">Inflow (this month)</span>
+              <span id="allocations-inflow-value" class="stat-card__value">$0.00</span>
+              <p class="u-muted u-small-note">Cash entering on-budget accounts this month.</p>
             </article>
             <article class="stat-card">
-              <span class="stat-label">Available to budget</span>
-              <span id="allocations-ready-value" class="stat-value">$0.00</span>
-              <p class="muted small-note">Matches Ready-to-Assign after allocations.</p>
+              <span class="stat-card__label">Available to budget</span>
+              <span id="allocations-ready-value" class="stat-card__value">$0.00</span>
+              <p class="u-muted u-small-note">Matches Ready-to-Assign after allocations.</p>
             </article>
           </div>
 
-          <section class="form-card">
+          <section class="form-panel allocations-page__form">
             <form data-testid="allocation-form">
-              <div class="form-grid form-grid--compact">
-                <label class="form-field">
+              <div class="form-panel__grid form-panel__grid--compact">
+                <label class="form-panel__field">
                   <span>Date</span>
                   <input type="date" name="allocation_date" required data-allocation-date />
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>From category</span>
                   <select name="from_category_id" data-allocation-from>
                     <option value="">Ready to Assign</option>
                   </select>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>To category</span>
                   <select name="to_category_id" required data-allocation-to>
                     <option value="" disabled selected>Select category</option>
                   </select>
                 </label>
-                <label class="form-field">
+                <label class="form-panel__field">
                   <span>Memo</span>
                   <input type="text" name="memo" placeholder="Optional note" />
                 </label>
-                <label class="form-field amount-field">
+                <label class="form-panel__field form-panel__field--amount">
                   <span>Amount</span>
                   <input type="number" name="amount" step="0.01" inputmode="decimal" placeholder="0.00" required />
                 </label>
               </div>
-              <div class="form-actions">
-                <button type="submit" class="primary" data-allocation-submit>Record allocation</button>
+              <div class="form-panel__actions">
+                <button type="submit" class="button button--primary" data-allocation-submit>Record allocation</button>
               </div>
             </form>
-            <p class="form-error" data-testid="allocation-error" aria-live="polite"></p>
+            <p class="form-panel__error" data-testid="allocation-error" aria-live="polite"></p>
           </section>
 
-          <div class="ledger-wrapper">
+          <div class="ledger-card ledger-card--allocations">
             <table class="ledger-table ledger-table--allocations">
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th class="amount-cell">Amount</th>
+                  <th class="ledger-table__amount">Amount</th>
                   <th>From</th>
                   <th>To</th>
                   <th>Memo</th>
@@ -277,57 +278,56 @@
               </thead>
               <tbody id="allocations-body">
                 <tr>
-                  <td colspan="5" class="muted">Loading allocations…</td>
+                  <td colspan="5" class="u-muted">Loading allocations…</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <!-- Budgets Page -->
-        <section class="page" id="budgets-page" data-route="budgets" data-testid="budgets-section">
-          <header class="budgets-header">
+        <section class="route-page budgets-page" id="budgets-page" data-route="budgets" data-testid="budgets-section">
+          <header class="budgets-page__header">
             <div>
               <p class="page-label">Budgets</p>
-              <p class="muted small-note">Allocate Ready-to-Assign into envelopes.</p>
+              <p class="u-muted u-small-note">Allocate Ready-to-Assign into envelopes.</p>
             </div>
-            <div class="budgets-header__actions">
-              <button type="button" class="secondary" data-open-group-modal data-testid="create-group-btn">+ Add group</button>
-              <button type="button" class="primary" data-open-category-modal data-testid="add-budget-button">+ Add budget</button>
+            <div class="budgets-page__actions">
+              <button type="button" class="button button--secondary" data-open-group-modal data-testid="create-group-btn">+ Add group</button>
+              <button type="button" class="button button--primary" data-open-category-modal data-testid="add-budget-button">+ Add budget</button>
             </div>
           </header>
-          <div class="summary-bar" role="region" aria-label="Budget summary">
-            <article class="summary-chip" data-summary="rta">
-              <span class="summary-label">Ready to Assign</span>
+          <div class="budgets-summary" role="region" aria-label="Budget summary">
+            <article class="summary-chip">
+              <span class="summary-chip__label">Ready to Assign</span>
               <strong id="budgets-ready-value">—</strong>
             </article>
-            <article class="summary-chip" data-summary="activity">
-              <span class="summary-label">Activity this month</span>
+            <article class="summary-chip">
+              <span class="summary-chip__label">Activity this month</span>
               <strong id="budgets-activity-value">—</strong>
             </article>
-            <article class="summary-chip summary-chip--warning" data-summary="available">
-              <span class="summary-label">Available this month</span>
+            <article class="summary-chip summary-chip--warning">
+              <span class="summary-chip__label">Available this month</span>
               <strong id="budgets-available-value">—</strong>
             </article>
-            <article class="summary-chip summary-chip--muted" data-summary="month">
-              <span class="summary-label">Budget month</span>
+            <article class="summary-chip summary-chip--muted">
+              <span class="summary-chip__label">Budget month</span>
               <strong id="budgets-month-label">—</strong>
             </article>
           </div>
-          <p class="muted small-note">Use the Allocations page to move Ready-to-Assign between envelopes.</p>
-          <div class="ledger-wrapper">
+          <p class="u-muted u-small-note">Use the Allocations page to move Ready-to-Assign between envelopes.</p>
+          <div class="ledger-card ledger-card--budgets">
             <table class="ledger-table ledger-table--budgets">
               <thead>
                 <tr>
                   <th>Category</th>
-                  <th class="amount-cell">Budgeted</th>
-                  <th class="amount-cell">Activity</th>
-                  <th class="amount-cell">Available</th>
+                  <th class="ledger-table__amount">Budgeted</th>
+                  <th class="ledger-table__amount">Activity</th>
+                  <th class="ledger-table__amount">Available</th>
                 </tr>
               </thead>
               <tbody id="budgets-body">
                 <tr>
-                  <td colspan="4" class="muted">Loading budgets…</td>
+                  <td colspan="4" class="u-muted">Loading budgets…</td>
                 </tr>
               </tbody>
             </table>
@@ -336,17 +336,18 @@
       </main>
     </div>
 
+    <!-- Modals -->
     <div class="modal-overlay" id="account-modal" aria-hidden="true" data-view="add">
       <div class="modal" data-view="add">
-        <header class="modal-header">
+        <header class="modal__header">
           <div>
-            <p class="stat-label" data-modal-label>Add account</p>
+            <p class="stat-card__label" data-modal-label>Add account</p>
             <h2 data-modal-title>Follow the guided steps</h2>
-            <p class="muted small-note" data-modal-subtitle>Digitally capture the new account.</p>
+            <p class="u-muted u-small-note" data-modal-subtitle>Digitally capture the new account.</p>
           </div>
-          <button class="modal-close" type="button" aria-label="Close modal" data-close-modal>×</button>
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-modal>×</button>
         </header>
-        <div class="modal-body">
+        <div class="modal__body">
           <section class="modal-detail" data-modal-section="detail">
             <div class="modal-detail__balance" data-modal-balance>—</div>
             <ul class="modal-detail__metadata" data-modal-metadata></ul>
@@ -362,7 +363,7 @@
             </div>
           </section>
           <section class="modal-add" data-modal-section="add">
-            <p class="muted small-note" data-modal-type-hint>Checking · On-budget</p>
+            <p class="u-muted u-small-note" data-modal-type-hint>Checking · On-budget</p>
             <ol class="modal-steps">
               <li><strong>Step 1:</strong> Choose the account type (checking, credit, investment, etc.).</li>
               <li><strong>Step 2:</strong> Enter the institution name and the account nickname.</li>
@@ -391,7 +392,7 @@
                 Notes
                 <textarea name="notes" rows="3" placeholder="Optional context (e.g. interest rate, minimum payment)"></textarea>
               </label>
-              <button type="button" class="primary" data-add-account-submit>Review &amp; create</button>
+              <button type="button" class="button button--primary" data-add-account-submit>Review &amp; create</button>
             </form>
           </section>
         </div>
@@ -400,13 +401,13 @@
 
     <div class="modal-overlay" id="category-modal" aria-hidden="true">
       <div class="modal">
-        <header class="modal-header">
+        <header class="modal__header">
           <div>
-            <p class="stat-label">Budget category</p>
+            <p class="stat-card__label">Budget category</p>
             <h2 data-category-modal-title>Add category</h2>
-            <p class="muted small-note" data-category-modal-hint>Create or rename an envelope slug.</p>
+            <p class="u-muted u-small-note" data-category-modal-hint>Create or rename an envelope slug.</p>
           </div>
-          <button class="modal-close" type="button" aria-label="Close modal" data-close-category-modal>×</button>
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-category-modal>×</button>
         </header>
         <form class="modal-form" data-category-form>
           <label>
@@ -422,24 +423,24 @@
           </label>
 
           <div class="segmented-control" role="group" aria-label="Goal type">
-            <span class="segmented-label">Goal</span>
-            <label class="segmented-option">
+            <span class="segmented-control__label">Goal</span>
+            <label class="segmented-control__option">
               <input type="radio" name="goal_type" value="recurring" checked data-goal-type data-testid="goal-type-recurring" />
               <span>Recurring</span>
             </label>
-            <label class="segmented-option">
+            <label class="segmented-control__option">
               <input type="radio" name="goal_type" value="target_date" data-goal-type data-testid="goal-type-target-date" />
               <span>Target Date</span>
             </label>
           </div>
 
           <div data-goal-section="target_date" style="display: none;">
-            <div class="form-grid form-grid--compact">
-              <label class="form-field">
+            <div class="form-panel__grid form-panel__grid--compact">
+              <label class="form-panel__field">
                 <span>Target Date</span>
                 <input type="date" name="target_date_dt" data-testid="target-date-input" />
               </label>
-              <label class="form-field amount-field">
+              <label class="form-panel__field form-panel__field--amount">
                 <span>Target Amount</span>
                 <input type="number" name="target_amount" step="0.01" placeholder="0.00" data-testid="target-amount-input" />
               </label>
@@ -447,8 +448,8 @@
           </div>
 
           <div data-goal-section="recurring">
-            <div class="form-grid form-grid--compact">
-              <label class="form-field">
+            <div class="form-panel__grid form-panel__grid--compact">
+              <label class="form-panel__field">
                 <span>Frequency</span>
                 <select name="frequency" data-testid="frequency-select">
                   <option value="monthly">Monthly</option>
@@ -456,20 +457,20 @@
                   <option value="yearly">Yearly</option>
                 </select>
               </label>
-              <label class="form-field">
+              <label class="form-panel__field">
                 <span>Next Due Date</span>
                 <input type="date" name="recurring_date_dt" data-testid="recurring-date-input" />
               </label>
-              <label class="form-field amount-field">
+              <label class="form-panel__field form-panel__field--amount">
                 <span>Amount</span>
                 <input type="number" name="recurring_amount" step="0.01" placeholder="0.00" data-testid="recurring-amount-input" />
               </label>
             </div>
           </div>
 
-          <p class="form-error" data-category-error aria-live="polite"></p>
-          <div class="form-actions">
-            <button type="submit" class="primary" data-category-submit data-testid="save-category-btn">Save budget</button>
+          <p class="form-panel__error" data-category-error aria-live="polite"></p>
+          <div class="form-panel__actions">
+            <button type="submit" class="button button--primary" data-category-submit data-testid="save-category-btn">Save budget</button>
           </div>
         </form>
       </div>
@@ -477,12 +478,12 @@
 
     <div class="modal-overlay" id="group-modal" aria-hidden="true">
       <div class="modal">
-        <header class="modal-header">
+        <header class="modal__header">
           <div>
-            <p class="stat-label">Category Group</p>
+            <p class="stat-card__label">Category Group</p>
             <h2 data-group-modal-title>Add group</h2>
           </div>
-          <button class="modal-close" type="button" aria-label="Close modal" data-close-group-modal>×</button>
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-group-modal>×</button>
         </header>
         <form class="modal-form" data-group-form>
           <label>
@@ -493,9 +494,9 @@
             Sort Order
             <input type="number" name="sort_order" value="0" required />
           </label>
-          <p class="form-error" data-group-error aria-live="polite"></p>
-          <div class="form-actions">
-            <button type="submit" class="primary" data-group-submit data-testid="save-group-btn">Save group</button>
+          <p class="form-panel__error" data-group-error aria-live="polite"></p>
+          <div class="form-panel__actions">
+            <button type="submit" class="button button--primary" data-group-submit data-testid="save-group-btn">Save group</button>
           </div>
         </form>
       </div>
@@ -503,47 +504,44 @@
 
     <div class="modal-overlay" id="budget-detail-modal" aria-hidden="true">
       <div class="modal">
-        <header class="modal-header">
+        <header class="modal__header">
           <div>
-            <p class="stat-label">Budget Detail</p>
+            <p class="stat-card__label">Budget Detail</p>
             <h2 data-budget-detail-title>Category Name</h2>
           </div>
-          <button class="modal-close" type="button" aria-label="Close modal" data-close-budget-detail-modal>×</button>
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-budget-detail-modal>×</button>
         </header>
-        <div class="modal-body">
+        <div class="modal__body">
           <div class="budget-detail-summary">
             <table class="ledger-table">
               <tbody>
                 <tr>
                   <td>Left over from last month</td>
-                  <td class="amount-cell" data-detail-leftover>—</td>
+                  <td class="ledger-table__amount" data-detail-leftover>—</td>
                 </tr>
                 <tr>
                   <td>Budgeted this month</td>
-                  <td class="amount-cell" data-detail-budgeted>—</td>
+                  <td class="ledger-table__amount" data-detail-budgeted>—</td>
                 </tr>
                 <tr>
                   <td>Activity</td>
-                  <td class="amount-cell" data-detail-activity>—</td>
+                  <td class="ledger-table__amount" data-detail-activity>—</td>
                 </tr>
-                <tr style="font-weight: 700;">
+                <tr>
                   <td>Available</td>
-                  <td class="amount-cell" data-detail-available>—</td>
+                  <td class="ledger-table__amount" data-detail-available>—</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          
+
           <div class="quick-allocations">
-            <p class="stat-label" style="margin-bottom: 0.5rem;">Quick Allocations</p>
-            <div class="form-actions" style="justify-content: flex-start; flex-wrap: wrap; gap: 0.5rem;" data-quick-actions>
-              <!-- Buttons injected here -->
-            </div>
+            <p class="stat-card__label">Quick Allocations</p>
+            <div class="quick-allocations__actions" data-quick-actions></div>
           </div>
 
-          <div class="form-actions form-actions--split" style="margin-top: 1rem; border-top: var(--border-thick); padding-top: 1rem;">
-            <button type="button" class="secondary" data-detail-edit>Edit Settings</button>
-            <!-- Delete button could go here -->
+          <div class="form-panel__actions form-panel__actions--split">
+            <button type="button" class="button button--secondary" data-detail-edit>Edit Settings</button>
           </div>
         </div>
       </div>
@@ -551,55 +549,51 @@
 
     <div class="modal-overlay" id="group-detail-modal" aria-hidden="true">
       <div class="modal">
-        <header class="modal-header">
+        <header class="modal__header">
           <div>
-            <p class="stat-label">Group Detail</p>
+            <p class="stat-card__label">Group Detail</p>
             <h2 data-group-detail-title>Group Name</h2>
           </div>
-          <button class="modal-close" type="button" aria-label="Close modal" data-close-group-detail-modal>×</button>
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-group-detail-modal>×</button>
         </header>
-        <div class="modal-body">
+        <div class="modal__body">
           <div class="budget-detail-summary">
             <table class="ledger-table">
               <tbody>
                 <tr>
                   <td>Left over from last month</td>
-                  <td class="amount-cell" data-group-detail-leftover>—</td>
+                  <td class="ledger-table__amount" data-group-detail-leftover>—</td>
                 </tr>
                 <tr>
                   <td>Budgeted this month</td>
-                  <td class="amount-cell" data-group-detail-budgeted>—</td>
+                  <td class="ledger-table__amount" data-group-detail-budgeted>—</td>
                 </tr>
                 <tr>
                   <td>Activity</td>
-                  <td class="amount-cell" data-group-detail-activity>—</td>
+                  <td class="ledger-table__amount" data-group-detail-activity>—</td>
                 </tr>
-                <tr style="font-weight: 700;">
+                <tr>
                   <td>Available</td>
-                  <td class="amount-cell" data-group-detail-available>—</td>
+                  <td class="ledger-table__amount" data-group-detail-available>—</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          
+
           <div class="quick-allocations">
-            <p class="stat-label" style="margin-bottom: 0.5rem;">Quick Allocations</p>
-            <div class="form-actions" style="justify-content: flex-start; flex-wrap: wrap; gap: 0.5rem;" data-group-quick-actions>
-              <!-- Buttons injected here -->
-            </div>
+            <p class="stat-card__label">Quick Allocations</p>
+            <div class="quick-allocations__actions" data-group-quick-actions></div>
           </div>
 
-          <div class="form-actions form-actions--split" style="margin-top: 1rem; border-top: var(--border-thick); padding-top: 1rem;">
-            <button type="button" class="secondary" data-group-detail-edit>Edit Group</button>
+          <div class="form-panel__actions form-panel__actions--split">
+            <button type="button" class="button button--secondary" data-group-detail-edit>Edit Group</button>
           </div>
         </div>
       </div>
     </div>
 
-
     <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
-
-    <script src="./app.js" type="module"></script>
+    <script src="./main.js" type="module"></script>
   </body>
 </html>

@@ -1,0 +1,143 @@
+:root {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
+  --bg: #fdfcfb;
+  --surface: #ffffff;
+  --text: #333333;
+  --muted: #8a8a8a;
+  --border: #e0e0e0;
+  --primary: #5a6e5a;
+  --primary-hover: #4a5c4a;
+  --accent: #c7b299;
+  --danger: #b95c5c;
+  --success: #6b8e23;
+  --stone-50: #fafaf9;
+  --stone-300: #d6d3d1;
+  --shadow-hard: 4px 4px 0px 0px rgba(0, 0, 0, 0.75);
+  --border-thick: 2px solid var(--text);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-sans);
+}
+
+.u-muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.u-small-note {
+  display: block;
+  max-width: 320px;
+}
+
+.button {
+  cursor: pointer;
+  border: var(--border-thick);
+  border-radius: 0;
+  padding: 0.75rem 1.25rem;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.button--primary {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.button--secondary {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  color: var(--bg);
+  box-shadow: var(--shadow-hard);
+  transform: translate(-2px, -2px);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background-color: var(--accent);
+  color: var(--text);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.stat-card {
+  background-color: var(--surface);
+  border: var(--border-thick);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-card__label {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.stat-card__value {
+  font-family: var(--font-sans);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.summary-chip {
+  border: var(--border-thick);
+  padding: 1rem;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.summary-chip--warning {
+  background: #fff4e6;
+}
+
+.summary-chip--muted {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.summary-chip__label {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.page-label {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}

@@ -9,7 +9,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 ## Progress
 
 - [x] **Python Backend:** Address all violations of the Python and engineering guidelines.
-- [ ] **Frontend:** Refactor the frontend to align with the component-based, stateless architecture.
+- [x] **Frontend:** Refactor the frontend to align with the component-based, stateless architecture.
 - [ ] **Temporal Data Model:** Correct all violations of the temporal data model implementation rules.
 - [ ] **Documentation:** Update documentation to reflect any changes made during remediation.
 
@@ -19,6 +19,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 - The use of a `threading.Lock` in the database connection management (`src/dojo/core/db.py`) suggests potential underlying concurrency issues that may need deeper investigation beyond a simple code fix.
 - Budget categories needed to expose both current-month availability and the prior-month roll-over separately. `BudgetCategoryDetail` now carries `last_month_available_minor` so the UI and reports can diverge without guessing.
 - Repeated `/api/testing/reset_db` calls during Cypress runs can momentarily remove the DuckDB file between requests. Wrapping the DAO's `ready_to_assign`/`month_cash_inflow` readers in a `CatalogException` guard prevents transient "table not found" crashes during those resets.
+- Breaking the UI into page-level modules surfaced just how intertwined DOM selection and data fetching had become; introducing a central store forced us to be explicit about each update path and highlighted where we were previously mutating shared objects from event handlers.
 
 ## Decision Log
 
@@ -127,6 +128,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 2. Break down `app.js` into smaller modules. For example, create a `services/api.js` for API calls, a `services/state.js` for state management, and then a directory for each component (e.g., `components/transaction-list/`).
 3. Each component directory should contain its own JavaScript and CSS file.
 
+**Status (2025-11-23):** ✅ Split the original monolith into `services/`, `components/`, and `store` modules (`main.js` now wires accounts, budgets, transactions, transfers, allocations, router, toast, and reference data) with per-feature CSS bundles under `styles/components/` so each page owns its structure and presentation.
+
 #### 2.2. Global State Mutation
 
 **Location:** `src/dojo/frontend/static/app.js`
@@ -139,6 +142,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 3.  `setState()` should be the only way to update the state, and it should always create a new state object instead of mutating the old one.
 4.  Refactor the rest of the code to use these functions for state management.
 
+**Status (2025-11-23):** ✅ Added `services/state.js` plus a shared `store.js` instance; every feature now reads via `store.getState()` and mutates via `store.setState`/`patchState`, which emit copies so DOM updates no longer rely on hidden shared references.
+
 #### 2.3. No BEM in CSS
 
 **Location:** `src/dojo/frontend/static/styles.css`
@@ -148,6 +153,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 **Remediation:**
 1.  As part of the component refactoring, rename all CSS classes to follow the BEM convention. For example, `.account-card__header` should be the standard.
 2.  Each component should have its own CSS file with styles scoped to that component.
+
+**Status (2025-11-23):** ✅ Replaced the single stylesheet with `base.css`, `layout.css`, shared form/ledger styles, and page-specific files under `styles/components/`, updating the markup to use explicit BEM/utility classes (`app-header__link`, `form-panel__field`, `u-muted`, etc.) so styling responsibilities live with their respective components.
 
 ### 3. Temporal Data Model Violations
 
