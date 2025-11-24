@@ -34,7 +34,7 @@ You operate by the values and principles outlined in our charter:
 
 ## Code Authoring & Review Principles
 - Name code constructs by their responsibilities in the domain, not by implementation details or history.
-- Comment to explain *what* the code does and *why* it exists.
+- Comment to explain the *reason* or *purpose* behind the code (the "why"), and *what* it does where non-obvious (complexity, domain, institutional knowledge).
 - Interpretability and correctness of financial maths is critical!
 - Make the smallest reasonable changes to achieve your goal when modifying code.
 - Minimize code duplication even if refactoring takes extra effort.
