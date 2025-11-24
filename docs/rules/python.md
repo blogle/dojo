@@ -155,7 +155,7 @@ Measure first, optimize second; do not micro-optimize without evidence.
 
 ## Comments, Docstrings, and Logging
 
-Every **2–5 lines** of logic are preceded by a **why-first** comment; add what/explanation where non-obvious (complexity, domain, institutional knowledge). Keep comments in sync with code.
+Every **2–5 lines** of logic are preceded by a comment explaining the *reason* or *purpose* behind the code (the "why"). Add additional explanation for *what* the code does when it's non-obvious (e.g., due to complexity, domain specifics, or institutional knowledge). Keep comments in sync with code.
 
 Use **NumPy-style** docstrings, with concise examples. No `print` in library code; use `logging` with structured context.
 

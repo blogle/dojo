@@ -6,7 +6,26 @@ from importlib import resources
 
 @lru_cache(maxsize=None)
 def load_sql(name: str) -> str:
-    """Load an SQL file from the budgeting SQL package."""
+    """
+    Loads SQL text from the `dojo.sql.budgeting` package.
 
+    This function provides a convenient way to retrieve SQL queries stored
+    as separate files within the `dojo.sql.budgeting` package. It uses `lru_cache`
+    to memoize the results, ensuring that each SQL file is read from disk
+    only once per application lifecycle.
+
+    Parameters
+    ----------
+    name : str
+        The name of the SQL file (e.g., "my_budget_query.sql") to load.
+        The file is expected to be located within the `dojo.sql.budgeting` package.
+
+    Returns
+    -------
+    str
+        The content of the SQL file as a string.
+    """
+    # Use importlib.resources to locate the SQL file within the package.
     sql_path = resources.files("dojo.sql.budgeting").joinpath(name)
+    # Read the content of the SQL file and return it as a string.
     return sql_path.read_text(encoding="utf-8")

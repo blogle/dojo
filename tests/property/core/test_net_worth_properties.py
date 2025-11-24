@@ -1,4 +1,11 @@
-"""Property-based tests for net worth aggregation."""
+"""
+Property-based tests for net worth aggregation.
+
+This module uses the Hypothesis library to test the `current_snapshot` function
+responsible for aggregating net worth. It verifies that the calculated net worth
+components (assets, liabilities, positions) and the total net worth match
+manual computations based on generated data.
+"""
 
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -14,18 +21,39 @@ from dojo.core.net_worth import current_snapshot
 
 @contextmanager
 def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
+    """
+    Creates an in-memory DuckDB connection and applies all migrations.
+
+    This fixture provides a clean and consistent database state for each test run,
+    with only the schema established, allowing tests to insert their own data.
+
+    Yields
+    ------
+    Generator[duckdb.DuckDBPyConnection, None, None]
+        An in-memory DuckDB connection object.
+    """
     conn = duckdb.connect(database=":memory:")
+    # Get the package path where migration SQL files are located.
     migrations_pkg = resources.files("dojo.sql.migrations")
+    # Apply all schema migrations to the in-memory database.
     apply_migrations(conn, migrations_pkg)
     try:
         yield conn
     finally:
+        # Ensure the connection is closed after the test completes.
         conn.close()
 
 
-assets_strategy = st.lists(st.integers(min_value=0, max_value=2_000_00), min_size=1, max_size=4)
-liabilities_strategy = st.lists(st.integers(min_value=0, max_value=1_000_00), min_size=1, max_size=4)
-pos_strategy = st.lists(st.integers(min_value=0, max_value=500_00), min_size=0, max_size=3)
+# Strategies for generating financial amounts in minor units.
+assets_strategy = st.lists(
+    st.integers(min_value=0, max_value=2_000_00), min_size=1, max_size=4
+)
+liabilities_strategy = st.lists(
+    st.integers(min_value=0, max_value=1_000_00), min_size=1, max_size=4
+)
+pos_strategy = st.lists(
+    st.integers(min_value=0, max_value=500_00), min_size=0, max_size=3
+)
 
 
 @given(
@@ -39,7 +67,25 @@ def test_net_worth_matches_manual_computation(
     liabilities: list[int],
     positions: list[int],
 ) -> None:
+    """
+    Verifies that the `current_snapshot` function accurately calculates net worth.
+
+    This property test generates various combinations of assets, liabilities,
+    and investment positions. It then populates the database with this data
+    and asserts that the `NetWorthSnapshot` returned by `current_snapshot`
+    matches the sum of generated values.
+
+    Parameters
+    ----------
+    assets : list[int]
+        A list of generated asset amounts in minor units.
+    liabilities : list[int]
+        A list of generated liability amounts in minor units.
+    positions : list[int]
+        A list of generated investment position values in minor units.
+    """
     with ledger_connection() as conn:
+        # Clear existing data to ensure a clean state for each test run.
         conn.execute("DELETE FROM positions")
         conn.execute("DELETE FROM tangible_assets")
         conn.execute("DELETE FROM cash_account_details")
@@ -50,6 +96,7 @@ def test_net_worth_matches_manual_computation(
         conn.execute("DELETE FROM tangible_asset_details")
         conn.execute("DELETE FROM accounts")
 
+        # Insert generated asset accounts.
         for idx, value in enumerate(assets):
             conn.execute(
                 """
@@ -58,6 +105,7 @@ def test_net_worth_matches_manual_computation(
                 """,
                 [f"asset_{idx}", f"Asset {idx}", value],
             )
+        # Insert generated liability accounts.
         for idx, value in enumerate(liabilities):
             conn.execute(
                 """
@@ -66,7 +114,9 @@ def test_net_worth_matches_manual_computation(
                 """,
                 [f"liability_{idx}", f"Liability {idx}", value],
             )
+        # Insert generated investment positions.
         for value in positions:
+            # Assuming 'asset_0' exists from the assets loop, or create a dummy one.
             conn.execute(
                 """
                 INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor, is_active)
@@ -75,8 +125,13 @@ def test_net_worth_matches_manual_computation(
                 [str(uuid4()), "TICK", value],
             )
 
+        # Retrieve the net worth snapshot.
         snapshot = current_snapshot(conn)
+        # Assert that the snapshot values match the sum of the generated inputs.
         assert snapshot.assets_minor == sum(assets)
         assert snapshot.liabilities_minor == sum(liabilities)
         assert snapshot.positions_minor == sum(positions)
-        assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(positions)
+        # Net worth is calculated as Assets - Liabilities + Positions.
+        assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(
+            positions
+        )
