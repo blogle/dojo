@@ -58,8 +58,9 @@ ALLOCATIONS_LIMIT_MAX = 500
 ServiceT = TypeVar("ServiceT")
 
 
-def _resolve_service(request: Request, attr: str, expected_type: Type[ServiceT]) -> ServiceT:
-    service = getattr(request.app.state, attr, None)
+def _ensure_service_type(
+    service: object | None, attr: str, expected_type: Type[ServiceT]
+) -> ServiceT:
     if service is None:
         raise RuntimeError(f"{expected_type.__name__} not configured on app.state")
     if not isinstance(service, expected_type):  # pragma: no cover
@@ -68,16 +69,28 @@ def _resolve_service(request: Request, attr: str, expected_type: Type[ServiceT])
 
 
 def transaction_service_dep(request: Request) -> TransactionEntryService:
-    return _resolve_service(request, "transaction_service", TransactionEntryService)
+    try:
+        service = request.app.state.transaction_service
+    except AttributeError as exc:
+        raise RuntimeError("TransactionEntryService not configured on app.state") from exc
+    return _ensure_service_type(service, "transaction_service", TransactionEntryService)
 
 
 def account_admin_service_dep(request: Request) -> AccountAdminService:
-    return _resolve_service(request, "account_admin_service", AccountAdminService)
+    try:
+        service = request.app.state.account_admin_service
+    except AttributeError as exc:
+        raise RuntimeError("AccountAdminService not configured on app.state") from exc
+    return _ensure_service_type(service, "account_admin_service", AccountAdminService)
 
 
 def category_admin_service_dep(request: Request) -> BudgetCategoryAdminService:
-    return _resolve_service(
-        request,
+    try:
+        service = request.app.state.budget_category_admin_service
+    except AttributeError as exc:
+        raise RuntimeError("BudgetCategoryAdminService not configured on app.state") from exc
+    return _ensure_service_type(
+        service,
         "budget_category_admin_service",
         BudgetCategoryAdminService,
     )

@@ -6,6 +6,9 @@ SELECT
     account_role,
     current_balance_minor,
     currency,
-    is_active
+    is_active,
+    opened_on,
+    created_at,
+    updated_at
 FROM accounts
 WHERE account_id = ?;
