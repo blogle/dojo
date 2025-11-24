@@ -1,7 +1,7 @@
 """Data access helpers for core domain features."""
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any
 
 import duckdb
 
@@ -17,13 +17,13 @@ class NetWorthRecord:
     net_worth_minor: int
 
     @classmethod
-    def from_row(cls, row: Sequence[int]) -> "NetWorthRecord":
+    def from_dict(cls, data: dict[str, Any]) -> "NetWorthRecord":
         return cls(
-            assets_minor=int(row[0]),
-            liabilities_minor=int(row[1]),
-            positions_minor=int(row[2]),
-            tangibles_minor=int(row[3]),
-            net_worth_minor=int(row[4]),
+            assets_minor=data["assets_minor"],
+            liabilities_minor=data["liabilities_minor"],
+            positions_minor=data["positions_minor"],
+            tangibles_minor=data["tangibles_minor"],
+            net_worth_minor=data["net_worth_minor"],
         )
 
 
@@ -35,7 +35,7 @@ class CoreDAO:
 
     def net_worth_snapshot(self) -> NetWorthRecord | None:
         sql = load_sql("net_worth_current.sql")
-        row = self._conn.execute(sql).fetchone()
-        if row is None:
+        df = self._conn.execute(sql).fetchdf()
+        if df.empty:
             return None
-        return NetWorthRecord.from_row(row)
+        return NetWorthRecord.from_dict(df.iloc[0].to_dict())

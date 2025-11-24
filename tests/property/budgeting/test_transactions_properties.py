@@ -13,6 +13,9 @@ from dojo.budgeting.services import TransactionEntryService
 from dojo.core.migrate import apply_migrations
 from dojo.testing.fixtures import apply_base_budgeting_fixture
 
+import pytest
+from dojo.budgeting.errors import UnknownAccount, UnknownCategory
+
 
 @contextmanager
 def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
@@ -91,10 +94,6 @@ def test_only_one_active_version_per_concept(
             """
         ).fetchall()
         assert all(row[1] == 1 for row in rows)
-
-
-import pytest
-from dojo.budgeting.errors import UnknownAccount, UnknownCategory
 
 
 edit_chain_strategy = st.lists(amount_strategy, min_size=2, max_size=5)

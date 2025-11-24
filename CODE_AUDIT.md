@@ -95,7 +95,7 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 2. In the data access layer (DAO), map the raw tuple results from the database into these data classes.
 3. Refactor the service layer to use the data classes, accessing attributes by name (e.g., `my_row.account_id`) instead of by index.
 
-**Status (2025-11-23):** ⚠️ **Partially remediated.** The `budgeting` DAO now returns rich dataclasses, resolving the issue for that service. However, other parts of the code, like `src/dojo/core/net_worth.py`, still use positional unpacking. This pattern must be replaced by mapping raw results to data classes within a DAO.
+**Status (2025-11-23):** ✅ Remediated. The `budgeting` DAO now returns rich dataclasses, resolving the issue for that service. The `CoreDAO` for net worth calculations also now maps raw results to data classes, eliminating positional unpacking.
 
 #### 1.5. Complex Functions
 
