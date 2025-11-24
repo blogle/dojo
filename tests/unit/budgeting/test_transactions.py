@@ -5,6 +5,7 @@ from datetime import date
 import duckdb
 import pytest
 
+from dojo.budgeting.dao import BudgetingDAO
 from dojo.budgeting.errors import InvalidTransaction
 from dojo.budgeting.schemas import CategorizedTransferRequest, NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
@@ -115,6 +116,116 @@ def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyC
     ).fetchone()
     assert status_row is not None
     assert status_row[0] == "cleared"
+
+
+def test_edit_transaction_failure_rolls_back(
+    in_memory_db: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = TransactionEntryService()
+    first_cmd = NewTransactionRequest(
+        transaction_date=date.today(),
+        account_id="house_checking",
+        category_id="groceries",
+        amount_minor=-1000,
+    )
+    first = service.create(in_memory_db, first_cmd)
+    month_start = date.today().replace(day=1)
+
+    baseline_balance_row = in_memory_db.execute(
+        "SELECT current_balance_minor FROM accounts WHERE account_id = ?",
+        ["house_checking"],
+    ).fetchone()
+    assert baseline_balance_row is not None
+    baseline_balance = int(baseline_balance_row[0])
+
+    baseline_category_row = in_memory_db.execute(
+        """
+        SELECT available_minor, activity_minor
+        FROM budget_category_monthly_state
+        WHERE category_id = ? AND month_start = ?
+        """,
+        ["groceries", month_start],
+    ).fetchone()
+    assert baseline_category_row is not None
+    baseline_available = int(baseline_category_row[0])
+    baseline_activity = int(baseline_category_row[1])
+
+    failing_cmd = NewTransactionRequest(
+        concept_id=first.concept_id,
+        transaction_date=date.today(),
+        account_id="house_checking",
+        category_id="groceries",
+        amount_minor=-2000,
+    )
+
+    original_insert = BudgetingDAO.insert_transaction
+    error_message = "forced failure for atomicity"
+    tripped = {"value": False}
+
+    def failing_insert(
+        self: BudgetingDAO,
+        transaction_version_id,
+        concept_id,
+        account_id,
+        category_id,
+        transaction_date,
+        amount_minor,
+        memo,
+        status,
+        recorded_at,
+        source,
+    ) -> None:
+        if not tripped["value"] and concept_id == failing_cmd.concept_id:
+            tripped["value"] = True
+            raise RuntimeError(error_message)
+        original_insert(
+            self,
+            transaction_version_id,
+            concept_id,
+            account_id,
+            category_id,
+            transaction_date,
+            amount_minor,
+            memo,
+            status,
+            recorded_at,
+            source,
+        )
+
+    monkeypatch.setattr(BudgetingDAO, "insert_transaction", failing_insert)
+
+    with pytest.raises(RuntimeError, match=error_message):
+        service.create(in_memory_db, failing_cmd)
+
+    counts = in_memory_db.execute(
+        """
+        SELECT SUM(CASE WHEN is_active THEN 1 ELSE 0 END)
+        FROM transactions
+        WHERE concept_id = ?
+        """,
+        [str(first.concept_id)],
+    ).fetchone()
+    assert counts is not None
+    assert counts[0] == 1
+
+    reloaded_balance_row = in_memory_db.execute(
+        "SELECT current_balance_minor FROM accounts WHERE account_id = ?",
+        ["house_checking"],
+    ).fetchone()
+    assert reloaded_balance_row is not None
+    assert int(reloaded_balance_row[0]) == baseline_balance
+
+    reloaded_category_row = in_memory_db.execute(
+        """
+        SELECT available_minor, activity_minor
+        FROM budget_category_monthly_state
+        WHERE category_id = ? AND month_start = ?
+        """,
+        ["groceries", month_start],
+    ).fetchone()
+    assert reloaded_category_row is not None
+    assert int(reloaded_category_row[0]) == baseline_available
+    assert int(reloaded_category_row[1]) == baseline_activity
 
 
 def test_zero_amount_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:

@@ -46,5 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Corrected the dashboard hero layout so the date, month-to-date spend, and net worth stay in a single card row and the page links pin to the top-right without stray pre-content text.
+- Wrapped transaction edits in the new `BudgetingDAO.transaction()` context manager, added a regression test that forces a failure mid-edit to prove rollback behavior, and documented that `accounts` and `budget_category_monthly_state` are mutable caches (not temporal tables) so in-place updates remain compliant.
 
 ### Security

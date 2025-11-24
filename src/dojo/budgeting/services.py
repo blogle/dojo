@@ -87,8 +87,7 @@ class TransactionEntryService:
         month_start = cmd.transaction_date.replace(day=1)
         activity_delta = -cmd.amount_minor
 
-        dao.begin()
-        try:
+        with dao.transaction():
             account_record = self._require_active_account(dao, cmd.account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
             track_budget_activity = self._should_track_budget_activity(category_record)
@@ -125,21 +124,16 @@ class TransactionEntryService:
                 cmd.category_id,
             )
 
-            dao.commit()
-        except Exception:
-            dao.rollback()
-            raise
-
-        return TransactionResponse(
-            transaction_version_id=transaction_version_id,
-            concept_id=concept_id,
-            amount_minor=cmd.amount_minor,
-            transaction_date=cmd.transaction_date,
-            status=cast(Literal["pending", "cleared"], cmd.status),
-            memo=cmd.memo,
-            account=account_state,
-            category=category_state,
-        )
+            return TransactionResponse(
+                transaction_version_id=transaction_version_id,
+                concept_id=concept_id,
+                amount_minor=cmd.amount_minor,
+                transaction_date=cmd.transaction_date,
+                status=cast(Literal["pending", "cleared"], cmd.status),
+                memo=cmd.memo,
+                account=account_state,
+                category=category_state,
+            )
 
     def transfer(
         self,

@@ -65,6 +65,8 @@ This is the master table for all accounts. It stores the common information shar
     -   `is_active` (BOOLEAN): A flag to soft-delete an account.
     -   `opened_on` (DATE): The date the account was opened.
 
+> **Temporal boundary:** The `accounts` table is an authoritative cache of the latest balance per account, not a temporal history. All immutable, temporal ledger history lives in the `transactions` table. The application updates `accounts.current_balance_minor` in place (via `update_account_balance.sql`) to keep API reads fast while the versioned transaction log remains the source of truth for historical reconstruction.
+
 ### Account Detail Tables
 
 These tables store attributes specific to a given `account_class`. They have a one-to-one relationship with the `accounts` table, linked by `account_id`. This design avoids cluttering the `accounts` table with dozens of columns that are only relevant to certain account types.

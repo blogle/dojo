@@ -98,6 +98,8 @@ This table is a performance-enhancing cache that stores summarized budget figure
     -   `activity_minor` (BIGINT): Total outflows (spending) from this category for the month.
     -   `available_minor` (BIGINT): The final calculated balance (`allocated + inflow - activity`).
 
+> **Mutable cache:** This table is not part of the temporal ledger. It is rebuilt transactionally each time allocations or ledger events occur, so the application issues `UPDATE` statements (see `upsert_category_monthly_state.sql`) to keep the cache synchronized while the immutable `transactions` table holds the full history.
+
 ## Shared Tables Used by the Budgeting Service
 
 -   **`transactions` (Read-Only):** The Budgeting Service reads from the `transactions` table to calculate the `activity_minor` and `inflow_minor` for the `budget_category_monthly_state` cache. When a transaction is created or updated, the service needs to know its category, amount, and date to update the correct monthly state.

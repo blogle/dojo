@@ -1,9 +1,10 @@
 """Data access helpers for the budgeting domain."""
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
-from typing import Any, Sequence
+from typing import Any, Generator, Sequence
 from uuid import UUID
 
 import duckdb
@@ -248,6 +249,17 @@ class BudgetingDAO:
 
     def rollback(self) -> None:
         self._conn.execute("ROLLBACK")
+
+    @contextmanager
+    def transaction(self) -> Generator["BudgetingDAO", None, None]:
+        self.begin()
+        try:
+            yield self
+        except Exception:
+            self.rollback()
+            raise
+        else:
+            self.commit()
 
     # Account queries -----------------------------------------------------
     def get_active_account(self, account_id: str) -> AccountRecord | None:

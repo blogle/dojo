@@ -10,7 +10,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 
 - [x] **Python Backend:** Address all violations of the Python and engineering guidelines.
 - [x] **Frontend:** Refactor the frontend to align with the component-based, stateless architecture.
-- [ ] **Temporal Data Model:** Correct all violations of the temporal data model implementation rules.
+- [x] **Temporal Data Model:** Correct all violations of the temporal data model implementation rules.
 - [ ] **Documentation:** Update documentation to reflect any changes made during remediation.
 
 ## Surprises & Discoveries
@@ -20,6 +20,7 @@ The goal of this audit is to identify all areas of the codebase that deviate fro
 - Budget categories needed to expose both current-month availability and the prior-month roll-over separately. `BudgetCategoryDetail` now carries `last_month_available_minor` so the UI and reports can diverge without guessing.
 - Repeated `/api/testing/reset_db` calls during Cypress runs can momentarily remove the DuckDB file between requests. Wrapping the DAO's `ready_to_assign`/`month_cash_inflow` readers in a `CatalogException` guard prevents transient "table not found" crashes during those resets.
 - Breaking the UI into page-level modules surfaced just how intertwined DOM selection and data fetching had become; introducing a central store forced us to be explicit about each update path and highlighted where we were previously mutating shared objects from event handlers.
+- Replacing ad-hoc `BEGIN`/`COMMIT` blocks with a DAO-level transaction context manager gives us a single place to enforce rollback discipline and makes the temporal ledger boundary obvious in code and tests.
 
 ## Decision Log
 
@@ -169,6 +170,8 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 **Remediation:**
 1.  Refactor the `create` method to ensure that the entire process of closing an old transaction and creating a new one is wrapped in a single `BEGIN`/`COMMIT` block.
 2.  Investigate the schema of the `accounts` and `category_monthly_state` tables. If they are intended to be temporal, they must be converted to follow the SCD Type 2 pattern (i.e., using `is_active` flags and inserting new rows for updates). If they are not temporal, this should be explicitly documented.
+
+**Status (2025-11-23):** ✅ Added a `BudgetingDAO.transaction()` context manager and updated `TransactionEntryService.create` to run reversals, closures, and inserts inside a single atomic block. The new unit test `test_edit_transaction_failure_rolls_back` proves that a forced failure leaves both the ledger and cache unchanged, and the Accounts/Budgeting data-model docs now explicitly describe `accounts` and `budget_category_monthly_state` as mutable caches outside the temporal history.
 
 ### 4. Data Model Invariant Violations & Property Test Gaps
 
