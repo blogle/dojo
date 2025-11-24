@@ -7,6 +7,7 @@ from typing import Type, TypeVar
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
+from dojo.budgeting.dao import BudgetingDAO
 from dojo.budgeting.errors import (
     AccountAlreadyExists,
     AccountNotFound,
@@ -40,7 +41,6 @@ from dojo.budgeting.schemas import (
     TransactionListItem,
     TransactionResponse,
 )
-from dojo.budgeting.sql import load_sql
 from dojo.budgeting.services import (
     AccountAdminService,
     BudgetCategoryAdminService,
@@ -119,30 +119,29 @@ def list_transactions(
 def get_reference_data(conn: duckdb.DuckDBPyConnection = Depends(connection_dep)) -> ReferenceDataResponse:
     """Return lightweight reference data for the SPA."""
 
-    accounts_sql = load_sql("select_reference_accounts.sql")
-    categories_sql = load_sql("select_reference_categories.sql")
-    account_rows = conn.execute(accounts_sql).fetchall()
-    category_rows = conn.execute(categories_sql).fetchall()
+    dao = BudgetingDAO(conn)
+    account_records = dao.list_reference_accounts()
     accounts = [
         AccountState(
-            account_id=row[0],
-            name=row[1],
-            account_type=row[2],
-            account_class=row[3],
-            account_role=row[4],
-            current_balance_minor=int(row[5]),
+            account_id=record.account_id,
+            name=record.name,
+            account_type=record.account_type,
+            account_class=record.account_class,
+            account_role=record.account_role,
+            current_balance_minor=record.current_balance_minor,
         )
-        for row in account_rows
+        for record in account_records
     ]
     # Category reference uses available = 0 until monthly state exists.
+    category_records = dao.list_reference_categories()
     categories = [
         CategoryState(
-            category_id=row[0],
-            name=row[1],
-            available_minor=0,
+            category_id=record.category_id,
+            name=record.name,
+            available_minor=record.available_minor,
             activity_minor=0,
         )
-        for row in category_rows
+        for record in category_records
     ]
     return ReferenceDataResponse(
         accounts=accounts,

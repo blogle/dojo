@@ -4,11 +4,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
-from typing import Any, Generator, Sequence
+from typing import Any, Generator, Literal, Sequence, cast
 from uuid import UUID
 
 import duckdb
 
+from dojo.budgeting.schemas import AccountClass, AccountRole
 from dojo.budgeting.sql import load_sql
 
 
@@ -21,9 +22,9 @@ def _sql(name: str) -> str:
 class AccountRecord:
     account_id: str
     name: str
-    account_type: str
-    account_class: str
-    account_role: str
+    account_type: Literal["asset", "liability"]
+    account_class: AccountClass
+    account_role: AccountRole
     current_balance_minor: int
     currency: str
     is_active: bool
@@ -40,15 +41,40 @@ class AccountRecord:
         return cls(
             account_id=row[0],
             name=row[1],
-            account_type=row[2],
-            account_class=row[3],
-            account_role=row[4],
+            account_type=cast(Literal["asset", "liability"], row[2]),
+            account_class=cast(AccountClass, row[3]),
+            account_role=cast(AccountRole, row[4]),
             current_balance_minor=int(row[5]),
             currency=str(currency_value),
             is_active=bool(row[7]),
             opened_on=opened_on,
             created_at=created_at,
             updated_at=updated_at,
+        )
+
+    @property
+    def is_credit_liability(self) -> bool:
+        return self.account_type == "liability" and self.account_class == "credit"
+
+
+@dataclass(frozen=True)
+class ReferenceAccountRecord:
+    account_id: str
+    name: str
+    account_type: Literal["asset", "liability"]
+    account_class: AccountClass
+    account_role: AccountRole
+    current_balance_minor: int
+
+    @classmethod
+    def from_row(cls, row: Sequence[Any]) -> "ReferenceAccountRecord":
+        return cls(
+            account_id=row[0],
+            name=row[1],
+            account_type=cast(Literal["asset", "liability"], row[2]),
+            account_class=cast(AccountClass, row[3]),
+            account_role=cast(AccountRole, row[4]),
+            current_balance_minor=int(row[5]),
         )
 
     @property
@@ -70,6 +96,21 @@ class CategoryRecord:
             name=row[1],
             is_active=bool(row[2]),
             is_system=bool(row[3]) if len(row) > 3 else False,
+        )
+
+
+@dataclass(frozen=True)
+class ReferenceCategoryRecord:
+    category_id: str
+    name: str
+    available_minor: int
+
+    @classmethod
+    def from_row(cls, row: Sequence[Any]) -> "ReferenceCategoryRecord":
+        return cls(
+            category_id=row[0],
+            name=row[1],
+            available_minor=int(row[2]),
         )
 
 
@@ -279,6 +320,11 @@ class BudgetingDAO:
         rows = self._conn.execute(sql).fetchall()
         return [AccountRecord.from_row(row) for row in rows]
 
+    def list_reference_accounts(self) -> list[ReferenceAccountRecord]:
+        sql = _sql("select_reference_accounts.sql")
+        rows = self._conn.execute(sql).fetchall()
+        return [ReferenceAccountRecord.from_row(row) for row in rows]
+
     def insert_account(
         self,
         account_id: str,
@@ -378,6 +424,11 @@ class BudgetingDAO:
             raise RuntimeError("select_budget_categories_admin.sql must contain 2 or 3 placeholders")
         rows = self._conn.execute(sql, params).fetchall()
         return [BudgetCategoryDetailRecord.from_row(row) for row in rows]
+
+    def list_reference_categories(self) -> list[ReferenceCategoryRecord]:
+        sql = _sql("select_reference_categories.sql")
+        rows = self._conn.execute(sql).fetchall()
+        return [ReferenceCategoryRecord.from_row(row) for row in rows]
 
     def insert_budget_category(
         self,

@@ -1,9 +1,8 @@
 import os
 from pathlib import Path
 
-import duckdb
-
 from ..core.migrate import migrate
+from .dao import get_testing_dao
 
 
 def reset_db(db_path: Path):
@@ -16,15 +15,14 @@ def reset_db(db_path: Path):
 
 
 def seed_db(db_path: Path, fixture_path: str):
-    """Seeds the database with data from a fixture file."""
+    """Seeds the database with data from a fixture file via the DAO."""
     # Build an absolute path to the fixture file, assuming the path is relative to the project root.
-    # The project root is assumed to be the grandparent of this file's directory.
     project_root = Path(__file__).parent.parent.parent.parent
     full_path = project_root / fixture_path
 
     if not full_path.exists():
         raise FileNotFoundError(f"Fixture file not found: {full_path}")
 
-    with duckdb.connect(str(db_path)) as con:
-        sql_script = full_path.read_text()
-        con.execute(sql_script)
+    sql_script = full_path.read_text()
+    dao = get_testing_dao(db_path=db_path)
+    dao.run_script(sql_script=sql_script)

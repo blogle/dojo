@@ -68,53 +68,58 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 
 #### 1.3. Mixing Business Logic and Data Access
 
-**Location:** `src/dojo/budgeting/services.py`
+**Location:** `src/dojo/*/services.py`
 
-**Violation:** The service classes directly execute SQL queries, mixing business logic with data access.
+**Violation:** Service modules directly execute SQL queries, mixing business logic with data access. This is a systemic issue. Any service needing database access must go through a Data Access Object (DAO). The `budgeting` service was one example of this violation.
 
 **Remediation:**
 1. Create a new `dao.py` (Data Access Object) file within each domain (e.g., `src/dojo/budgeting/dao.py`).
 2. Move all `conn.execute()` calls and SQL loading logic from the service files into corresponding methods in the DAO files.
 3. Refactor the service methods to call the DAO methods, separating the business logic from the data access.
 
-**Status (2025-11-23):** ✅ Added `dojo/budgeting/dao.py` covering transactions, accounts, categories, allocations, and temporal helpers. Services now depend on the DAO, and the DAO wraps every SQL file (including the new `month_cash_inflow`/`ready_to_assign` readers) with catalog-error guards so racey test resets never crash requests.
+**Status (2025-11-23):** ✅ All service modules now route through explicit DAOs. Budgeting continues to lean on `BudgetingDAO`, testing utilities call `TestingDAO.run_script`, and the new `CoreDAO` drives the net worth snapshot so no service or router executes SQL directly.
+
+**Notes (2025-11-23):**
+- `BudgetingDAO` owns the reference-data queries, so `/api/budget/reference-data` no longer reads `.sql` files inside the router and all DTO coercion stays within the service boundary.
+- Added `dojo/core/dao.py` plus typed records to back the net-worth service, ensuring core routers can only see rich objects instead of tuple unpacking.
+- Verified with `rg "execute\(" -g"*services.py"` that the services layer remains SQL-free; future data access should extend the DAO objects instead of mixing concerns.
 
 #### 1.4. Magic Numbers and Strings
 
-**Location:** `src/dojo/budgeting/services.py`
+**Location:** Various modules, including `src/dojo/core/net_worth.py` and formerly `src/dojo/budgeting/services.py`.
 
-**Violation:** The code uses magic numbers to access tuple elements from database rows (e.g., `row[0]`, `row[7]`). This violates the principle of "Prefer objects over dictionaries for structured data" from `docs/rules/python.md`.
+**Violation:** The code uses magic numbers or positional unpacking to access tuple elements from database rows. This violates the principle of "Prefer objects over dictionaries for structured data" from `docs/rules/python.md`. Any module directly executing database queries without mapping results to data classes is a potential source of this violation.
 
 **Remediation:**
 1. Define `dataclasses` or Pydantic `BaseModel` classes that correspond to the structure of the database rows.
 2. In the data access layer (DAO), map the raw tuple results from the database into these data classes.
 3. Refactor the service layer to use the data classes, accessing attributes by name (e.g., `my_row.account_id`) instead of by index.
 
-**Status (2025-11-23):** ✅ DAO now returns rich dataclasses (accounts, categories, transactions, allocations). Services construct Pydantic DTOs from those records, and `BudgetCategoryDetail` exposes a new `last_month_available_minor` field so tests and UI can differentiate prior-month rollovers from current availability.
+**Status (2025-11-23):** ⚠️ **Partially remediated.** The `budgeting` DAO now returns rich dataclasses, resolving the issue for that service. However, other parts of the code, like `src/dojo/core/net_worth.py`, still use positional unpacking. This pattern must be replaced by mapping raw results to data classes within a DAO.
 
 #### 1.5. Complex Functions
 
-**Location:** `src/dojo/budgeting/services.py`
+**Location:** System-wide, exemplified in `src/dojo/budgeting/services.py`.
 
-**Violation:** Functions like `create` and `transfer` are overly long and complex, handling validation, data access, and business logic in one place.
+**Violation:** Functions are often overly long and complex, handling multiple responsibilities like validation, data access, and business logic in one place. This is a general code health issue that needs to be addressed wherever it is found.
 
 **Remediation:**
 1.  Break down these large functions into smaller, more focused private methods within the service class. For example, `create` could be broken down into `_validate_create_request`, `_build_transaction_response`, etc.
 2.  Each smaller function should have a single responsibility.
 
-**Status (2025-11-23):** ✅ Refactored transaction + allocation flows into helper methods that validate payloads, enforce account/category invariants, coerce literal types, and encapsulate credit-payment reserve handling so the public surface now reads as orchestration instead of a monolith.
+**Status (2025-11-23):** ⚠️ **Partially remediated.** The transaction and allocation flows within the `budgeting` service have been refactored into smaller, more focused methods. This approach should be applied to other complex functions throughout the codebase during refactoring efforts.
 
 #### 1.6. Inline SQL
 
-**Location:** `src/dojo/budgeting/services.py`
+**Location:** System-wide. Previously found in `src/dojo/budgeting/services.py`. Also present in `src/dojo/budgeting/routers.py`.
 
-**Violation:** The `_ensure_credit_payment_group` and `_ensure_credit_payment_category` methods contain complex inline SQL. `docs/rules/sql.md` requires complex queries to be in `.sql` files.
+**Violation:** Modules other than DAOs contain inline SQL, and complex queries are not always externalized into `.sql` files as required by `docs/rules/sql.md`. For instance, `src/dojo/budgeting/routers.py` contains inline SQL, which is also a layer violation.
 
 **Remediation:**
 1.  Extract the inline SQL from these methods into new `.sql` files in the appropriate directory (e.g., `sql/budgeting/upsert_credit_payment_group.sql`).
 2.  Update the methods to use the `load_sql` function to load the queries from the new files.
 
-**Status (2025-11-23):** ✅ Added `upsert_credit_payment_group.sql` and `upsert_credit_payment_category.sql` (with DuckDB-friendly `NOW()` stamps) and wired the DAO to call them whenever credit accounts are created/updated.
+**Status (2025-11-23):** ✅ All budgeting SQL now lives inside DAOs. The reference-data endpoint consumes the new `BudgetingDAO` helpers, so no router or service layer reaches for `.sql` files directly.
 
 ### 2. Frontend Violations
 

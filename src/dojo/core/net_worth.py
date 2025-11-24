@@ -5,7 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP, getcontext
 
 import duckdb
 
-from dojo.core.sql import load_sql
+from .dao import CoreDAO
 
 getcontext().prec = 28
 
@@ -28,15 +28,14 @@ class NetWorthSnapshot:
 def current_snapshot(conn: duckdb.DuckDBPyConnection) -> NetWorthSnapshot:
     """Return the instantaneous net worth."""
 
-    sql = load_sql("net_worth_current.sql")
-    row = conn.execute(sql).fetchone()
-    if row is None:
+    dao = CoreDAO(conn)
+    record = dao.net_worth_snapshot()
+    if record is None:
         return NetWorthSnapshot(0, 0, 0, 0, 0)
-    assets, liabilities, positions, tangibles, net_worth = row
     return NetWorthSnapshot(
-        assets_minor=int(assets),
-        liabilities_minor=int(liabilities),
-        positions_minor=int(positions),
-        tangibles_minor=int(tangibles),
-        net_worth_minor=int(net_worth),
+        assets_minor=record.assets_minor,
+        liabilities_minor=record.liabilities_minor,
+        positions_minor=record.positions_minor,
+        tangibles_minor=record.tangibles_minor,
+        net_worth_minor=record.net_worth_minor,
     )
