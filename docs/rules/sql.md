@@ -26,12 +26,12 @@ Promotion rules (when a query “graduates” to a `.sql` file):
 
 Inline is acceptable when the query is ≤ ~6 lines, read only, and tightly scoped to nearby code (e.g., fetching a single row by key).
 
-Recommended layout:
+Recommended layout for package data:
 
-- sql/queries/<domain>/<name>.sql
-- sql/migrations/VYYYYMMDD__<slug>.sql
-- sql/etl/<job>/<step>.sql
-- sql/seeds/<scenario>.sql (dev/demo data only)
+- src/dojo/sql/<domain>/<name>.sql
+- src/dojo/sql/migrations/VYYYYMMDD__<slug>.sql
+- src/dojo/sql/etl/<job>/<step>.sql
+- src/dojo/sql/seeds/<scenario>.sql (dev/demo data only)
 - tests/fixtures/<feature>.sql (tiny deterministic fixtures)
 
 
