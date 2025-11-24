@@ -37,8 +37,9 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversabl
 
     _ensure_schema(conn)
     applied = {
-        row[0]
-        for row in conn.execute("SELECT filename FROM schema_migrations").fetchall()
+        filename
+        for (filename,)
+        in conn.execute("SELECT filename FROM schema_migrations").fetchall()
     }
     for sql_file in _list_sql_files(migrations_pkg):
         if sql_file.name in applied:

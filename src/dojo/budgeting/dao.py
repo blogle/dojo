@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
+from types import SimpleNamespace
 from typing import Any, Generator, Literal, Sequence, cast
 from uuid import UUID, uuid4
 
@@ -16,6 +17,16 @@ from dojo.budgeting.sql import load_sql
 @lru_cache(maxsize=None)
 def _sql(name: str) -> str:
     return load_sql(name)
+
+
+def _row_to_namespace(
+    description: Sequence[tuple[Any, ...]] | None,
+    row: Sequence[Any],
+) -> SimpleNamespace:
+    if description is None:
+        raise ValueError("Cannot convert row without column metadata.")
+    values = {column[0]: row[idx] for idx, column in enumerate(description)}
+    return SimpleNamespace(**values)
 
 
 @dataclass(frozen=True)
@@ -33,20 +44,20 @@ class AccountRecord:
     updated_at: datetime | None = None
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "AccountRecord":
-        opened_on = row[8] if len(row) > 8 and row[8] is not None else None
-        created_at = row[9] if len(row) > 9 and row[9] is not None else None
-        updated_at = row[10] if len(row) > 10 and row[10] is not None else None
-        currency_value = row[6] if len(row) > 6 and row[6] is not None else "USD"
+    def from_row(cls, row: SimpleNamespace) -> "AccountRecord":
+        opened_on = getattr(row, "opened_on", None)
+        created_at = getattr(row, "created_at", None)
+        updated_at = getattr(row, "updated_at", None)
+        currency_value = getattr(row, "currency", "USD")
         return cls(
-            account_id=str(row[0]),
-            name=str(row[1]),
-            account_type=cast(Literal["asset", "liability"], str(row[2])),
-            account_class=cast(AccountClass, str(row[3])),
-            account_role=cast(AccountRole, str(row[4])),
-            current_balance_minor=int(row[5]),
+            account_id=str(row.account_id),
+            name=str(row.name),
+            account_type=cast(Literal["asset", "liability"], str(row.account_type)),
+            account_class=cast(AccountClass, str(row.account_class)),
+            account_role=cast(AccountRole, str(row.account_role)),
+            current_balance_minor=int(row.current_balance_minor),
             currency=str(currency_value),
-            is_active=bool(row[7]),
+            is_active=bool(getattr(row, "is_active", True)),
             opened_on=opened_on,
             created_at=created_at,
             updated_at=updated_at,
@@ -67,14 +78,14 @@ class ReferenceAccountRecord:
     current_balance_minor: int
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "ReferenceAccountRecord":
+    def from_row(cls, row: SimpleNamespace) -> "ReferenceAccountRecord":
         return cls(
-            account_id=str(row[0]),
-            name=str(row[1]),
-            account_type=cast(Literal["asset", "liability"], str(row[2])),
-            account_class=cast(AccountClass, str(row[3])),
-            account_role=cast(AccountRole, str(row[4])),
-            current_balance_minor=int(row[5]),
+            account_id=str(row.account_id),
+            name=str(row.name),
+            account_type=cast(Literal["asset", "liability"], str(row.account_type)),
+            account_class=cast(AccountClass, str(row.account_class)),
+            account_role=cast(AccountRole, str(row.account_role)),
+            current_balance_minor=int(row.current_balance_minor),
         )
 
     @property
@@ -100,12 +111,12 @@ class CategoryRecord:
     is_system: bool
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "CategoryRecord":
+    def from_row(cls, row: SimpleNamespace) -> "CategoryRecord":
         return cls(
-            category_id=str(row[0]),
-            name=str(row[1]),
-            is_active=bool(row[2]),
-            is_system=bool(row[3]) if len(row) > 3 and row[3] is not None else False,
+            category_id=str(row.category_id),
+            name=str(row.name),
+            is_active=bool(getattr(row, "is_active", True)),
+            is_system=bool(getattr(row, "is_system", False)),
         )
 
 
@@ -116,11 +127,11 @@ class ReferenceCategoryRecord:
     available_minor: int
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "ReferenceCategoryRecord":
+    def from_row(cls, row: SimpleNamespace) -> "ReferenceCategoryRecord":
         return cls(
-            category_id=str(row[0]),
-            name=str(row[1]),
-            available_minor=int(row[2]),
+            category_id=str(row.category_id),
+            name=str(row.name),
+            available_minor=int(row.available_minor),
         )
 
 
@@ -132,12 +143,12 @@ class CategoryMonthStateRecord:
     activity_minor: int
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "CategoryMonthStateRecord":
+    def from_row(cls, row: SimpleNamespace) -> "CategoryMonthStateRecord":
         return cls(
-            category_id=str(row[0]),
-            name=str(row[1]),
-            available_minor=int(row[2]),
-            activity_minor=int(row[3]),
+            category_id=str(row.category_id),
+            name=str(row.name),
+            available_minor=int(row.available_minor),
+            activity_minor=int(row.activity_minor),
         )
 
 
@@ -161,24 +172,28 @@ class BudgetCategoryDetailRecord:
     last_month_available_minor: int = 0
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "BudgetCategoryDetailRecord":
-        last_month_allocated = int(row[13]) if len(row) > 13 and row[13] is not None else 0
-        last_month_activity = int(row[14]) if len(row) > 14 and row[14] is not None else 0
-        last_month_available = int(row[15]) if len(row) > 15 and row[15] is not None else 0
+    def from_row(cls, row: SimpleNamespace) -> "BudgetCategoryDetailRecord":
+        last_month_allocated = int(getattr(row, "last_month_allocated_minor", 0) or 0)
+        last_month_activity = int(getattr(row, "last_month_activity_minor", 0) or 0)
+        last_month_available = int(getattr(row, "last_month_available_minor", 0) or 0)
+        group_id = getattr(row, "group_id", None)
+        goal_type = getattr(row, "goal_type", None)
+        goal_amount_minor = getattr(row, "goal_amount_minor", None)
+        goal_frequency = getattr(row, "goal_frequency", None)
         return cls(
-            category_id=str(row[0]),
-            group_id=str(row[1]) if row[1] is not None else None,
-            name=str(row[2]),
-            is_active=bool(row[3]),
-            created_at=row[4],
-            updated_at=row[5],
-            goal_type=str(row[6]) if row[6] is not None else None,
-            goal_amount_minor=int(row[7]) if row[7] is not None else None,
-            goal_target_date=row[8] if row[8] is not None else None,
-            goal_frequency=str(row[9]) if row[9] is not None else None,
-            available_minor=int(row[10]),
-            activity_minor=int(row[11]),
-            allocated_minor=int(row[12]),
+            category_id=str(row.category_id),
+            group_id=str(group_id) if group_id is not None else None,
+            name=str(row.name),
+            is_active=bool(row.is_active),
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            goal_type=str(goal_type) if goal_type is not None else None,
+            goal_amount_minor=int(goal_amount_minor) if goal_amount_minor is not None else None,
+            goal_target_date=getattr(row, "goal_target_date", None),
+            goal_frequency=str(goal_frequency) if goal_frequency is not None else None,
+            available_minor=int(row.available_minor),
+            activity_minor=int(row.activity_minor),
+            allocated_minor=int(row.allocated_minor),
             last_month_allocated_minor=last_month_allocated,
             last_month_activity_minor=last_month_activity,
             last_month_available_minor=last_month_available,
@@ -195,14 +210,14 @@ class BudgetCategoryGroupRecord:
     updated_at: datetime
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "BudgetCategoryGroupRecord":
+    def from_row(cls, row: SimpleNamespace) -> "BudgetCategoryGroupRecord":
         return cls(
-            group_id=str(row[0]),
-            name=str(row[1]),
-            sort_order=int(row[2]),
-            is_active=bool(row[3]),
-            created_at=row[4],
-            updated_at=row[5],
+            group_id=str(row.group_id),
+            name=str(row.name),
+            sort_order=int(row.sort_order),
+            is_active=bool(row.is_active),
+            created_at=row.created_at,
+            updated_at=row.updated_at,
         )
 
 
@@ -216,14 +231,14 @@ class TransactionVersionRecord:
     status: str
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "TransactionVersionRecord":
+    def from_row(cls, row: SimpleNamespace) -> "TransactionVersionRecord":
         return cls(
-            transaction_version_id=UUID(str(row[0])),
-            account_id=str(row[1]),
-            category_id=str(row[2]),
-            transaction_date=row[3],
-            amount_minor=int(row[4]),
-            status=str(row[5]),
+            transaction_version_id=UUID(str(row.transaction_version_id)),
+            account_id=str(row.account_id),
+            category_id=str(row.category_id),
+            transaction_date=row.transaction_date,
+            amount_minor=int(row.amount_minor),
+            status=str(row.status),
         )
 
 
@@ -242,19 +257,19 @@ class TransactionListRecord:
     recorded_at: datetime
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "TransactionListRecord":
+    def from_row(cls, row: SimpleNamespace) -> "TransactionListRecord":
         return cls(
-            transaction_version_id=UUID(str(row[0])),
-            concept_id=UUID(str(row[1])),
-            transaction_date=row[2],
-            account_id=str(row[3]),
-            account_name=str(row[4]),
-            category_id=str(row[5]),
-            category_name=str(row[6]),
-            amount_minor=int(row[7]),
-            status=str(row[8]),
-            memo=str(row[9]) if row[9] is not None else None,
-            recorded_at=row[10],
+            transaction_version_id=UUID(str(row.transaction_version_id)),
+            concept_id=UUID(str(row.concept_id)),
+            transaction_date=row.transaction_date,
+            account_id=str(row.account_id),
+            account_name=str(row.account_name),
+            category_id=str(row.category_id),
+            category_name=str(row.category_name),
+            amount_minor=int(row.amount_minor),
+            status=str(row.status),
+            memo=str(row.memo) if getattr(row, "memo", None) is not None else None,
+            recorded_at=row.recorded_at,
         )
 
 
@@ -271,17 +286,17 @@ class BudgetAllocationRecord:
     created_at: datetime
 
     @classmethod
-    def from_row(cls, row: Sequence[Any]) -> "BudgetAllocationRecord":
+    def from_row(cls, row: SimpleNamespace) -> "BudgetAllocationRecord":
         return cls(
-            allocation_id=UUID(str(row[0])),
-            allocation_date=row[1],
-            amount_minor=int(row[2]),
-            memo=str(row[3]) if row[3] is not None else None,
-            from_category_id=str(row[4]) if row[4] is not None else None,
-            from_category_name=str(row[5]) if row[5] is not None else None,
-            to_category_id=str(row[6]),
-            to_category_name=str(row[7]),
-            created_at=row[8],
+            allocation_id=UUID(str(row.allocation_id)),
+            allocation_date=row.allocation_date,
+            amount_minor=int(row.amount_minor),
+            memo=str(row.memo) if getattr(row, "memo", None) is not None else None,
+            from_category_id=str(row.from_category_id) if getattr(row, "from_category_id", None) is not None else None,
+            from_category_name=str(row.from_category_name) if getattr(row, "from_category_name", None) is not None else None,
+            to_category_id=str(row.to_category_id),
+            to_category_name=str(row.to_category_name),
+            created_at=row.created_at,
         )
 
 
@@ -290,6 +305,20 @@ class BudgetingDAO:
 
     def __init__(self, conn: duckdb.DuckDBPyConnection):
         self._conn = conn
+
+    def _fetchone_namespace(self, sql: str, params: Sequence[Any] | None = None) -> SimpleNamespace | None:
+        cursor = self._conn.execute(sql, params or [])
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return _row_to_namespace(cursor.description, row)
+
+    def _fetchall_namespaces(self, sql: str, params: Sequence[Any] | None = None) -> list[SimpleNamespace]:
+        cursor = self._conn.execute(sql, params or [])
+        rows = cursor.fetchall()
+        if not rows:
+            return []
+        return [_row_to_namespace(cursor.description, row) for row in rows]
 
     # Transaction control -------------------------------------------------
     def begin(self) -> None:
@@ -314,25 +343,25 @@ class BudgetingDAO:
 
     # Account queries -----------------------------------------------------
     def get_active_account(self, account_id: str) -> AccountRecord | None:
-        row = self._conn.execute(_sql("select_active_account.sql"), [account_id]).fetchone()
+        row = self._fetchone_namespace(_sql("select_active_account.sql"), [account_id])
         if row is None:
             return None
         return AccountRecord.from_row(row)
 
     def get_account_detail(self, account_id: str) -> AccountRecord | None:
-        row = self._conn.execute(_sql("select_account_detail.sql"), [account_id]).fetchone()
+        row = self._fetchone_namespace(_sql("select_account_detail.sql"), [account_id])
         if row is None:
             return None
         return AccountRecord.from_row(row)
 
     def list_accounts(self) -> list[AccountRecord]:
         sql = _sql("select_accounts_admin.sql")
-        rows = self._conn.execute(sql).fetchall()
+        rows = self._fetchall_namespaces(sql)
         return [AccountRecord.from_row(row) for row in rows]
 
     def list_reference_accounts(self) -> list[ReferenceAccountRecord]:
         sql = _sql("select_reference_accounts.sql")
-        rows = self._conn.execute(sql).fetchall()
+        rows = self._fetchall_namespaces(sql)
         return [ReferenceAccountRecord.from_row(row) for row in rows]
 
     def insert_account(
@@ -406,29 +435,29 @@ class BudgetingDAO:
 
     # Category queries ----------------------------------------------------
     def get_active_category(self, category_id: str) -> CategoryRecord | None:
-        row = self._conn.execute(_sql("select_active_category.sql"), [category_id]).fetchone()
+        row = self._fetchone_namespace(_sql("select_active_category.sql"), [category_id])
         if row is None:
             return None
         return CategoryRecord.from_row(row)
 
     def get_category_optional(self, category_id: str) -> CategoryRecord | None:
-        row = self._conn.execute(_sql("select_active_category.sql"), [category_id]).fetchone()
+        row = self._fetchone_namespace(_sql("select_active_category.sql"), [category_id])
         if row is None:
             return None
-        if len(row) >= 3 and not row[2]:
+        if not bool(getattr(row, "is_active", True)):
             return None
         return CategoryRecord.from_row(row)
 
     def get_category_month_state(self, category_id: str, month_start: date) -> CategoryMonthStateRecord | None:
         sql = _sql("select_category_month_state.sql")
-        row = self._conn.execute(sql, [month_start, category_id]).fetchone()
+        row = self._fetchone_namespace(sql, [month_start, category_id])
         if row is None:
             return None
         return CategoryMonthStateRecord.from_row(row)
 
     def get_budget_category_detail(self, category_id: str, month_start: date) -> BudgetCategoryDetailRecord | None:
         sql = _sql("select_budget_category_detail.sql")
-        row = self._conn.execute(sql, [month_start, category_id]).fetchone()
+        row = self._fetchone_namespace(sql, [month_start, category_id])
         if row is None:
             return None
         return BudgetCategoryDetailRecord.from_row(row)
@@ -436,12 +465,12 @@ class BudgetingDAO:
     def list_budget_categories(self, month: date, previous_month: date) -> list[BudgetCategoryDetailRecord]:
         sql = _sql("select_budget_categories_admin.sql")
         params = [month, previous_month]
-        rows = self._conn.execute(sql, params).fetchall()
+        rows = self._fetchall_namespaces(sql, params)
         return [BudgetCategoryDetailRecord.from_row(row) for row in rows]
 
     def list_reference_categories(self) -> list[ReferenceCategoryRecord]:
         sql = _sql("select_reference_categories.sql")
-        rows = self._conn.execute(sql).fetchall()
+        rows = self._fetchall_namespaces(sql)
         return [ReferenceCategoryRecord.from_row(row) for row in rows]
 
     def insert_budget_category(
@@ -502,7 +531,7 @@ class BudgetingDAO:
     # Category groups -----------------------------------------------------
     def list_budget_category_groups(self) -> list[BudgetCategoryGroupRecord]:
         sql = _sql("select_budget_category_groups.sql")
-        rows = self._conn.execute(sql).fetchall()
+        rows = self._fetchall_namespaces(sql)
         return [BudgetCategoryGroupRecord.from_row(row) for row in rows]
 
     def insert_budget_category_group(
@@ -512,7 +541,7 @@ class BudgetingDAO:
         sort_order: int,
     ) -> BudgetCategoryGroupRecord | None:
         sql = _sql("insert_budget_category_group.sql")
-        row = self._conn.execute(sql, [group_id, name, sort_order]).fetchone()
+        row = self._fetchone_namespace(sql, [group_id, name, sort_order])
         if row is None:
             return None
         return BudgetCategoryGroupRecord.from_row(row)
@@ -524,7 +553,7 @@ class BudgetingDAO:
         sort_order: int,
     ) -> BudgetCategoryGroupRecord | None:
         sql = _sql("update_budget_category_group.sql")
-        row = self._conn.execute(sql, [name, sort_order, group_id]).fetchone()
+        row = self._fetchone_namespace(sql, [name, sort_order, group_id])
         if row is None:
             return None
         return BudgetCategoryGroupRecord.from_row(row)
@@ -534,7 +563,7 @@ class BudgetingDAO:
 
     def get_budget_category_group(self, group_id: str) -> BudgetCategoryGroupRecord | None:
         sql = _sql("select_budget_category_group.sql")
-        row = self._conn.execute(sql, [group_id]).fetchone()
+        row = self._fetchone_namespace(sql, [group_id])
         if row is None:
             return None
         return BudgetCategoryGroupRecord.from_row(row)
@@ -542,7 +571,7 @@ class BudgetingDAO:
     # Transactions --------------------------------------------------------
     def get_active_transaction(self, concept_id: UUID | str) -> TransactionVersionRecord | None:
         sql = _sql("select_active_transaction.sql")
-        row = self._conn.execute(sql, [str(concept_id)]).fetchone()
+        row = self._fetchone_namespace(sql, [str(concept_id)])
         if row is None:
             return None
         return TransactionVersionRecord.from_row(row)
@@ -636,33 +665,33 @@ class BudgetingDAO:
 
     def list_recent_transactions(self, limit: int) -> list[TransactionListRecord]:
         sql = _sql("select_recent_transactions.sql")
-        rows = self._conn.execute(sql, [limit]).fetchall()
+        rows = self._fetchall_namespaces(sql, [limit])
         return [TransactionListRecord.from_row(row) for row in rows]
 
     def list_budget_allocations(self, month_start: date, limit: int) -> list[BudgetAllocationRecord]:
         sql = _sql("select_budget_allocations.sql")
-        rows = self._conn.execute(sql, [month_start, limit]).fetchall()
+        rows = self._fetchall_namespaces(sql, [month_start, limit])
         return [BudgetAllocationRecord.from_row(row) for row in rows]
 
     def ready_to_assign(self, month_start: date) -> int:
         sql = _sql("select_ready_to_assign.sql")
         try:
-            row = self._conn.execute(sql, [month_start]).fetchone()
+            row = self._fetchone_namespace(sql, [month_start])
         except duckdb.CatalogException:
             return 0
         if row is None:
             return 0
-        return int(row[0])
+        return int(getattr(row, "ready_to_assign_minor", 0))
 
     def month_cash_inflow(self, month_start: date) -> int:
         sql = _sql("sum_month_cash_inflows.sql")
         try:
-            row = self._conn.execute(sql, [month_start, month_start]).fetchone()
+            row = self._fetchone_namespace(sql, [month_start, month_start])
         except duckdb.CatalogException:
             return 0
         if row is None:
             return 0
-        return int(row[0])
+        return int(getattr(row, "inflow_minor", 0))
 
     # Credit payment helpers ---------------------------------------------
     def upsert_credit_payment_group(

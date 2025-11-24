@@ -98,6 +98,10 @@ The project is a FastAPI application with a Python backend and a vanilla JavaScr
 
 **Status (2025-11-23):** ✅ Remediated. The `budgeting` DAO now returns rich dataclasses, resolving the issue for that service. The `CoreDAO` for net worth calculations also now maps raw results to data classes, eliminating positional unpacking.
 
+**Notes (2025-11-24):**
+- Added `_fetchone_namespace`/`_fetchall_namespaces` helpers inside `BudgetingDAO` so every SELECT result is transformed into a `SimpleNamespace` before dataclasses consume it; no service or test reaches into tuple positions anymore.
+- Updated the budgeting/admin/investments property suites plus unit tests to use lightweight namespace/named-row helpers so invariants assert against named attributes rather than `row[1]`-style magic numbers.
+
 #### 1.5. Complex Functions
 
 **Location:** System-wide, exemplified in `src/dojo/budgeting/services.py`.
@@ -278,19 +282,26 @@ def _ensure_credit_payment_group(self, conn: duckdb.DuckDBPyConnection) -> None:
     )
 ```
 
-**Example of Magic Number Violation:**
+**Example of Magic Number Remediation:**
 ```python
-# From src/dojo/budgeting/services.py
-def _row_to_category(self, row: Tuple[Any, ...]) -> BudgetCategoryDetail:
-    # ...
-    if len(row) >= 15:
-        last_month_allocated = int(row[13])
-        last_month_activity = int(row[14])
-
-    return BudgetCategoryDetail(
-        category_id=row[0],
-        group_id=row[1],
-        name=row[2],
-        # ...
-    )
+# From src/dojo/budgeting/dao.py
+@dataclass(frozen=True)
+class BudgetCategoryDetailRecord:
+    ...
+    @classmethod
+    def from_row(cls, row: SimpleNamespace) -> "BudgetCategoryDetailRecord":
+        last_month_allocated = int(getattr(row, "last_month_allocated_minor", 0) or 0)
+        last_month_activity = int(getattr(row, "last_month_activity_minor", 0) or 0)
+        last_month_available = int(getattr(row, "last_month_available_minor", 0) or 0)
+        group_id = getattr(row, "group_id", None)
+        ...
+        return cls(
+            category_id=str(row.category_id),
+            group_id=str(group_id) if group_id is not None else None,
+            name=str(row.name),
+            ...,
+            last_month_allocated_minor=last_month_allocated,
+            last_month_activity_minor=last_month_activity,
+            last_month_available_minor=last_month_available,
+        )
 ```

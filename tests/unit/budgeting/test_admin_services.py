@@ -1,5 +1,6 @@
 """Unit tests for account and budget category admin services."""
 
+from dataclasses import dataclass
 from datetime import date
 
 import duckdb
@@ -13,6 +14,18 @@ from dojo.budgeting.schemas import (
     BudgetCategoryUpdateRequest,
 )
 from dojo.budgeting.services import AccountAdminService, BudgetCategoryAdminService
+
+
+@dataclass(frozen=True)
+class CategoryRowView:
+    name: str
+    group_id: str
+
+
+@dataclass(frozen=True)
+class CategoryGroupRowView:
+    name: str
+    sort_order: int
 
 
 def test_create_account_inserts_row(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -47,19 +60,21 @@ def test_credit_account_auto_creates_payment_category(in_memory_db: duckdb.DuckD
 
     service.create_account(in_memory_db, payload)
 
-    category_row = in_memory_db.execute(
+    raw_category_row = in_memory_db.execute(
         "SELECT name, group_id FROM budget_categories WHERE category_id = 'payment_visa_signature'"
     ).fetchone()
-    assert category_row is not None
-    assert category_row[0] == "Visa Signature"
-    assert category_row[1] == "credit_card_payments"
+    assert raw_category_row is not None
+    category_row = CategoryRowView(*raw_category_row)
+    assert category_row.name == "Visa Signature"
+    assert category_row.group_id == "credit_card_payments"
 
-    group_row = in_memory_db.execute(
+    raw_group_row = in_memory_db.execute(
         "SELECT name, sort_order FROM budget_category_groups WHERE group_id = 'credit_card_payments'"
     ).fetchone()
-    assert group_row is not None
-    assert group_row[0] == "Credit Card Payments"
-    assert group_row[1] == -1000
+    assert raw_group_row is not None
+    group_row = CategoryGroupRowView(*raw_group_row)
+    assert group_row.name == "Credit Card Payments"
+    assert group_row.sort_order == -1000
 
 
 def test_duplicate_account_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:

@@ -4,6 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
+from types import SimpleNamespace
 import duckdb
 
 from hypothesis import given, settings, strategies as st
@@ -30,6 +31,20 @@ def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 
 def build_transaction_service() -> TransactionEntryService:
     return TransactionEntryService()
+
+
+def _fetch_namespace(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> SimpleNamespace | None:
+    cursor = conn.execute(sql, params or [])
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    columns = [column[0] for column in cursor.description or ()]
+    data = {columns[idx]: row[idx] for idx in range(len(columns))}
+    return SimpleNamespace(**data)
 
 
 # --- Conservation of Money Invariant ---
@@ -68,10 +83,12 @@ def test_conservation_of_money_in_reallocation(reallocations):
         service.allocate_envelope(conn, "housing", 1500_00, month)
 
         # Get initial total available
-        initial_available_row = conn.execute(
-            "SELECT SUM(available_minor) FROM budget_category_monthly_state WHERE month_start = ?", [month]
-        ).fetchone()
-        initial_available = initial_available_row[0] if initial_available_row else 0
+        initial_available_row = _fetch_namespace(
+            conn,
+            "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
+            [month],
+        )
+        initial_available = int(initial_available_row.total_available) if initial_available_row else 0
 
         # Perform reallocations
         for reallocation in reallocations:
@@ -89,10 +106,12 @@ def test_conservation_of_money_in_reallocation(reallocations):
                 )
 
         # Get final total available
-        final_available_row = conn.execute(
-            "SELECT SUM(available_minor) FROM budget_category_monthly_state WHERE month_start = ?", [month]
-        ).fetchone()
-        final_available = final_available_row[0] if final_available_row else 0
+        final_available_row = _fetch_namespace(
+            conn,
+            "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
+            [month],
+        )
+        final_available = int(final_available_row.total_available) if final_available_row else 0
 
         assert initial_available == final_available
 
@@ -203,37 +222,29 @@ def test_budget_category_cache_correctness(inflows, spendings, allocations):
         # 2. Manual calculation
 
 
-        expected_activity_row = conn.execute(
+        expected_activity_row = _fetch_namespace(
+            conn,
+            "SELECT SUM(amount_minor) AS total_activity FROM transactions WHERE category_id = ? AND strftime('%Y-%m', transaction_date) = ?",
+            [TARGET_CATEGORY, month.strftime('%Y-%m')],
+        )
+        raw_activity = (
+            int(expected_activity_row.total_activity)
+            if expected_activity_row and expected_activity_row.total_activity
+            else 0
+        )
+        expected_activity = -raw_activity
 
+        expected_allocated_row = _fetch_namespace(
+            conn,
+            "SELECT SUM(amount_minor) AS total_allocated FROM budget_allocations WHERE to_category_id = ? AND month_start = ?",
+            [TARGET_CATEGORY, month],
+        )
+        expected_allocated = (
+            int(expected_allocated_row.total_allocated)
+            if expected_allocated_row and expected_allocated_row.total_allocated
+            else 0
+        )
 
-            "SELECT SUM(amount_minor) FROM transactions WHERE category_id = ? AND strftime('%Y-%m', transaction_date) = ?",
-
-
-            [TARGET_CATEGORY, month.strftime('%Y-%m')]
-
-
-        ).fetchone()
-
-
-        expected_activity = -expected_activity_row[0] if expected_activity_row and expected_activity_row[0] else 0
-
-
-
-
-
-        expected_allocated_row = conn.execute(
-
-
-            "SELECT SUM(amount_minor) FROM budget_allocations WHERE to_category_id = ? AND month_start = ?",
-
-
-            [TARGET_CATEGORY, month]
-
-
-        ).fetchone()
-
-
-        expected_allocated = expected_allocated_row[0] if expected_allocated_row and expected_allocated_row[0] else 0
 
 
         
@@ -332,14 +343,11 @@ def test_group_category_relationship():
             if group_id is not None:
 
 
-                group_row = conn.execute(
+                group_row = _fetch_namespace(
+                    conn,
+                    "SELECT COUNT(*) AS group_count FROM budget_category_groups WHERE group_id = ?",
+                    [group_id],
+                )
+                assert group_row and group_row.group_count == 1, f"Category '{category_id}' has invalid group_id '{group_id}'"
 
-
-                    "SELECT COUNT(*) FROM budget_category_groups WHERE group_id = ?", [group_id]
-
-
-                ).fetchone()
-
-
-                assert group_row is not None and group_row[0] == 1, f"Category '{category_id}' has invalid group_id '{group_id}'"
 

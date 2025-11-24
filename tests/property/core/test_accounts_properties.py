@@ -5,6 +5,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
+from types import SimpleNamespace
 import duckdb
 from uuid import uuid4
 
@@ -44,6 +45,19 @@ def build_transaction_service() -> TransactionEntryService:
 
 def build_account_admin_service() -> AccountAdminService:
     return AccountAdminService()
+
+
+def _fetch_namespace(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> SimpleNamespace:
+    cursor = conn.execute(sql, params or [])
+    row = cursor.fetchone()
+    assert row is not None
+    columns = [column[0] for column in cursor.description or ()]
+    data = {columns[idx]: row[idx] for idx in range(len(columns))}
+    return SimpleNamespace(**data)
 
 
 # Strategies
@@ -166,17 +180,19 @@ def test_balance_synchronization(account_data, initial_balance, transactions):
             )
 
         # 3. Verify final balance.
-        final_balance_row = conn.execute(
-            "SELECT current_balance_minor FROM accounts WHERE account_id = ?", [account_data["account_id"]]
-        ).fetchone()
-        assert final_balance_row is not None
-        final_balance = final_balance_row[0]
+        final_balance_row = _fetch_namespace(
+            conn,
+            "SELECT current_balance_minor FROM accounts WHERE account_id = ?",
+            [account_data["account_id"]],
+        )
+        final_balance = final_balance_row.current_balance_minor
 
-        total_transactions_row = conn.execute(
-            "SELECT SUM(amount_minor) FROM transactions WHERE account_id = ?", [account_data["account_id"]]
-        ).fetchone()
-        assert total_transactions_row is not None
-        total_transactions = total_transactions_row[0]
+        total_transactions_row = _fetch_namespace(
+            conn,
+            "SELECT SUM(amount_minor) AS total_amount_minor FROM transactions WHERE account_id = ?",
+            [account_data["account_id"]],
+        )
+        total_transactions = total_transactions_row.total_amount_minor
 
         assert final_balance == total_transactions
 
@@ -197,21 +213,23 @@ def test_one_to_one_account_details(payload: AccountCreateRequest):
         target_table = DETAIL_TABLES[payload.account_class]
 
         # Check that the target detail table has the record.
-        count_row = conn.execute(
-            f"SELECT COUNT(*) FROM {target_table} WHERE account_id = ?", [payload.account_id]
-        ).fetchone()
-        assert count_row is not None
-        assert count_row[0] == 1, f"Expected 1 record in {target_table}, found {count_row[0]}"
+        count_row = _fetch_namespace(
+            conn,
+            f"SELECT COUNT(*) AS row_count FROM {target_table} WHERE account_id = ?",
+            [payload.account_id],
+        )
+        assert count_row.row_count == 1, f"Expected 1 record in {target_table}, found {count_row.row_count}"
 
         # Check that other detail tables do not have the record.
         for account_class, detail_table in DETAIL_TABLES.items():
             if account_class == payload.account_class:
                 continue
-            count_row = conn.execute(
-                f"SELECT COUNT(*) FROM {detail_table} WHERE account_id = ?", [payload.account_id]
-            ).fetchone()
-            assert count_row is not None
-            assert count_row[0] == 0, f"Expected 0 records in {detail_table}, found {count_row[0]}"
+            count_row = _fetch_namespace(
+                conn,
+                f"SELECT COUNT(*) AS row_count FROM {detail_table} WHERE account_id = ?",
+                [payload.account_id],
+            )
+            assert count_row.row_count == 0, f"Expected 0 records in {detail_table}, found {count_row.row_count}"
 
 
 @given(payload=credit_account_create_request_strategy())
@@ -228,19 +246,20 @@ def test_credit_account_creates_payment_category(payload: AccountCreateRequest):
         expected_category_id = derive_payment_category_id(payload.account_id)
         expected_category_name = derive_payment_category_name(payload.name)
         
-        category_row = conn.execute(
-            "SELECT name, group_id FROM budget_categories WHERE category_id = ?", [expected_category_id]
-        ).fetchone()
+        category_row = _fetch_namespace(
+            conn,
+            "SELECT name, group_id FROM budget_categories WHERE category_id = ?",
+            [expected_category_id],
+        )
 
-        assert category_row is not None, "Payment category was not created"
-        assert category_row[0] == expected_category_name
-        assert category_row[1] == "credit_card_payments"
+        assert category_row.name == expected_category_name, "Payment category was not created"
+        assert category_row.group_id == "credit_card_payments"
         
-        group_row = conn.execute(
-            "SELECT name FROM budget_category_groups WHERE group_id = 'credit_card_payments'"
-        ).fetchone()
+        group_row = _fetch_namespace(
+            conn,
+            "SELECT name FROM budget_category_groups WHERE group_id = 'credit_card_payments'",
+        )
         
-        assert group_row is not None, "Credit card payment group does not exist"
-        assert group_row[0] == "Credit Card Payments"
+        assert group_row.name == "Credit Card Payments", "Credit card payment group does not exist"
 
 

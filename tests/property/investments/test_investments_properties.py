@@ -5,6 +5,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
+from types import SimpleNamespace
 import duckdb
 from uuid import uuid4
 
@@ -31,6 +32,19 @@ def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 
 def build_account_admin_service() -> AccountAdminService:
     return AccountAdminService()
+
+
+def _fetch_namespace(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> SimpleNamespace:
+    cursor = conn.execute(sql, params or [])
+    row = cursor.fetchone()
+    assert row is not None
+    columns = [column[0] for column in cursor.description or ()]
+    data = {columns[idx]: row[idx] for idx in range(len(columns))}
+    return SimpleNamespace(**data)
 
 
 # Strategies
@@ -120,13 +134,13 @@ def test_position_uniqueness_is_not_enforced(account_data, instrument, quantity,
         )
         
         # Verify that two active positions now exist, which violates the invariant
-        count_row = conn.execute(
-            "SELECT COUNT(*) FROM positions WHERE account_id = ? AND instrument = ? AND is_active = TRUE",
+        count_row = _fetch_namespace(
+            conn,
+            "SELECT COUNT(*) AS total_positions FROM positions WHERE account_id = ? AND instrument = ? AND is_active = TRUE",
             [account_data["account_id"], instrument],
-        ).fetchone()
+        )
         
-        assert count_row is not None
-        assert count_row[0] == 2, "Duplicate active positions were not created, which is unexpected."
+        assert count_row.total_positions == 2, "Duplicate active positions were not created, which is unexpected."
 
 
 @given(
@@ -152,10 +166,10 @@ def test_account_class_is_not_enforced(account_data, instrument, quantity, marke
         )
 
         # Verify that the position was created, which violates the invariant
-        count_row = conn.execute(
-            "SELECT COUNT(*) FROM positions WHERE account_id = ?",
+        count_row = _fetch_namespace(
+            conn,
+            "SELECT COUNT(*) AS total_positions FROM positions WHERE account_id = ?",
             [account_data["account_id"]],
-        ).fetchone()
+        )
 
-        assert count_row is not None
-        assert count_row[0] == 1, "Position for non-investment account was not created, which is unexpected."
+        assert count_row.total_positions == 1, "Position for non-investment account was not created, which is unexpected."

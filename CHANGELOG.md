@@ -52,5 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wrapped transaction edits in the new `BudgetingDAO.transaction()` context manager, added a regression test that forces a failure mid-edit to prove rollback behavior, and documented that `accounts` and `budget_category_monthly_state` are mutable caches (not temporal tables) so in-place updates remain compliant.
 - Testing reset/seed endpoints now route fixture SQL through `TestingDAO` so layer boundaries stay intact and every DuckDB call uses the serialized connection helper.
 - Introduced `CoreDAO` plus Budgeting reference-data DAO helpers so the net-worth service and `/api/budget/reference-data` no longer execute inline SQL.
+- Eliminated the lingering `row[n]` magic-number accessors by wrapping DuckDB result sets in typed namespace helpers inside `BudgetingDAO` and the property/unit suites, so dataclasses and tests rely on named attributes per the statics-over-dynamics rule.
 
 ### Security

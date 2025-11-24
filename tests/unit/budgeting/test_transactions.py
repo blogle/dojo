@@ -1,6 +1,7 @@
 """Unit tests for the transaction entry service."""
 
 from datetime import date
+from types import SimpleNamespace
 
 import duckdb
 import pytest
@@ -9,6 +10,18 @@ from dojo.budgeting.dao import BudgetingDAO
 from dojo.budgeting.errors import InvalidTransaction
 from dojo.budgeting.schemas import CategorizedTransferRequest, NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
+
+
+def _fetch_namespace(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> SimpleNamespace:
+    row = conn.execute(sql, params or []).fetchone()
+    assert row is not None
+    columns = [column[0] for column in conn.description or ()]
+    data = {columns[idx]: row[idx] for idx in range(len(columns))}
+    return SimpleNamespace(**data)
 
 
 def test_create_transaction_updates_account_and_category(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -26,12 +39,12 @@ def test_create_transaction_updates_account_and_category(in_memory_db: duckdb.Du
     assert response.status == "pending"
     assert response.account.current_balance_minor == 500000 - 12345
     assert response.category.available_minor == 12345 * -1
-    rows = in_memory_db.execute(
-        "SELECT COUNT(*) FROM transactions WHERE concept_id = ?",
+    count_row = _fetch_namespace(
+        in_memory_db,
+        "SELECT COUNT(*) AS concept_total FROM transactions WHERE concept_id = ?",
         [str(response.concept_id)],
-    ).fetchone()
-    assert rows is not None
-    assert rows[0] == 1
+    )
+    assert count_row.concept_total == 1
 
 
 def test_system_category_transactions_skip_budget_activity(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -48,12 +61,12 @@ def test_system_category_transactions_skip_budget_activity(in_memory_db: duckdb.
 
     assert response.category.activity_minor == 0
     assert response.category.available_minor == 0
-    row = in_memory_db.execute(
-        "SELECT COUNT(*) FROM budget_category_monthly_state WHERE category_id = 'opening_balance'",
-        []
-    ).fetchone()
-    assert row is not None
-    assert row[0] == 0
+    state_row = _fetch_namespace(
+        in_memory_db,
+        "SELECT COUNT(*) AS monthly_state_count FROM budget_category_monthly_state WHERE category_id = 'opening_balance'",
+        [],
+    )
+    assert state_row.monthly_state_count == 0
 
 
 def test_available_to_budget_increases_ready_to_assign(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -98,7 +111,8 @@ def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyC
 
     assert updated.status == "cleared"
 
-    counts = in_memory_db.execute(
+    counts = _fetch_namespace(
+        in_memory_db,
         """
         SELECT
             SUM(CASE WHEN is_active THEN 1 ELSE 0 END) AS active_rows
@@ -106,16 +120,15 @@ def test_edit_transaction_closes_previous_version(in_memory_db: duckdb.DuckDBPyC
         WHERE concept_id = ?
         """,
         [str(first.concept_id)],
-    ).fetchone()
-    assert counts is not None
-    assert counts[0] == 1
+    )
+    assert counts.active_rows == 1
 
-    status_row = in_memory_db.execute(
+    status_row = _fetch_namespace(
+        in_memory_db,
         "SELECT status FROM transactions WHERE transaction_version_id = ?",
         [str(updated.transaction_version_id)],
-    ).fetchone()
-    assert status_row is not None
-    assert status_row[0] == "cleared"
+    )
+    assert status_row.status == "cleared"
 
 
 def test_edit_transaction_failure_rolls_back(
@@ -131,24 +144,24 @@ def test_edit_transaction_failure_rolls_back(
     first = service.create(in_memory_db, first_cmd)
     month_start = date.today().replace(day=1)
 
-    baseline_balance_row = in_memory_db.execute(
+    baseline_balance_row = _fetch_namespace(
+        in_memory_db,
         "SELECT current_balance_minor FROM accounts WHERE account_id = ?",
         ["house_checking"],
-    ).fetchone()
-    assert baseline_balance_row is not None
-    baseline_balance = int(baseline_balance_row[0])
+    )
+    baseline_balance = int(baseline_balance_row.current_balance_minor)
 
-    baseline_category_row = in_memory_db.execute(
+    baseline_category_row = _fetch_namespace(
+        in_memory_db,
         """
         SELECT available_minor, activity_minor
         FROM budget_category_monthly_state
         WHERE category_id = ? AND month_start = ?
         """,
         ["groceries", month_start],
-    ).fetchone()
-    assert baseline_category_row is not None
-    baseline_available = int(baseline_category_row[0])
-    baseline_activity = int(baseline_category_row[1])
+    )
+    baseline_available = int(baseline_category_row.available_minor)
+    baseline_activity = int(baseline_category_row.activity_minor)
 
     failing_cmd = NewTransactionRequest(
         concept_id=first.concept_id,
@@ -197,35 +210,35 @@ def test_edit_transaction_failure_rolls_back(
     with pytest.raises(RuntimeError, match=error_message):
         service.create(in_memory_db, failing_cmd)
 
-    counts = in_memory_db.execute(
+    counts = _fetch_namespace(
+        in_memory_db,
         """
-        SELECT SUM(CASE WHEN is_active THEN 1 ELSE 0 END)
+        SELECT SUM(CASE WHEN is_active THEN 1 ELSE 0 END) AS active_rows
         FROM transactions
         WHERE concept_id = ?
         """,
         [str(first.concept_id)],
-    ).fetchone()
-    assert counts is not None
-    assert counts[0] == 1
+    )
+    assert counts.active_rows == 1
 
-    reloaded_balance_row = in_memory_db.execute(
+    reloaded_balance_row = _fetch_namespace(
+        in_memory_db,
         "SELECT current_balance_minor FROM accounts WHERE account_id = ?",
         ["house_checking"],
-    ).fetchone()
-    assert reloaded_balance_row is not None
-    assert int(reloaded_balance_row[0]) == baseline_balance
+    )
+    assert int(reloaded_balance_row.current_balance_minor) == baseline_balance
 
-    reloaded_category_row = in_memory_db.execute(
+    reloaded_category_row = _fetch_namespace(
+        in_memory_db,
         """
         SELECT available_minor, activity_minor
         FROM budget_category_monthly_state
         WHERE category_id = ? AND month_start = ?
         """,
         ["groceries", month_start],
-    ).fetchone()
-    assert reloaded_category_row is not None
-    assert int(reloaded_category_row[0]) == baseline_available
-    assert int(reloaded_category_row[1]) == baseline_activity
+    )
+    assert int(reloaded_category_row.available_minor) == baseline_available
+    assert int(reloaded_category_row.activity_minor) == baseline_activity
 
 
 def test_zero_amount_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
@@ -436,27 +449,27 @@ def test_reassign_between_categories_updates_both_states(in_memory_db: duckdb.Du
         memo="cover rent",
     )
 
-    groceries_state = in_memory_db.execute(
+    groceries_state = _fetch_namespace(
+        in_memory_db,
         "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = ? AND month_start = ?",
         ["groceries", month_start],
-    ).fetchone()
-    housing_state = in_memory_db.execute(
+    )
+    housing_state = _fetch_namespace(
+        in_memory_db,
         "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = ? AND month_start = ?",
         ["housing", month_start],
-    ).fetchone()
-    assert groceries_state is not None
-    assert groceries_state[0] == 3000
-    assert housing_state is not None
-    assert housing_state[0] == 2000
-    ledger_row = in_memory_db.execute(
+    )
+    assert groceries_state.available_minor == 3000
+    assert housing_state.available_minor == 2000
+    ledger_row = _fetch_namespace(
+        in_memory_db,
         "SELECT to_category_id, from_category_id, amount_minor, memo FROM budget_allocations ORDER BY created_at DESC LIMIT 1",
         [],
-    ).fetchone()
-    assert ledger_row is not None
-    assert ledger_row[0] == "housing"
-    assert ledger_row[1] == "groceries"
-    assert ledger_row[2] == 2000
-    assert ledger_row[3] == "cover rent"
+    )
+    assert ledger_row.to_category_id == "housing"
+    assert ledger_row.from_category_id == "groceries"
+    assert ledger_row.amount_minor == 2000
+    assert ledger_row.memo == "cover rent"
 
 
 def test_month_cash_inflow_counts_cash_accounts_only(in_memory_db: duckdb.DuckDBPyConnection) -> None:

@@ -4,6 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
+from types import SimpleNamespace
 
 import duckdb
 from hypothesis import given, settings, strategies as st
@@ -15,6 +16,7 @@ from dojo.testing.fixtures import apply_base_budgeting_fixture
 
 import pytest
 from dojo.budgeting.errors import UnknownAccount, UnknownCategory
+
 
 
 @contextmanager
@@ -31,6 +33,30 @@ def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 
 def build_service() -> TransactionEntryService:
     return TransactionEntryService()
+
+
+def _fetchall_namespaces(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> list[SimpleNamespace]:
+    cursor = conn.execute(sql, params or [])
+    rows = cursor.fetchall()
+    columns = [column[0] for column in cursor.description or ()]
+    return [SimpleNamespace(**{columns[idx]: row[idx] for idx in range(len(columns))}) for row in rows]
+
+
+def _fetch_namespace(
+    conn: duckdb.DuckDBPyConnection,
+    sql: str,
+    params: list[object] | tuple[object, ...] | None = None,
+) -> SimpleNamespace:
+    cursor = conn.execute(sql, params or [])
+    row = cursor.fetchone()
+    assert row is not None
+    columns = [column[0] for column in cursor.description or ()]
+    data = {columns[idx]: row[idx] for idx in range(len(columns))}
+    return SimpleNamespace(**data)
 
 
 amount_strategy = st.integers(min_value=-50_00, max_value=50_00).filter(lambda x: x != 0)
@@ -51,11 +77,11 @@ def test_account_balance_matches_sum(amounts: list[int]) -> None:
                     amount_minor=amt,
                 ),
             )
-        row = conn.execute(
-            "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_checking'"
-        ).fetchone()
-        assert row is not None
-        assert row[0] == 500000 + sum(amounts)
+        balance_row = _fetch_namespace(
+            conn,
+            "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_checking'",
+        )
+        assert balance_row.current_balance_minor == 500000 + sum(amounts)
 
 
 @given(
@@ -86,14 +112,15 @@ def test_only_one_active_version_per_concept(
             )
             last_concept_id = result.concept_id
 
-        rows = conn.execute(
+        rows = _fetchall_namespaces(
+            conn,
             """
             SELECT concept_id, SUM(CASE WHEN is_active THEN 1 ELSE 0 END) AS active_rows
             FROM transactions
             GROUP BY concept_id
-            """
-        ).fetchall()
-        assert all(row[1] == 1 for row in rows)
+            """,
+        )
+        assert all(row.active_rows == 1 for row in rows)
 
 
 edit_chain_strategy = st.lists(amount_strategy, min_size=2, max_size=5)
@@ -135,18 +162,19 @@ def test_chronological_integrity_of_edits(edits):
             )
             
         # Verify the chain of validity
-        versions = conn.execute(
+        versions = _fetchall_namespaces(
+            conn,
             "SELECT valid_from, valid_to FROM transactions WHERE concept_id = ? ORDER BY valid_from",
             [str(concept_id)],
-        ).fetchall()
+        )
 
         assert len(versions) == len(edits)
 
         for i in range(len(versions) - 1):
-            assert versions[i][1] == versions[i+1][0], f"Gap or overlap found at version {i}"
+            assert versions[i].valid_to == versions[i + 1].valid_from, f"Gap or overlap found at version {i}"
 
         # Check that the last version is open-ended
-        last_valid_to = versions[-1][1]
+        last_valid_to = versions[-1].valid_to
         assert last_valid_to.year == 9999
         assert last_valid_to.month == 12
         assert last_valid_to.day == 31
