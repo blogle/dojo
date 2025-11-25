@@ -104,7 +104,7 @@ run_tool() {
 }
 
 run_sql_string_guard() {
-    run_tool "inline SQL string guard" python - <<'PY'
+    run_tool "py-sql check" python - "src/dojo" <<'PY'
 import argparse
 import ast
 import os
@@ -205,7 +205,7 @@ parse_args "$@"
 run_tool "ruff" ruff check .
 run_tool "sqlfluff" sqlfluff lint --dialect duckdb src/dojo/sql
 run_tool "biome" biome lint src/dojo/frontend
-run_sql_string_guard src/dojo
+run_sql_string_guard
 
 if [[ "$had_failure" -ne 0 ]]; then
     echo "[FAIL] ${SCRIPT_NAME} (one or more linters failed) log dir: ${RUN_DIR}"

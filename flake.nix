@@ -67,6 +67,7 @@
         {
           default = pkgs.mkShell {
             buildInputs = with pkgs; [
+              biome
               cypress
               duckdb
               nodejs
