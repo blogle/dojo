@@ -38,8 +38,23 @@ scripts/run-tests --skip-integration
 scripts/run-tests --skip-property --skip-integration
 ```
 
+### `scripts/lint`
+
+- **Description**: Runs the repository linters (ruff, sqlfluff, biome) with repo defaults, plus a custom inline-SQL guard that refuses long SQL strings in Python files.
+- **Underlying tools**:
+  - `ruff check .`
+  - `sqlfluff lint --dialect duckdb src/dojo/sql`
+  - `biome lint`
+  - Custom Python verifier that scans `src/**/*.py` for large SQL literals.
+- **Behavior**: Emits `[OK]`/`[FAIL]` lines for each tool, retains temp logs on failure, and surfaces a final summary line similar to other scripts.
+- **Examples**:
+```
+scripts/lint
+```
+
 ## Notes for Agents
 
 1. When asked to run tests, call `scripts/run-tests` (with optional skip flags) instead of invoking `pytest`, `npx cypress`, or other tooling directly.
 2. Treat `[FAIL]` lines as the authoritative failure signal: read the referenced temp log (`tail`, `cat`, `rg`, etc.) instead of re-running the underlying command until a fix is in place.
 3. Document any new or changed scripts in this README and follow the manpage/summary/logging conventions before updating `AGENTS.md`.
+4. When asked to lint code, run `scripts/lint` instead of invoking `ruff`, `sqlfluff`, `biome`, or other linters directly.

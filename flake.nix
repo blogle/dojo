@@ -72,6 +72,7 @@
               nodejs
               mermaid-cli
               python312
+              biome
               ruff
               sqlfluff
               uv
