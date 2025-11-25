@@ -124,14 +124,18 @@ run_suite() {
     fi
 }
 
+
 parse_args "$@"
 
-run_suite "unit tests" python -m pytest tests/unit || true
+pids=()
+run_suite "unit tests" python -m pytest tests/unit &
+pids+=($!)
 
 if [[ "$SKIP_PROPERTY" -eq 1 ]]; then
     echo "[SKIP] property tests (--skip-property)"
 else
-    run_suite "property tests" python -m pytest tests/property || true
+    run_suite "property tests" python -m pytest tests/property &
+    pids+=($!)
 fi
 
 if [[ "$SKIP_INTEGRATION" -eq 1 ]]; then
@@ -139,14 +143,22 @@ if [[ "$SKIP_INTEGRATION" -eq 1 ]]; then
 elif [[ ! -d tests/integration ]]; then
     echo "[SKIP] integration tests (tests/integration missing)"
 else
-    run_suite "integration tests" python -m pytest tests/integration || true
+    run_suite "integration tests" python -m pytest tests/integration &
+    pids+=($!)
 fi
 
 if [[ "$SKIP_E2E" -eq 1 ]]; then
     echo "[SKIP] e2e tests (--skip-e2e)"
 else
-    run_suite "e2e tests (cypress)" npx cypress run --e2e --browser chrome || true
+    run_suite "e2e tests (cypress)" npx cypress run --e2e --browser chrome &
+    pids+=($!)
 fi
+
+for pid in "${pids[@]}"; do
+    if ! wait "$pid"; then
+        had_failure=1
+    fi
+done
 
 if [[ "$had_failure" -ne 0 ]]; then
     echo "[FAIL] ${SCRIPT_NAME} (one or more suites failed) log dir: ${RUN_DIR}"
