@@ -13,8 +13,8 @@ set -euo pipefail
 readonly REPO_NAME="dojo"
 readonly SCRIPT_NAME="lint"
 readonly TMP_DIR="${TMPDIR:-/tmp}"
-readonly RUN_DIR
 RUN_DIR=$(mktemp -d "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-XXXXXX")
+readonly RUN_DIR
 had_failure=0
 
 usage() {
