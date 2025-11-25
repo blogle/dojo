@@ -8,3 +8,4 @@ __pycache__/
 artifacts/
 data/*.duckdb
 src/dojo.egg-info/
+cypress/downloads
