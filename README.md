@@ -196,14 +196,14 @@ We welcome contributions! Please follow these guidelines.
 
 - **Run Tests**:
   ```bash
-  scripts/run-tests
+  pytest
+  npx cypress run --e2e --browser <browser> [--headed]
   ```
-  Use the `--skip-*` flags explained in `scripts/README.md` when suites aren’t relevant.
-- **Lint & Format**:
+- **Style Rules**: We rely on Ruff for lint+format and Pyright for type checking.
   ```bash
-  scripts/lint
+  ruff check .
+  pyright
   ```
-- **Tooling Details**: See [`scripts/README.md`](./scripts/README.md) for how lint/test scripts orchestrate Ruff, sqlfluff, Biome, and the inline SQL guard.
 - **Branch/PR Guidelines**: See [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Issue Templates**: Use the provided templates for bug reports and feature requests.
 - **Code of Conduct**: See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).

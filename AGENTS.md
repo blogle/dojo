@@ -65,10 +65,7 @@ When creating or maintaining project-specific development scripts (linters, test
 
 | Task | Script |
 | --- | --- |
-| lint | `scripts/lint` (ruff, sqlfluff, biome, inline SQL guard) |
 | tests | `scripts/run-tests` (runs the full suite with optional `--skip-*` flags) |
-
-Linting must always go through `scripts/lint` so that we execute every configured linter and our inline-SQL guard while keeping the wrapper-based logging conventions intact.
 
 ### Maintenance
 - When adding or editing a script, update `scripts/README.md` and maintain the GenTool output/logging conventions described there.

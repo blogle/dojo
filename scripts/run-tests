@@ -13,8 +13,6 @@ set -euo pipefail
 readonly REPO_NAME="dojo"
 readonly SCRIPT_NAME="run-tests"
 readonly TMP_DIR="${TMPDIR:-/tmp}"
-readonly RUN_DIR
-RUN_DIR=$(mktemp -d "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-XXXXXX")
 
 SKIP_PROPERTY=0
 SKIP_INTEGRATION=0
@@ -84,14 +82,6 @@ print(f"{end - start:.2f}")
 PY
 }
 
-log_stats() {
-    local file="$1"
-    local lines bytes
-    lines=$(wc -l <"$file" | tr -d '[:space:]')
-    bytes=$(stat -c%s "$file")
-    printf '%s %s' "$lines" "$bytes"
-}
-
 had_failure=0
 
 run_suite() {
@@ -100,7 +90,7 @@ run_suite() {
     local suite_id
     suite_id=$(sanitize_label "$label")
     local log
-    log="${RUN_DIR}/${suite_id}.log"
+    log=$(mktemp "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-${suite_id}-XXXXXX.log")
     local start end elapsed
     start=$(date +%s.%N)
 
@@ -113,12 +103,7 @@ run_suite() {
     else
         end=$(date +%s.%N)
         elapsed=$(time_diff "$start" "$end")
-        local stats lines bytes log_name
-        stats=$(log_stats "$log")
-        lines=${stats%% *}
-        bytes=${stats##* }
-        log_name=$(basename "$log")
-        echo "[FAIL] $label failed in ${elapsed}s see ${log_name}{lines: ${lines}, bytes: ${bytes}}"
+        echo "[FAIL] $label in ${elapsed}s (log: $log)"
         had_failure=1
         return 1
     fi
@@ -149,7 +134,7 @@ else
 fi
 
 if [[ "$had_failure" -ne 0 ]]; then
-    echo "[FAIL] ${SCRIPT_NAME} (one or more suites failed) log dir: ${RUN_DIR}"
+    echo "[FAIL] ${SCRIPT_NAME} (one or more suites failed)"
     exit 1
 fi
 
