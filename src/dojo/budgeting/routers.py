@@ -2,7 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
-from typing import Type, TypeVar
+from typing import TypeVar
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -23,8 +23,8 @@ from dojo.budgeting.schemas import (
     AccountDetail,
     AccountState,
     AccountUpdateRequest,
-    BudgetAllocationRequest,
     BudgetAllocationEntry,
+    BudgetAllocationRequest,
     BudgetAllocationsResponse,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
@@ -32,9 +32,9 @@ from dojo.budgeting.schemas import (
     BudgetCategoryGroupDetail,
     BudgetCategoryGroupUpdateRequest,
     BudgetCategoryUpdateRequest,
-    CategoryState,
     CategorizedTransferRequest,
     CategorizedTransferResponse,
+    CategoryState,
     NewTransactionRequest,
     ReadyToAssignResponse,
     ReferenceDataResponse,
@@ -63,7 +63,7 @@ ServiceT = TypeVar("ServiceT")
 
 
 def _ensure_service_type(
-    service: object | None, attr: str, expected_type: Type[ServiceT]
+    service: object | None, attr: str, expected_type: type[ServiceT]
 ) -> ServiceT:
     """
     Ensures that a service retrieved from app.state is of the expected type.

@@ -13,7 +13,8 @@ from importlib import resources
 from uuid import uuid4
 
 import duckdb
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from dojo.core.migrate import apply_migrations
 from dojo.core.net_worth import current_snapshot

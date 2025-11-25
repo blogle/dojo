@@ -7,7 +7,9 @@ and retrieved through the `BudgetCategoryAdminService`.
 """
 
 from datetime import date
+
 import duckdb
+
 from dojo.budgeting.schemas import (
     BudgetCategoryCreateRequest,
     BudgetCategoryUpdateRequest,

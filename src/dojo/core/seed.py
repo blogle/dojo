@@ -1,9 +1,9 @@
 """Seed runner for dev/demo data sets."""
 
 import logging
+from collections.abc import Iterable
 from importlib.resources import files
 from importlib.resources.abc import Traversable
-from typing import Iterable
 
 import duckdb
 

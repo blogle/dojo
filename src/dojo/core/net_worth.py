@@ -1,7 +1,7 @@
 """Net worth aggregation services."""
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP, getcontext
+from decimal import ROUND_HALF_UP, Decimal, getcontext
 
 import duckdb
 

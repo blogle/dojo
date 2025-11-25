@@ -2,11 +2,10 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 # Maximum length for names (e.g., account names, category names).
 NAME_MAX_LENGTH = 120
@@ -44,7 +43,7 @@ class NewTransactionRequest(BaseModel):
         Optional free-form note or description for the transaction.
     """
 
-    concept_id: Optional[UUID] = Field(
+    concept_id: UUID | None = Field(
         default=None, description="Stable identifier for the logical transaction."
     )
     transaction_date: date = Field(description="Date the transaction occurred.")
@@ -54,7 +53,7 @@ class NewTransactionRequest(BaseModel):
     status: Literal["pending", "cleared"] = Field(
         default="pending", description="Ledger status used for reconciliation."
     )
-    memo: Optional[str] = Field(default=None, description="Optional free-form note.")
+    memo: str | None = Field(default=None, description="Optional free-form note.")
 
 
 class CategorizedTransferRequest(BaseModel):
@@ -96,10 +95,10 @@ class CategorizedTransferRequest(BaseModel):
         gt=0, description="Positive amount in minor units to move."
     )
     transaction_date: date = Field(description="Date the transfer occurred.")
-    memo: Optional[str] = Field(
+    memo: str | None = Field(
         default=None, description="Optional comment for both legs."
     )
-    concept_id: Optional[UUID] = Field(
+    concept_id: UUID | None = Field(
         default=None, description="Optional shared concept identifier."
     )
 
@@ -200,7 +199,7 @@ class TransactionResponse(BaseModel):
     amount_minor: int
     transaction_date: date
     status: Literal["pending", "cleared"]
-    memo: Optional[str]
+    memo: str | None
     account: AccountState
     category: CategoryState
 
@@ -266,7 +265,7 @@ class TransactionListItem(BaseModel):
     category_name: str
     amount_minor: int
     status: Literal["pending", "cleared"]
-    memo: Optional[str]
+    memo: str | None
     recorded_at: datetime
 
 
@@ -393,7 +392,7 @@ class BudgetAllocationRequest(BaseModel):
     allocation_date: date | None = Field(
         default=None, description="Date the allocation is recorded (defaults to today)."
     )
-    memo: Optional[str] = Field(
+    memo: str | None = Field(
         default=None, description="Optional note for the allocation ledger."
     )
     month_start: date | None = Field(
@@ -437,11 +436,11 @@ class BudgetAllocationEntry(BaseModel):
     allocation_id: UUID
     allocation_date: date
     amount_minor: int
-    from_category_id: Optional[str]
-    from_category_name: Optional[str]
+    from_category_id: str | None
+    from_category_name: str | None
     to_category_id: str
     to_category_name: str
-    memo: Optional[str]
+    memo: str | None
     created_at: datetime
 
 
@@ -524,7 +523,7 @@ class AccountCommand(BaseModel):
         min_length=CURRENCY_CODE_LENGTH,
         max_length=CURRENCY_CODE_LENGTH,
     )
-    opened_on: Optional[date] = Field(
+    opened_on: date | None = Field(
         default=None, description="Optional account open date."
     )
     is_active: bool = Field(
@@ -609,14 +608,14 @@ class BudgetCategoryCommand(BaseModel):
     """
 
     name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    group_id: Optional[str] = Field(
+    group_id: str | None = Field(
         default=None, description="Parent category group ID."
     )
     is_active: bool = Field(default=True)
-    goal_type: Optional[Literal["target_date", "recurring"]] = Field(default=None)
-    goal_amount_minor: Optional[int] = Field(default=None)
-    goal_target_date: Optional[date] = Field(default=None)
-    goal_frequency: Optional[Literal["monthly", "quarterly", "yearly"]] = Field(
+    goal_type: Literal["target_date", "recurring"] | None = Field(default=None)
+    goal_amount_minor: int | None = Field(default=None)
+    goal_target_date: date | None = Field(default=None)
+    goal_frequency: Literal["monthly", "quarterly", "yearly"] | None = Field(
         default=None
     )
 
@@ -706,7 +705,7 @@ class BudgetCategoryCreateRequest(BudgetCategoryCommand):
         If None, a new ID will be generated.
     """
 
-    category_id: Optional[str] = Field(
+    category_id: str | None = Field(
         default=None,
         pattern=SLUG_PATTERN,
         description="Stable identifier for the category.",
@@ -755,7 +754,7 @@ class BudgetCategoryDetail(BudgetCategoryCommand):
     """
 
     category_id: str
-    group_id: Optional[str] = None
+    group_id: str | None = None
     created_at: datetime
     updated_at: datetime
     available_minor: int = Field(

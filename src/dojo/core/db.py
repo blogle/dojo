@@ -1,10 +1,10 @@
 """DuckDB connection utilities and FastAPI dependencies."""
 
-from contextlib import contextmanager
 import logging
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 import duckdb
 from fastapi import Depends

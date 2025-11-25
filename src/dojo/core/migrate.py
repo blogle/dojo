@@ -1,10 +1,10 @@
 """Simple DuckDB migration runner."""
 
 import logging
-from pathlib import Path
+from collections.abc import Iterable
 from importlib.resources import files
 from importlib.resources.abc import Traversable
-from typing import Iterable
+from pathlib import Path
 
 import duckdb
 

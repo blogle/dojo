@@ -1,10 +1,10 @@
 """Helpers for loading SQL under `dojo.sql.core`."""
 
-from functools import lru_cache
+from functools import cache
 from importlib import resources
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_sql(name: str) -> str:
     """
     Loads SQL text from the `dojo.sql.core` package.

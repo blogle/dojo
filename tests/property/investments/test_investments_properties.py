@@ -14,11 +14,12 @@ from contextlib import contextmanager
 from datetime import date
 from importlib import resources
 from types import SimpleNamespace
-import duckdb
 from typing import Any
 from uuid import uuid4
 
-from hypothesis import given, settings, strategies as st
+import duckdb
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from dojo.budgeting.schemas import AccountClass
 from dojo.budgeting.services import AccountAdminService

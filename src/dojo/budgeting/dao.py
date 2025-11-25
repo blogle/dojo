@@ -1,13 +1,13 @@
 """Data access helpers for the budgeting domain."""
 
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from functools import lru_cache
+from functools import cache
 from types import SimpleNamespace
-from typing import Any, Generator, Literal, Sequence, cast
+from typing import Any, Literal, cast
 from uuid import UUID, uuid4
-
 
 import duckdb
 
@@ -15,7 +15,7 @@ from dojo.budgeting.schemas import AccountClass, AccountRole
 from dojo.budgeting.sql import load_sql
 
 
-@lru_cache(maxsize=None)
+@cache
 def _sql(name: str) -> str:
     # Caches the loaded SQL queries to avoid repeated disk I/O.
     return load_sql(name)

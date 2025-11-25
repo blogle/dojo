@@ -9,12 +9,12 @@ investment tracking, forecasting, optimization, backtesting, and SQL-related mod
 # Defines the public API of the 'dojo' package, specifying which submodules
 # are considered part of the package's public interface when 'import *' is used.
 __all__ = [
-    "core",
+    "backtesting",
     "budgeting",
+    "core",
+    "forecasting",
     "frontend",
     "investments",
-    "forecasting",
     "optimization",
-    "backtesting",
     "sql",
 ]

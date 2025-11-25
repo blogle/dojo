@@ -1,8 +1,8 @@
 """Budgeting domain services."""
 
 import re
-from datetime import date, datetime, timezone
-from typing import Any, Literal, Optional, cast
+from datetime import UTC, date, datetime
+from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import duckdb
@@ -43,10 +43,10 @@ from dojo.budgeting.schemas import (
     BudgetCategoryGroupDetail,
     BudgetCategoryGroupUpdateRequest,
     BudgetCategoryUpdateRequest,
-    CategoryState,
     CategorizedTransferLeg,
     CategorizedTransferRequest,
     CategorizedTransferResponse,
+    CategoryState,
     NewTransactionRequest,
     TransactionListItem,
     TransactionResponse,
@@ -156,7 +156,7 @@ class TransactionEntryService:
         # Generate a unique ID for this specific version of the transaction.
         transaction_version_id = uuid4()
         # Record the current UTC time as the transaction's recorded_at timestamp.
-        recorded_at = datetime.now(timezone.utc)
+        recorded_at = datetime.now(UTC)
         # Determine the start of the month for budgeting purposes.
         month_start = cmd.transaction_date.replace(day=1)
         # Calculate the activity delta for the category. Outflows are positive activity.
@@ -280,7 +280,7 @@ class TransactionEntryService:
         # Generate a new concept_id if not provided.
         concept_id = cmd.concept_id or uuid4()
         # Record the current UTC time.
-        recorded_at = datetime.now(timezone.utc)
+        recorded_at = datetime.now(UTC)
         # Determine the start of the month for budgeting purposes.
         month_start = cmd.transaction_date.replace(day=1)
         # Generate unique IDs for each leg of the transfer.
@@ -2155,10 +2155,10 @@ class BudgetCategoryAdminService:
         """
         # Cast goal types and frequencies to their specific Literal types for the schema.
         goal_type = cast(
-            Optional[Literal["target_date", "recurring"]], record.goal_type
+            Literal["target_date", "recurring"] | None, record.goal_type
         )
         goal_frequency = cast(
-            Optional[Literal["monthly", "quarterly", "yearly"]], record.goal_frequency
+            Literal["monthly", "quarterly", "yearly"] | None, record.goal_frequency
         )
         return BudgetCategoryDetail(
             category_id=record.category_id,

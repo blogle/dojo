@@ -7,10 +7,11 @@ It ensures that these endpoints work as expected in testing mode and are
 correctly disabled in non-testing (production) mode.
 """
 
+from pathlib import Path
+
 import duckdb
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
 
 from dojo.core.app import create_app
 from dojo.core.config import Settings, get_settings
