@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual transaction lifecycle Cypress spec + fixture walk a pending debit through edit → cleared while asserting category availability, Ready-to-Assign, and account balances stay in sync.
 
 ### Changed
+- Renamed the canonical test wrapper to `scripts/run-tests`, fixed its timing helper, and refreshed `scripts/README.md`/`AGENTS.md` so agents consistently call the renamed script instead of the shell `test` builtin.
 - Updated `docs/rules/sql.md` to recommend storing SQL files inside the application source (`src/dojo/sql/`) to align with the established practice of packaging data files within the Python namespace.
 
 ### Changed

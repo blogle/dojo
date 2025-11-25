@@ -57,6 +57,20 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 # ExecResearch
 When investigating new algorithms, conducting experiments, or validating theoretical approaches, use an ExecResearch plan (as described in .agent/RESEARCH.md) from hypothesis to conclusion.
 
+# GenTool
+When creating or maintaining project-specific development scripts (linters, tests, migrations, orchestration, etc.), use GenTool (as described in .agent/GenTool.md) to generate thin wrapper commands with terse summaries, temp-logged failures, and synchronized documentation in scripts/README.md and here in AGENTS.md.
+
+## Scripts and Tooling
+`scripts/` is the canonical interface for repository-level tooling and must be preferred over raw invocations of `pytest`, `npx cypress`, or other per-suite commands. These wrappers encapsulate the GenTool expectations: manpage headers, terse `[OK]`/`[FAIL]` reporting, temp-log references on failure, and consistent exit codes. See `scripts/README.md` for the curated catalog and suite-level behaviors.
+
+| Task | Script |
+| --- | --- |
+| tests | `scripts/run-tests` (runs the full suite with optional `--skip-*` flags) |
+
+### Maintenance
+- When adding or editing a script, update `scripts/README.md` and maintain the GenTool output/logging conventions described there.
+- Point agents to `scripts/README.md` whenever they need per-suite details, skip flags, or failure/log guidance instead of expanding AGENTS.md further.
+
 ## Documentation Standards
 
 ### [ARCHITECTURE.md](./ARCHITECTURE.md)

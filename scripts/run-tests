@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# NAME
+#     run-tests - run the full test matrix (unit, property, integration, e2e)
+# SYNOPSIS
+#     scripts/run-tests [--skip-property] [--skip-integration] [--skip-e2e]
+# DESCRIPTION
+#     Runs pytest suites for unit, property, and integration code plus Cypress e2e while
+#     timing each suite, hiding verbose logs when everything passes, and spilling temp log
+#     paths if something fails.
+
+set -euo pipefail
+
+readonly REPO_NAME="dojo"
+readonly SCRIPT_NAME="run-tests"
+readonly TMP_DIR="${TMPDIR:-/tmp}"
+
+SKIP_PROPERTY=0
+SKIP_INTEGRATION=0
+SKIP_E2E=0
+
+usage() {
+    cat <<EOF
+NAME
+    ${SCRIPT_NAME} - run pytest suites and Cypress e2e with unified reporting
+SYNOPSIS
+    scripts/${SCRIPT_NAME} [--skip-property] [--skip-integration] [--skip-e2e] [-h|--help]
+DESCRIPTION
+    Runs unit, property, integration, and e2e suites (Cypress with Chrome) and prints a
+    terse [OK]/[FAIL] summary per suite. Failures reference a temp log for the full output.
+EOF
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --skip-property)
+                SKIP_PROPERTY=1
+                shift
+                ;;
+            --skip-integration)
+                SKIP_INTEGRATION=1
+                shift
+                ;;
+            --skip-e2e)
+                SKIP_E2E=1
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+sanitize_label() {
+    local label="$1"
+    local sanitized
+    sanitized=$(printf '%s' "$label" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '-')
+    while [[ "$sanitized" == *--* ]]; do
+        sanitized="${sanitized//--/-}"
+    done
+    sanitized="${sanitized#-}"
+    sanitized="${sanitized%-}"
+    if [[ -z "$sanitized" ]]; then
+        sanitized="suite"
+    fi
+    printf '%s' "$sanitized"
+}
+
+time_diff() {
+    python - "$1" "$2" <<'PY'
+import sys
+start = float(sys.argv[1])
+end = float(sys.argv[2])
+print(f"{end - start:.2f}")
+PY
+}
+
+had_failure=0
+
+run_suite() {
+    local label="$1"
+    shift
+    local suite_id
+    suite_id=$(sanitize_label "$label")
+    local log
+    log=$(mktemp "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-${suite_id}-XXXXXX.log")
+    local start end elapsed
+    start=$(date +%s.%N)
+
+    if "$@" >"$log" 2>&1; then
+        end=$(date +%s.%N)
+        elapsed=$(time_diff "$start" "$end")
+        rm -f "$log"
+        echo "[OK]   $label in ${elapsed}s"
+        return 0
+    else
+        end=$(date +%s.%N)
+        elapsed=$(time_diff "$start" "$end")
+        echo "[FAIL] $label in ${elapsed}s (log: $log)"
+        had_failure=1
+        return 1
+    fi
+}
+
+parse_args "$@"
+
+run_suite "unit tests" python -m pytest tests/unit || true
+
+if [[ "$SKIP_PROPERTY" -eq 1 ]]; then
+    echo "[SKIP] property tests (--skip-property)"
+else
+    run_suite "property tests" python -m pytest tests/property || true
+fi
+
+if [[ "$SKIP_INTEGRATION" -eq 1 ]]; then
+    echo "[SKIP] integration tests (--skip-integration)"
+elif [[ ! -d tests/integration ]]; then
+    echo "[SKIP] integration tests (tests/integration missing)"
+else
+    run_suite "integration tests" python -m pytest tests/integration || true
+fi
+
+if [[ "$SKIP_E2E" -eq 1 ]]; then
+    echo "[SKIP] e2e tests (--skip-e2e)"
+else
+    run_suite "e2e tests (cypress)" npx cypress run --e2e --browser chrome || true
+fi
+
+if [[ "$had_failure" -ne 0 ]]; then
+    echo "[FAIL] ${SCRIPT_NAME} (one or more suites failed)"
+    exit 1
+fi
+
+echo "[OK] ${SCRIPT_NAME} (all requested suites passed)"
+exit 0
