@@ -21,6 +21,7 @@ let modalBalance;
 let refreshReferenceData = async () => {};
 let refreshBudgetsData = async () => {};
 let renderBudgetsPage = () => {};
+let refreshTransactionsPage = async () => {};
 
 const setModalView = (view) => {
   if (!modalOverlay) return;
@@ -232,6 +233,7 @@ const handleAddAccount = async () => {
     try {
       await Promise.all([refreshAccountsPage(), refreshReferenceData(), refreshBudgetsData()]);
       renderBudgetsPage();
+      await refreshTransactionsPage();
     } catch (refreshError) {
       console.error("Account created but failed to refresh UI state", refreshError);
     }
@@ -300,10 +302,12 @@ export const initAccounts = ({
   onReferenceRefresh,
   onBudgetsRefresh,
   onBudgetsRender,
+  onTransactionsRefresh,
 } = {}) => {
   refreshReferenceData = onReferenceRefresh || (async () => {});
   refreshBudgetsData = onBudgetsRefresh || (async () => {});
   renderBudgetsPage = onBudgetsRender || (() => {});
+  refreshTransactionsPage = onTransactionsRefresh || (async () => {});
   modalOverlay = document.querySelector(selectors.accountModal);
   modalElement = modalOverlay?.querySelector(".modal");
   modalTitle = document.querySelector(selectors.accountModalTitle);

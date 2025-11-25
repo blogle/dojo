@@ -11,6 +11,7 @@ const bootstrap = async () => {
     onReferenceRefresh: loadReferenceData,
     onBudgetsRefresh: loadBudgetsData,
     onBudgetsRender: renderBudgetsPage,
+    onTransactionsRefresh: refreshTransactions,
   });
 
   initBudgets({
