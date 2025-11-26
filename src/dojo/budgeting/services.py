@@ -997,10 +997,8 @@ class TransactionEntryService:
         int
             The signed amount to be applied to the account's balance.
         """
-        # For liability accounts, the amount is inverted because an increase in a liability
-        # is a decrease in net worth (and conceptually a negative balance adjustment).
-        if account.account_type == "liability":
-            return -amount_minor
+        # The amount_minor is already correctly signed (negative for outflow, positive for inflow)
+        # and should be directly applied to the current balance.
         return amount_minor
 
     def _require_active_account(self, dao: BudgetingDAO, account_id: str) -> AccountRecord:

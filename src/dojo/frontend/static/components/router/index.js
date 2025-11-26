@@ -1,4 +1,4 @@
-export const initRouter = ({ onBudgetsRefresh, onBudgetsRender, onAllocationsRefresh, onAllocationsRender } = {}) => {
+export const initRouter = ({ onBudgetsRefresh, onBudgetsRender, onAllocationsRefresh, onAllocationsRender, onTransactionsRefresh } = {}) => {
   const pageNodes = document.querySelectorAll(".route-page");
   const routeLinks = document.querySelectorAll("[data-route-link]");
 
@@ -22,6 +22,10 @@ export const initRouter = ({ onBudgetsRefresh, onBudgetsRender, onAllocationsRef
           onAllocationsRender?.();
         })
         .catch((error) => console.error("Allocations refresh failed", error));
+    }
+    if (normalizedRoute === "transactions" && onTransactionsRefresh) {
+      onTransactionsRefresh()
+        .catch((error) => console.error("Transactions refresh failed", error));
     }
   };
 

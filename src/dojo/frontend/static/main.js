@@ -46,6 +46,7 @@ const bootstrap = async () => {
     onBudgetsRender: renderBudgetsPage,
     onAllocationsRefresh: loadAllocationsData,
     onAllocationsRender: renderAllocationsPage,
+    onTransactionsRefresh: refreshTransactions,
   });
 
   await loadReferenceData();
