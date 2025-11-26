@@ -93,8 +93,8 @@ def apply_migrations(conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversabl
             conn.execute(sql)
             # Record the applied migration in the schema_migrations table.
             conn.execute(
-                "INSERT INTO schema_migrations (filename) VALUES (?)",
-                [sql_file.name],
+                "INSERT INTO schema_migrations (filename) VALUES ($filename)",
+                {"filename": sql_file.name},
             )
             # Commit the transaction if successful.
             conn.execute("COMMIT")
