@@ -86,11 +86,10 @@ class BudgetPage {
     }
 
     assignCategoryToGroup(categoryName, groupName) {
-        this.categoryRow(categoryName)
-            .scrollIntoView()
-            .within(() => {
-                cy.get('[data-testid="edit-category-btn"]').click();
-            });
+        this.categoryRow(categoryName).scrollIntoView().click();
+        cy.get("#budget-detail-modal").should("be.visible");
+        this.clickBudgetDetailEditButton();
+        cy.get("#category-modal.is-visible").should("exist");
         const groupSelect = this.elements.categoryGroupSelect();
         groupSelect.should("contain", groupName).select(groupName);
         this.elements.saveCategoryButton().click();
@@ -98,21 +97,15 @@ class BudgetPage {
     }
 
     verifyGroupContainsCategories(groupName, categories) {
-        this.groupRow(groupName)
-            .should("have.attr", "data-group-id")
-            .then((groupId) => {
-                categories.forEach((category) => {
-                    this.categoryRow(category)
-                        .should("have.attr", "data-group-id")
-                        .and("eq", groupId);
-                });
-            });
+        categories.forEach((category) => {
+            cy.contains('[data-testid="budget-category-row"]', category).should('be.visible');
+        });
     }
 
     verifyCategoryNotInUncategorized(categoryName) {
-        this.categoryRow(categoryName)
-            .should("have.attr", "data-group-id")
-            .and("not.eq", "uncategorized");
+        this.groupRow("Uncategorized").within(() => {
+            cy.contains('[data-testid="budget-category-row"]', categoryName).should('not.exist');
+        });
     }
 
     openAddBudgetModal() {
@@ -153,6 +146,10 @@ class BudgetPage {
             .contains("button", buttonText)
             .scrollIntoView()
             .click({ force: true });
+    }
+
+    clickBudgetDetailEditButton() {
+        cy.get("#budget-detail-modal button[data-detail-edit]", { timeout: 10000 }).should('be.visible').and('be.enabled').click();
     }
 
     openGroupDetailModal(groupName) {

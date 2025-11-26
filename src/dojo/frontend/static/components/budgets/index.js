@@ -70,17 +70,11 @@ const renderGroupRows = (grouped, body) => {
     groupRow.className = "group-row";
     groupRow.style.cursor = "pointer";
     groupRow.dataset.groupId = group.group_id;
-    groupRow.dataset.testid = group.group_id === "uncategorized" ? "budget-group-uncategorized" : "budget-group-row";
+    groupRow.dataset.testid = "budget-group-row";
     groupRow.innerHTML = `
       <td colspan="4" class="group-cell">
         <div class="group-cell__content">
           <span>${group.name}</span>
-          <button type="button" class="icon-button" data-edit-group-id="${group.group_id}" data-testid="edit-group-btn" aria-label="Edit group">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-          </button>
         </div>
       </td>
     `;
@@ -90,7 +84,6 @@ const renderGroupRows = (grouped, body) => {
       const row = document.createElement("tr");
       row.style.cursor = "pointer";
       row.dataset.categoryId = cat.category_id;
-      row.dataset.groupId = cat.group_id || "uncategorized";
       row.dataset.testid = "budget-category-row";
 
       let goalText = "";
@@ -108,12 +101,6 @@ const renderGroupRows = (grouped, body) => {
               <span>${cat.name}</span>
               ${goalText}
             </div>
-            <button type="button" class="icon-button" data-edit-category-id="${cat.category_id}" data-testid="edit-category-btn" aria-label="Edit category">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
           </div>
         </td>
         <td class="amount-cell">${formatAmount(cat.allocated_minor)}</td>

@@ -50,7 +50,8 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 
     transactionPage.visit();
     cy.contains("#transactions-body tr", "Groceries run").click();
-    cy.get("[data-inline-outflow]").clear().type("200");
+    cy.get("[data-inline-outflow]").clear();
+    cy.get("[data-inline-outflow]").type("200");
     transactionPage.saveInlineEdit();
     cy.wait("@persistTransaction").its("response.statusCode").should("eq", 201);
     cy.get("#month-spend").should("contain", "$200.00");

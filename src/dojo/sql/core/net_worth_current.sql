@@ -32,7 +32,7 @@ SELECT
     position_totals.positions_minor,
     tangible_totals.tangibles_minor,
     asset_totals.assets_minor
-    - liability_totals.liabilities_minor
+    + liability_totals.liabilities_minor
     + position_totals.positions_minor
     + tangible_totals.tangibles_minor AS net_worth_minor
 FROM asset_totals

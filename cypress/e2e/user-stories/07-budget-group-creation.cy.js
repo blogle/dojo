@@ -32,6 +32,7 @@ describe("User Story 07 — Budget Group Creation and Assignment Flow", () => {
       cy.wait("@updateCategory").its("response.statusCode").should("eq", 200);
       cy.wait("@fetchBudgets");
     });
+    cy.wait("@fetchBudgets");
 
     budgetPage.verifyGroupContainsCategories(groupName, categories);
     categories.forEach((category) => budgetPage.verifyCategoryNotInUncategorized(category));

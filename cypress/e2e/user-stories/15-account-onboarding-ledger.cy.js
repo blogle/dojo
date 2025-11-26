@@ -18,7 +18,7 @@ const creditAccount = {
   type: "credit",
   name: "Rewards Credit",
   balance: "1200",
-  heroDisplay: "-$1,200.00",
+  heroDisplay: "$1,200.00",
   ledgerDisplay: "$1,200.00",
   modalDisplay: "$1,200.00",
 };

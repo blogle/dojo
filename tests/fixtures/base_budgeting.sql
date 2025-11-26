@@ -3,7 +3,7 @@ INSERT INTO accounts (account_id, name, account_type, current_balance_minor, cur
 VALUES
     ('house_checking', 'House Checking', 'asset', 500000, 'USD', TRUE, 'cash', 'on_budget'),
     ('house_savings', 'House Savings', 'asset', 1250000, 'USD', TRUE, 'cash', 'on_budget'),
-    ('house_credit_card', 'House Credit Card', 'liability', 250000, 'USD', TRUE, 'credit', 'on_budget')
+    ('house_credit_card', 'House Credit Card', 'liability', -250000, 'USD', TRUE, 'credit', 'on_budget')
 ON CONFLICT (account_id) DO UPDATE
     SET name = EXCLUDED.name,
         account_type = EXCLUDED.account_type,

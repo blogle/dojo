@@ -29,7 +29,7 @@ describe("User Story 03 — Funded Credit Card Spending", () => {
     budgetPage.verifyAvailableAmount("Visa Signature", "$60.00");
 
     accountPage.visit();
-    accountPage.verifyAccountBalance("Visa Signature", "-$60.00");
+    accountPage.verifyAccountBalance("Visa Signature", "$60.00");
     accountPage.verifyAccountBalance("House Checking", "$5,000.00");
   });
 });

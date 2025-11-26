@@ -35,8 +35,8 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     accountPage.visit();
     cy.wait("@fetchAccounts");
     cy.wait("@fetchNetWorth");
-    accountPage.verifyAccountBalance(visaAccount, "$1,000.00");
     accountPage.verifyAccountBalance(mastercardAccount, "$500.00");
+    accountPage.verifyNetWorth("$3,500.00");
     cy.get("#net-worth").invoke("text").as("initialNetWorth");
 
     // Record a transaction on the wrong credit account (Visa)
@@ -59,8 +59,8 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     accountPage.visit();
     cy.wait("@fetchAccounts");
     cy.wait("@fetchNetWorth");
-    accountPage.verifyAccountBalance(visaAccount, "$1,020.00");
     accountPage.verifyAccountBalance(mastercardAccount, "$500.00");
+    accountPage.verifyNetWorth("$3,480.00");
     // Net worth should reflect the spending
     cy.get("#net-worth").invoke("text").should("not.eq", "@initialNetWorth");
 
@@ -87,6 +87,7 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     cy.wait("@fetchNetWorth");
     accountPage.verifyAccountBalance(visaAccount, "$1,000.00"); // Back to initial
     accountPage.verifyAccountBalance(mastercardAccount, "$520.00"); // Increased liability
+    accountPage.verifyNetWorth("$3,480.00");
     cy.get("#net-worth").invoke("text").should("not.eq", "@initialNetWorth"); // Should still reflect spending
   });
 });

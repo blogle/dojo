@@ -26,6 +26,8 @@ textarea {
   background-color: var(--surface);
   color: var(--text);
   transition: outline 0.2s ease-in-out;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 input:focus,
