@@ -18,7 +18,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from dojo.budgeting.errors import UnknownAccount, UnknownCategory
+from dojo.budgeting.errors import UnknownAccountError, UnknownCategoryError
 from dojo.budgeting.schemas import NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
 from dojo.core.migrate import apply_migrations
@@ -91,10 +91,7 @@ def _fetchall_namespaces(
     # Extract column names from the cursor description.
     columns = [column[0] for column in cursor.description or ()]
     # Convert each row into a SimpleNamespace.
-    return [
-        SimpleNamespace(**{columns[idx]: row[idx] for idx in range(len(columns))})
-        for row in rows
-    ]
+    return [SimpleNamespace(**{columns[idx]: row[idx] for idx in range(len(columns))}) for row in rows]
 
 
 def _fetch_namespace(
@@ -136,9 +133,7 @@ def _fetch_namespace(
 
 
 # Strategy for generating transaction amounts (non-zero).
-amount_strategy = st.integers(min_value=-50_00, max_value=50_00).filter(
-    lambda x: x != 0
-)
+amount_strategy = st.integers(min_value=-50_00, max_value=50_00).filter(lambda x: x != 0)
 
 
 @given(amounts=st.lists(amount_strategy, min_size=1, max_size=5))
@@ -210,11 +205,7 @@ def test_only_one_active_version_per_concept(
         last_concept_id = None
         for amount_minor, reuse_concept in operations:
             # Determine whether to use an existing concept_id or generate a new one.
-            concept = (
-                last_concept_id
-                if reuse_concept and last_concept_id is not None
-                else None
-            )
+            concept = last_concept_id if reuse_concept and last_concept_id is not None else None
             result = service.create(
                 conn,
                 NewTransactionRequest(
@@ -247,7 +238,7 @@ edit_chain_strategy = st.lists(amount_strategy, min_size=2, max_size=5)
 
 @given(edits=edit_chain_strategy)
 @settings(max_examples=10, deadline=None)
-def test_chronological_integrity_of_edits(edits):
+def test_chronological_integrity_of_edits(edits: list[int]) -> None:
     """
     Verifies the chronological integrity of transaction versions after edits.
 
@@ -301,9 +292,7 @@ def test_chronological_integrity_of_edits(edits):
 
         # Verify that valid_to of a version matches valid_from of the subsequent version.
         for i in range(len(versions) - 1):
-            assert versions[i].valid_to == versions[i + 1].valid_from, (
-                f"Gap or overlap found at version {i}"
-            )
+            assert versions[i].valid_to == versions[i + 1].valid_from, f"Gap or overlap found at version {i}"
 
         # Check that the last version is open-ended (valid until the end of time).
         last_valid_to = versions[-1].valid_to
@@ -312,7 +301,7 @@ def test_chronological_integrity_of_edits(edits):
         assert last_valid_to.day == 31
 
 
-def test_referential_integrity():
+def test_referential_integrity() -> None:
     """
     Verifies that creating transactions with non-existent or inactive
     account/category IDs fails with appropriate exceptions.
@@ -325,7 +314,7 @@ def test_referential_integrity():
         service = build_service()
 
         # Test case: Attempt to create a transaction with a non-existent account ID.
-        with pytest.raises(UnknownAccount):
+        with pytest.raises(UnknownAccountError):
             service.create(
                 conn,
                 NewTransactionRequest(
@@ -337,7 +326,7 @@ def test_referential_integrity():
             )
 
         # Test case: Attempt to create a transaction with a non-existent category ID.
-        with pytest.raises(UnknownCategory):
+        with pytest.raises(UnknownCategoryError):
             service.create(
                 conn,
                 NewTransactionRequest(
@@ -350,10 +339,8 @@ def test_referential_integrity():
 
         # Test case: Attempt to create a transaction with an inactive account.
         # First, deactivate the 'house_checking' account.
-        conn.execute(
-            "UPDATE accounts SET is_active = FALSE WHERE account_id = 'house_checking'"
-        )
-        with pytest.raises(UnknownAccount):
+        conn.execute("UPDATE accounts SET is_active = FALSE WHERE account_id = 'house_checking'")
+        with pytest.raises(UnknownAccountError):
             service.create(
                 conn,
                 NewTransactionRequest(

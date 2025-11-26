@@ -15,6 +15,26 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  padding: 0.75rem;
+  border: var(--border-thick);
+  border-radius: 0;
+  background-color: var(--surface);
+  color: var(--text);
+  transition: outline 0.2s ease-in-out;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .form-panel__field {
   display: flex;
   flex-direction: column;
@@ -48,25 +68,6 @@
   color: var(--danger);
 }
 
-input,
-select,
-textarea {
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  padding: 0.75rem;
-  border: var(--border-thick);
-  border-radius: 0;
-  background-color: var(--surface);
-  color: var(--text);
-  transition: outline 0.2s ease-in-out;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
 
 .segmented-control {
   display: flex;

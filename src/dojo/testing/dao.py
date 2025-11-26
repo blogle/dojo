@@ -13,7 +13,7 @@ class TestingDAO:
     allowing direct execution of SQL scripts against a DuckDB database.
     """
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path) -> None:
         """
         Initializes the TestingDAO with the path to the DuckDB database.
 

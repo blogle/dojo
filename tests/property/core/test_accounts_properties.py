@@ -8,11 +8,12 @@ synchronization and the creation of associated detail records.
 """
 
 import string
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import duckdb
@@ -125,23 +126,17 @@ def _fetch_namespace(
 
 # Strategies
 # Strategy for generating valid account IDs (alphanumeric with underscores).
-account_id_strategy = st.text(
-    min_size=3, max_size=20, alphabet=string.ascii_lowercase + string.digits + "_"
-)
+account_id_strategy = st.text(min_size=3, max_size=20, alphabet=string.ascii_lowercase + string.digits + "_")
 # Strategy for generating account names.
 account_name_strategy = st.text(min_size=3, max_size=50)
 # Strategy for sampling account classes, excluding 'tangible' and 'accessible' for this context.
-account_class_strategy = st.sampled_from(
-    [c for c in AccountClass.__args__ if c not in ["tangible", "accessible"]]
-)
+account_class_strategy = st.sampled_from([c for c in AccountClass.__args__ if c not in ["tangible", "accessible"]])
 # Strategy for generating non-zero transaction amounts in minor units.
-amount_strategy = st.integers(min_value=-50_000, max_value=50_000).filter(
-    lambda x: x != 0
-)
+amount_strategy = st.integers(min_value=-50_000, max_value=50_000).filter(lambda x: x != 0)
 
 
 @st.composite
-def cash_account_strategy(draw):
+def cash_account_strategy(draw: Callable[..., Any]) -> dict[str, Any]:
     """
     Hypothesis strategy for generating a dictionary representing a cash account.
 
@@ -169,7 +164,7 @@ def cash_account_strategy(draw):
 
 
 @st.composite
-def account_create_request_strategy(draw):
+def account_create_request_strategy(draw: Callable[..., Any]) -> AccountCreateRequest:
     """
     Hypothesis strategy for generating `AccountCreateRequest` payloads.
 
@@ -202,7 +197,7 @@ def account_create_request_strategy(draw):
 
 
 @st.composite
-def credit_account_create_request_strategy(draw):
+def credit_account_create_request_strategy(draw: Callable[..., Any]) -> AccountCreateRequest:
     """
     Hypothesis strategy for generating `AccountCreateRequest` payloads specifically for credit accounts.
 
@@ -246,7 +241,11 @@ DETAIL_TABLES = {
     transactions=st.lists(amount_strategy, min_size=1, max_size=10),
 )
 @settings(max_examples=10, deadline=None)
-def test_balance_synchronization(account_data, initial_balance, transactions):
+def test_balance_synchronization(
+    account_data: dict[str, Any],
+    initial_balance: int,
+    transactions: list[int],
+) -> None:
     """
     Verifies that the `accounts.current_balance_minor` field correctly
     reflects the sum of all associated transactions.
@@ -272,7 +271,17 @@ def test_balance_synchronization(account_data, initial_balance, transactions):
         # but for direct balance testing, we create it here to control initial state.
         conn.execute(
             """
-            INSERT INTO accounts (account_id, name, account_type, account_class, account_role, current_balance_minor, currency, is_active, opened_on)
+            INSERT INTO accounts (
+                account_id,
+                name,
+                account_type,
+                account_class,
+                account_role,
+                current_balance_minor,
+                currency,
+                is_active,
+                opened_on
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             list(account_data.values()),
@@ -330,7 +339,7 @@ def test_balance_synchronization(account_data, initial_balance, transactions):
 
 @given(payload=account_create_request_strategy())
 @settings(max_examples=10, deadline=None)
-def test_one_to_one_account_details(payload: AccountCreateRequest):
+def test_one_to_one_account_details(payload: AccountCreateRequest) -> None:
     """
     Verifies the one-to-one relationship between `accounts` and detail tables.
 
@@ -353,9 +362,7 @@ def test_one_to_one_account_details(payload: AccountCreateRequest):
             f"SELECT COUNT(*) AS row_count FROM {target_table} WHERE account_id = ?",
             [payload.account_id],
         )
-        assert count_row.row_count == 1, (
-            f"Expected 1 record in {target_table}, found {count_row.row_count}"
-        )
+        assert count_row.row_count == 1, f"Expected 1 record in {target_table}, found {count_row.row_count}"
 
         # Check that all other detail tables do NOT have a record for this account.
         for account_class, detail_table in DETAIL_TABLES.items():
@@ -366,14 +373,12 @@ def test_one_to_one_account_details(payload: AccountCreateRequest):
                 f"SELECT COUNT(*) AS row_count FROM {detail_table} WHERE account_id = ?",
                 [payload.account_id],
             )
-            assert count_row.row_count == 0, (
-                f"Expected 0 records in {detail_table}, found {count_row.row_count}"
-            )
+            assert count_row.row_count == 0, f"Expected 0 records in {detail_table}, found {count_row.row_count}"
 
 
 @given(payload=credit_account_create_request_strategy())
 @settings(max_examples=10, deadline=None)
-def test_credit_account_creates_payment_category(payload: AccountCreateRequest):
+def test_credit_account_creates_payment_category(payload: AccountCreateRequest) -> None:
     """
     Verifies that creating a 'credit' class account automatically
     creates a corresponding "payment" category.
@@ -404,9 +409,7 @@ def test_credit_account_creates_payment_category(payload: AccountCreateRequest):
         )
 
         # Assert that the payment category was created with the correct name and group ID.
-        assert category_row.name == expected_category_name, (
-            "Payment category was not created with the expected name."
-        )
+        assert category_row.name == expected_category_name, "Payment category was not created with the expected name."
         assert category_row.group_id == "credit_card_payments", (
             "Payment category was not assigned to the 'credit_card_payments' group."
         )

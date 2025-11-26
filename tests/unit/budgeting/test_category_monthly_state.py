@@ -81,9 +81,7 @@ def test_category_monthly_state_aggregates(
     assert groceries.allocated_minor == 5000  # 50.00 USD allocated
     # Activity is stored as a positive value for spending (outflows).
     assert groceries.activity_minor == 2000  # 20.00 USD spent
-    assert (
-        groceries.available_minor == 3000
-    )  # 50.00 allocated - 20.00 spent = 30.00 available
+    assert groceries.available_minor == 3000  # 50.00 allocated - 20.00 spent = 30.00 available
 
 
 def test_last_month_state_aggregates(in_memory_db: duckdb.DuckDBPyConnection) -> None:

@@ -10,7 +10,7 @@ class BudgetingError(Exception):
     """
 
 
-class InvalidTransaction(BudgetingError):
+class InvalidTransactionError(BudgetingError):
     """
     Raised when transaction input fails validation.
 
@@ -21,7 +21,7 @@ class InvalidTransaction(BudgetingError):
     """
 
 
-class UnknownAccount(BudgetingError):
+class UnknownAccountError(BudgetingError):
     """
     Raised when the referenced account does not exist or is inactive.
 
@@ -32,7 +32,7 @@ class UnknownAccount(BudgetingError):
     """
 
 
-class UnknownCategory(BudgetingError):
+class UnknownCategoryError(BudgetingError):
     """
     Raised when the referenced category does not exist or is inactive.
 
@@ -43,7 +43,7 @@ class UnknownCategory(BudgetingError):
     """
 
 
-class AccountAlreadyExists(BudgetingError):
+class AccountAlreadyExistsError(BudgetingError):
     """
     Raised when attempting to create an account with a duplicate identifier.
 
@@ -54,7 +54,7 @@ class AccountAlreadyExists(BudgetingError):
     """
 
 
-class AccountNotFound(BudgetingError):
+class AccountNotFoundError(BudgetingError):
     """
     Raised when the requested account cannot be located.
 
@@ -65,7 +65,7 @@ class AccountNotFound(BudgetingError):
     """
 
 
-class CategoryAlreadyExists(BudgetingError):
+class CategoryAlreadyExistsError(BudgetingError):
     """
     Raised when attempting to create a category with a duplicate identifier.
 
@@ -76,7 +76,7 @@ class CategoryAlreadyExists(BudgetingError):
     """
 
 
-class CategoryNotFound(BudgetingError):
+class CategoryNotFoundError(BudgetingError):
     """
     Raised when the requested budget category cannot be located.
 
@@ -87,7 +87,7 @@ class CategoryNotFound(BudgetingError):
     """
 
 
-class GroupAlreadyExists(BudgetingError):
+class GroupAlreadyExistsError(BudgetingError):
     """
     Raised when attempting to create a category group with a duplicate identifier.
 
@@ -98,7 +98,7 @@ class GroupAlreadyExists(BudgetingError):
     """
 
 
-class GroupNotFound(BudgetingError):
+class GroupNotFoundError(BudgetingError):
     """
     Raised when the requested category group cannot be located.
 

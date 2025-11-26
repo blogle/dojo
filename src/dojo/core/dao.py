@@ -65,7 +65,7 @@ class CoreDAO:
     application functionalities, such as retrieving net worth snapshots.
     """
 
-    def __init__(self, conn: duckdb.DuckDBPyConnection):
+    def __init__(self, conn: duckdb.DuckDBPyConnection) -> None:
         """
         Initializes the CoreDAO with a DuckDB connection.
 

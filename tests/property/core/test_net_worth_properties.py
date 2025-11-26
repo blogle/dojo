@@ -46,15 +46,9 @@ def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 
 
 # Strategies for generating financial amounts in minor units.
-assets_strategy = st.lists(
-    st.integers(min_value=0, max_value=2_000_00), min_size=1, max_size=4
-)
-liabilities_strategy = st.lists(
-    st.integers(min_value=0, max_value=1_000_00), min_size=1, max_size=4
-)
-pos_strategy = st.lists(
-    st.integers(min_value=0, max_value=500_00), min_size=0, max_size=3
-)
+assets_strategy = st.lists(st.integers(min_value=0, max_value=2_000_00), min_size=1, max_size=4)
+liabilities_strategy = st.lists(st.integers(min_value=0, max_value=1_000_00), min_size=1, max_size=4)
+pos_strategy = st.lists(st.integers(min_value=0, max_value=500_00), min_size=0, max_size=3)
 
 
 @given(
@@ -133,6 +127,4 @@ def test_net_worth_matches_manual_computation(
         assert snapshot.liabilities_minor == sum(liabilities)
         assert snapshot.positions_minor == sum(positions)
         # Net worth is calculated as Assets - Liabilities + Positions.
-        assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(
-            positions
-        )
+        assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(positions)

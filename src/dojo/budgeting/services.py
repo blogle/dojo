@@ -19,16 +19,16 @@ from dojo.budgeting.dao import (
     TransactionVersionRecord,
 )
 from dojo.budgeting.errors import (
-    AccountAlreadyExists,
-    AccountNotFound,
+    AccountAlreadyExistsError,
+    AccountNotFoundError,
     BudgetingError,
-    CategoryAlreadyExists,
-    CategoryNotFound,
-    GroupAlreadyExists,
-    GroupNotFound,
-    InvalidTransaction,
-    UnknownAccount,
-    UnknownCategory,
+    CategoryAlreadyExistsError,
+    CategoryNotFoundError,
+    GroupAlreadyExistsError,
+    GroupNotFoundError,
+    InvalidTransactionError,
+    UnknownAccountError,
+    UnknownCategoryError,
 )
 from dojo.budgeting.schemas import (
     AccountClass,
@@ -116,9 +116,7 @@ class TransactionEntryService:
     # Special category ID used for the transfer leg of categorized transfers.
     TRANSFER_CATEGORY_ID = "account_transfer"
 
-    def create(
-        self, conn: duckdb.DuckDBPyConnection, cmd: NewTransactionRequest
-    ) -> TransactionResponse:
+    def create(self, conn: duckdb.DuckDBPyConnection, cmd: NewTransactionRequest) -> TransactionResponse:
         """
         Inserts a new transaction using the temporal ledger model.
 
@@ -141,11 +139,11 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the transaction payload is invalid (e.g., zero amount, future date too far).
-        UnknownAccount
+        UnknownAccountError
             If the referenced account does not exist or is inactive.
-        UnknownCategory
+        UnknownCategoryError
             If the referenced category does not exist or is inactive.
         """
         # Validate the incoming transaction payload.
@@ -170,9 +168,7 @@ class TransactionEntryService:
             # Determine if this transaction should affect budget category activity.
             track_budget_activity = self._should_track_budget_activity(category_record)
             # Calculate the impact on the account balance.
-            balance_delta = self._account_balance_delta(
-                cmd.amount_minor, account_record
-            )
+            balance_delta = self._account_balance_delta(cmd.amount_minor, account_record)
 
             # If a concept_id is provided, it indicates an update or a reversal of a previous transaction.
             if cmd.concept_id is not None:
@@ -202,22 +198,14 @@ class TransactionEntryService:
 
             # If the category tracks budget activity, update its monthly activity.
             if track_budget_activity:
-                dao.upsert_category_activity(
-                    cmd.category_id, month_start, activity_delta
-                )
+                dao.upsert_category_activity(cmd.category_id, month_start, activity_delta)
 
             # Check if this transaction involves a credit account and needs a payment reserve adjustment.
-            if self._should_reserve_credit_payment(
-                account_record, category_record, cmd.amount_minor
-            ):
-                self._record_credit_payment_reserve(
-                    dao, account_record, month_start, cmd.amount_minor
-                )
+            if self._should_reserve_credit_payment(account_record, category_record, cmd.amount_minor):
+                self._record_credit_payment_reserve(dao, account_record, month_start, cmd.amount_minor)
 
             # Retrieve the updated state of the account and category for the response.
-            account_state = self._account_state_from_record(
-                self._require_active_account(dao, cmd.account_id)
-            )
+            account_state = self._account_state_from_record(self._require_active_account(dao, cmd.account_id))
             category_state = self._category_state_from_month(
                 dao.get_category_month_state(cmd.category_id, month_start),
                 cmd.category_id,
@@ -262,19 +250,19 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the transfer payload is invalid (e.g., source and destination accounts are the same,
             future date too far).
-        UnknownAccount
+        UnknownAccountError
             If either the source or destination account does not exist or is inactive.
-        UnknownCategory
+        UnknownCategoryError
             If the referenced category does not exist or is inactive.
         """
         # Validate the incoming transfer payload.
         self._validate_transfer_payload(cmd)
         # Ensure source and destination accounts are different.
         if cmd.source_account_id == cmd.destination_account_id:
-            raise InvalidTransaction("Source and destination accounts must differ.")
+            raise InvalidTransactionError("Source and destination accounts must differ.")
 
         dao = BudgetingDAO(conn)
         # Generate a new concept_id if not provided.
@@ -291,20 +279,14 @@ class TransactionEntryService:
         with dao.transaction():
             # Retrieve and validate accounts and category.
             source_account = self._require_active_account(dao, cmd.source_account_id)
-            destination_account = self._require_active_account(
-                dao, cmd.destination_account_id
-            )
+            destination_account = self._require_active_account(dao, cmd.destination_account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
             # Determine if the budget category tracks activity.
             track_budget_activity = self._should_track_budget_activity(category_record)
 
             # Calculate the amount deltas for each account based on their type and direction.
-            source_amount = self._transfer_delta(
-                cmd.amount_minor, source_account, "outgoing"
-            )
-            destination_amount = self._transfer_delta(
-                cmd.amount_minor, destination_account, "incoming"
-            )
+            source_amount = self._transfer_delta(cmd.amount_minor, source_account, "outgoing")
+            destination_amount = self._transfer_delta(cmd.amount_minor, destination_account, "incoming")
 
             # Record the budget leg of the transfer.
             self._record_transfer_leg(
@@ -335,16 +317,12 @@ class TransactionEntryService:
 
             # If the budget category tracks activity, record the activity.
             if track_budget_activity:
-                self._record_category_activity(
-                    dao, cmd.category_id, month_start, cmd.amount_minor
-                )
+                self._record_category_activity(dao, cmd.category_id, month_start, cmd.amount_minor)
 
             # Retrieve updated states of accounts and category for the response.
             source_state = self._account_state_for(dao, cmd.source_account_id)
             destination_state = self._account_state_for(dao, cmd.destination_account_id)
-            category_state = self._category_state_for_month(
-                dao, cmd.category_id, month_start
-            )
+            category_state = self._category_state_for_month(dao, cmd.category_id, month_start)
 
         # Return the categorized transfer response.
         return CategorizedTransferResponse(
@@ -360,9 +338,7 @@ class TransactionEntryService:
             category=category_state,
         )
 
-    def ready_to_assign(
-        self, conn: duckdb.DuckDBPyConnection, month_start: date
-    ) -> int:
+    def ready_to_assign(self, conn: duckdb.DuckDBPyConnection, month_start: date) -> int:
         """
         Retrieves the "Ready to Assign" amount for a given month.
 
@@ -381,9 +357,7 @@ class TransactionEntryService:
         dao = BudgetingDAO(conn)
         return dao.ready_to_assign(month_start)
 
-    def month_cash_inflow(
-        self, conn: duckdb.DuckDBPyConnection, month_start: date
-    ) -> int:
+    def month_cash_inflow(self, conn: duckdb.DuckDBPyConnection, month_start: date) -> int:
         """
         Retrieves the total cash inflow for a given month.
 
@@ -445,18 +419,16 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the allocation amount is non-positive, destination category is invalid,
             source category is invalid, or insufficient funds are available.
-        UnknownCategory
+        UnknownCategoryError
             If a referenced category (source or destination) is not found or inactive.
         """
         # Validate that the allocation amount is positive.
         self._validate_allocation_amount(amount_minor)
         # Determine and validate the destination category, ensuring it's not the same as source if specified.
-        destination_category_id = self._require_allocation_destination(
-            category_id, from_category_id
-        )
+        destination_category_id = self._require_allocation_destination(category_id, from_category_id)
         # Determine the allocation date, defaulting to today.
         allocation_day = allocation_date or date.today()
         # Coerce month_start to the first day of the month, defaulting to allocation_day's month if not provided.
@@ -466,17 +438,13 @@ class TransactionEntryService:
 
         dao = BudgetingDAO(conn)
         # Retrieve and validate the destination category.
-        destination_category = self._require_active_category(
-            dao, destination_category_id
-        )
+        destination_category = self._require_active_category(dao, destination_category_id)
         # Assert that the destination category can receive allocations (e.g., not a system category).
         self._assert_destination_category_can_receive_allocations(destination_category)
 
         # Handle reallocation from a source category.
         if from_category_id:
-            self._ensure_allocation_source_can_allocate(
-                dao, from_category_id, month, amount_minor
-            )
+            self._ensure_allocation_source_can_allocate(dao, from_category_id, month, amount_minor)
         else:
             # Handle allocation from "Ready to Assign".
             self._ensure_ready_to_assign(dao, month, amount_minor)
@@ -497,9 +465,7 @@ class TransactionEntryService:
                 memo_value,
             )
             # Retrieve the updated state of the destination category for the response.
-            category_state = self._category_state_for_month(
-                dao, destination_category_id, month
-            )
+            category_state = self._category_state_for_month(dao, destination_category_id, month)
         return category_state
 
     def list_recent(
@@ -557,9 +523,7 @@ class TransactionEntryService:
         # Convert DAO records to a list of dictionaries.
         return [self._record_to_allocation(row) for row in records]
 
-    def _record_to_transaction_item(
-        self, record: TransactionListRecord
-    ) -> TransactionListItem:
+    def _record_to_transaction_item(self, record: TransactionListRecord) -> TransactionListItem:
         """
         Converts a `TransactionListRecord` DAO object to a `TransactionListItem` schema.
 
@@ -709,13 +673,9 @@ class TransactionEntryService:
         AccountState
             The current state of the account.
         """
-        return self._account_state_from_record(
-            self._require_active_account(dao, account_id)
-        )
+        return self._account_state_from_record(self._require_active_account(dao, account_id))
 
-    def _category_state_for_month(
-        self, dao: BudgetingDAO, category_id: str, month_start: date
-    ) -> CategoryState:
+    def _category_state_for_month(self, dao: BudgetingDAO, category_id: str, month_start: date) -> CategoryState:
         """
         Retrieves the `CategoryState` for a given category and month.
 
@@ -747,11 +707,11 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the amount is not positive.
         """
         if amount_minor <= 0:
-            raise InvalidTransaction("amount_minor must be positive for allocations.")
+            raise InvalidTransactionError("amount_minor must be positive for allocations.")
 
     def _require_allocation_destination(
         self,
@@ -778,18 +738,16 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If `to_category_id` is missing or if source and destination are the same.
         """
         if not destination_category_id:
-            raise InvalidTransaction("to_category_id is required for allocations.")
+            raise InvalidTransactionError("to_category_id is required for allocations.")
         if from_category_id and from_category_id == destination_category_id:
-            raise InvalidTransaction("Source and destination categories must differ.")
+            raise InvalidTransactionError("Source and destination categories must differ.")
         return destination_category_id
 
-    def _assert_destination_category_can_receive_allocations(
-        self, category_record: CategoryRecord
-    ) -> None:
+    def _assert_destination_category_can_receive_allocations(self, category_record: CategoryRecord) -> None:
         """
         Asserts that the destination category is not a system category.
 
@@ -802,11 +760,11 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the destination category is a system category.
         """
         if category_record.is_system:
-            raise InvalidTransaction("System categories cannot receive allocations.")
+            raise InvalidTransactionError("System categories cannot receive allocations.")
 
     def _ensure_allocation_source_can_allocate(
         self,
@@ -834,26 +792,22 @@ class TransactionEntryService:
 
         Raises
         ------
-        UnknownCategory
+        UnknownCategoryError
             If the source category is not found or inactive.
-        InvalidTransaction
+        InvalidTransactionError
             If the source category is a system category or has insufficient funds.
         """
         source_category = self._require_active_category(dao, from_category_id)
         if source_category.is_system:
-            raise InvalidTransaction("System categories cannot provide allocations.")
+            raise InvalidTransactionError("System categories cannot provide allocations.")
         source_state = self._category_state_from_month(
             dao.get_category_month_state(from_category_id, month_start),
             from_category_id,
         )
         if source_state.available_minor < amount_minor:
-            raise InvalidTransaction(
-                "Source category does not have enough available funds."
-            )
+            raise InvalidTransactionError("Source category does not have enough available funds.")
 
-    def _ensure_ready_to_assign(
-        self, dao: BudgetingDAO, month_start: date, amount_minor: int
-    ) -> None:
+    def _ensure_ready_to_assign(self, dao: BudgetingDAO, month_start: date, amount_minor: int) -> None:
         """
         Ensures there is sufficient "Ready to Assign" funds for an allocation.
 
@@ -868,14 +822,12 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If "Ready to Assign" funds are insufficient.
         """
         ready_minor = dao.ready_to_assign(month_start)
         if ready_minor < amount_minor:
-            raise InvalidTransaction(
-                "Ready-to-Assign is insufficient for this allocation."
-            )
+            raise InvalidTransactionError("Ready-to-Assign is insufficient for this allocation.")
 
     def _persist_allocation(
         self,
@@ -921,14 +873,10 @@ class TransactionEntryService:
             memo=memo,
         )
         # Adjust the allocated and available amounts for the destination category.
-        dao.adjust_category_allocation(
-            destination_category_id, month_start, amount_minor, amount_minor
-        )
+        dao.adjust_category_allocation(destination_category_id, month_start, amount_minor, amount_minor)
         # If there's a source category, adjust its allocated and available amounts negatively.
         if from_category_id:
-            dao.adjust_category_allocation(
-                from_category_id, month_start, -amount_minor, -amount_minor
-            )
+            dao.adjust_category_allocation(from_category_id, month_start, -amount_minor, -amount_minor)
 
     @staticmethod
     def _coerce_month_start(month_start: date | None) -> date:
@@ -962,15 +910,15 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the amount is zero or the transaction date is too far in the future.
         """
         if cmd.amount_minor == 0:
-            raise InvalidTransaction("amount_minor must be non-zero.")
+            raise InvalidTransactionError("amount_minor must be non-zero.")
         # Calculate the difference in days between the transaction date and today.
         future_delta = (cmd.transaction_date - date.today()).days
         if future_delta > self.MAX_FUTURE_DAYS:
-            raise InvalidTransaction(
+            raise InvalidTransactionError(
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
             )
 
@@ -987,13 +935,13 @@ class TransactionEntryService:
 
         Raises
         ------
-        InvalidTransaction
+        InvalidTransactionError
             If the transaction date is too far in the future.
         """
         # Calculate the difference in days between the transaction date and today.
         future_delta = (cmd.transaction_date - date.today()).days
         if future_delta > self.MAX_FUTURE_DAYS:
-            raise InvalidTransaction(
+            raise InvalidTransactionError(
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
             )
 
@@ -1055,9 +1003,7 @@ class TransactionEntryService:
             return -amount_minor
         return amount_minor
 
-    def _require_active_account(
-        self, dao: BudgetingDAO, account_id: str
-    ) -> AccountRecord:
+    def _require_active_account(self, dao: BudgetingDAO, account_id: str) -> AccountRecord:
         """
         Retrieves an active account record or raises an error if not found/active.
 
@@ -1075,17 +1021,15 @@ class TransactionEntryService:
 
         Raises
         ------
-        UnknownAccount
+        UnknownAccountError
             If the account does not exist or is not active.
         """
         record = dao.get_active_account(account_id)
         if record is None or not record.is_active:
-            raise UnknownAccount(f"Account `{account_id}` is not active.")
+            raise UnknownAccountError(f"Account `{account_id}` is not active.")
         return record
 
-    def _require_active_category(
-        self, dao: BudgetingDAO, category_id: str
-    ) -> CategoryRecord:
+    def _require_active_category(self, dao: BudgetingDAO, category_id: str) -> CategoryRecord:
         """
         Retrieves an active category record or raises an error if not found/active.
 
@@ -1103,12 +1047,12 @@ class TransactionEntryService:
 
         Raises
         ------
-        UnknownCategory
+        UnknownCategoryError
             If the category does not exist or is not active.
         """
         record = dao.get_active_category(category_id)
         if record is None or not record.is_active:
-            raise UnknownCategory(f"Category `{category_id}` is not active.")
+            raise UnknownCategoryError(f"Category `{category_id}` is not active.")
         return record
 
     def _account_state_from_record(self, record: AccountRecord) -> AccountState:
@@ -1197,24 +1141,18 @@ class TransactionEntryService:
         month_start = transaction.transaction_date.replace(day=1)
         account_record = self._require_active_account(dao, transaction.account_id)
         # Calculate the balance delta for the original transaction.
-        balance_delta = self._account_balance_delta(
-            transaction.amount_minor, account_record
-        )
+        balance_delta = self._account_balance_delta(transaction.amount_minor, account_record)
         # Apply the negative of the original delta to reverse the account balance change.
         dao.update_account_balance(transaction.account_id, -balance_delta)
         # Get the category record for the transaction.
         category_record = dao.get_category_optional(transaction.category_id)
         # If the category exists and is not a system category, reverse its activity.
         if category_record and not category_record.is_system:
-            dao.upsert_category_activity(
-                transaction.category_id, month_start, transaction.amount_minor
-            )
+            dao.upsert_category_activity(transaction.category_id, month_start, transaction.amount_minor)
         # If it was a credit payment reservation, reverse that as well.
         if category_record:
             account_record = self._require_active_account(dao, transaction.account_id)
-            if self._should_reserve_credit_payment(
-                account_record, category_record, transaction.amount_minor
-            ):
+            if self._should_reserve_credit_payment(account_record, category_record, transaction.amount_minor):
                 self._record_credit_payment_reserve(
                     dao,
                     account_record,
@@ -1318,9 +1256,7 @@ class TransactionEntryService:
         # Positive transaction amount (return) means less to reserve (negative delta).
         sign = 1 if amount_minor < 0 else -1
         # Adjust the inflow and available amounts of the payment category.
-        dao.adjust_category_inflow(
-            payment_category.category_id, month_start, sign * delta, sign * delta
-        )
+        dao.adjust_category_inflow(payment_category.category_id, month_start, sign * delta, sign * delta)
 
 
 def _coerce_account_type(value: str) -> Literal["asset", "liability"]:
@@ -1455,7 +1391,7 @@ class AccountAdminService:
 
         Raises
         ------
-        AccountAlreadyExists
+        AccountAlreadyExistsError
             If an account with the provided `account_id` already exists.
         BudgetingError
             For other budgeting-related errors during account creation.
@@ -1463,9 +1399,7 @@ class AccountAdminService:
         dao = BudgetingDAO(conn)
         # Check if an account with the given ID already exists to prevent duplicates.
         if dao.get_account_detail(payload.account_id) is not None:
-            raise AccountAlreadyExists(
-                f"Account `{payload.account_id}` already exists."
-            )
+            raise AccountAlreadyExistsError(f"Account `{payload.account_id}` already exists.")
 
         # Ensure currency code is uppercase for consistency.
         currency = payload.currency.upper()
@@ -1486,9 +1420,7 @@ class AccountAdminService:
             # Insert specific detail records based on the account class.
             dao.insert_account_detail(payload.account_class, payload.account_id)
             # If it's a credit account, ensure a corresponding payment category exists.
-            if self._should_create_payment_category(
-                payload.account_type, payload.account_class
-            ):
+            if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
                     dao,
                     account_id=payload.account_id,
@@ -1528,7 +1460,7 @@ class AccountAdminService:
 
         Raises
         ------
-        AccountNotFound
+        AccountNotFoundError
             If the account with the provided `account_id` does not exist.
         BudgetingError
             For other budgeting-related errors during account update.
@@ -1555,9 +1487,7 @@ class AccountAdminService:
             # Update specific account detail records, if necessary.
             dao.insert_account_detail(payload.account_class, account_id)
             # If it's a credit account, ensure a corresponding payment category exists (or is updated).
-            if self._should_create_payment_category(
-                payload.account_type, payload.account_class
-            ):
+            if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
                     dao,
                     account_id=account_id,
@@ -1570,9 +1500,7 @@ class AccountAdminService:
         # Retrieve and return the full details of the updated account.
         return self._require_account(dao, account_id)
 
-    def deactivate_account(
-        self, conn: duckdb.DuckDBPyConnection, account_id: str
-    ) -> None:
+    def deactivate_account(self, conn: duckdb.DuckDBPyConnection, account_id: str) -> None:
         """
         Deactivates an existing financial account.
 
@@ -1588,7 +1516,7 @@ class AccountAdminService:
 
         Raises
         ------
-        AccountNotFound
+        AccountNotFoundError
             If the account with the provided `account_id` does not exist.
         BudgetingError
             For other budgeting-related errors during account deactivation.
@@ -1623,12 +1551,12 @@ class AccountAdminService:
 
         Raises
         ------
-        AccountNotFound
+        AccountNotFoundError
             If the account does not exist.
         """
         record = dao.get_account_detail(account_id)
         if record is None:
-            raise AccountNotFound(f"Account `{account_id}` was not found.")
+            raise AccountNotFoundError(f"Account `{account_id}` was not found.")
         # Convert the DAO record to an AccountDetail schema.
         return self._record_to_account(record)
 
@@ -1801,7 +1729,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        CategoryAlreadyExists
+        CategoryAlreadyExistsError
             If a category with the generated or provided `category_id` already exists.
         """
         dao = BudgetingDAO(conn)
@@ -1810,19 +1738,12 @@ class BudgetCategoryAdminService:
         if not category_id:
             normalized = payload.name.lower()
             normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
-            category_id = (
-                normalized.strip("_") or f"category_{int(datetime.now().timestamp())}"
-            )
+            category_id = normalized.strip("_") or f"category_{int(datetime.now().timestamp())}"
         category_id = str(category_id)
 
         # Check if a category with the determined ID already exists.
-        if (
-            dao.get_budget_category_detail(
-                category_id, self._coerce_month_start(month_start)
-            )
-            is not None
-        ):
-            raise CategoryAlreadyExists(f"Category `{category_id}` already exists.")
+        if dao.get_budget_category_detail(category_id, self._coerce_month_start(month_start)) is not None:
+            raise CategoryAlreadyExistsError(f"Category `{category_id}` already exists.")
 
         dao.begin()
         try:
@@ -1872,7 +1793,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        CategoryNotFound
+        CategoryNotFoundError
             If the category with the provided `category_id` does not exist.
         """
         dao = BudgetingDAO(conn)
@@ -1898,9 +1819,7 @@ class BudgetCategoryAdminService:
         # Retrieve and return the full details of the updated category.
         return self._require_category(dao, category_id, month_start)
 
-    def deactivate_category(
-        self, conn: duckdb.DuckDBPyConnection, category_id: str
-    ) -> None:
+    def deactivate_category(self, conn: duckdb.DuckDBPyConnection, category_id: str) -> None:
         """
         Deactivates a budgeting category.
 
@@ -1916,7 +1835,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        CategoryNotFound
+        CategoryNotFoundError
             If the category with the provided `category_id` does not exist.
         """
         dao = BudgetingDAO(conn)
@@ -1931,9 +1850,7 @@ class BudgetCategoryAdminService:
             dao.rollback()
             raise
 
-    def list_groups(
-        self, conn: duckdb.DuckDBPyConnection
-    ) -> list[BudgetCategoryGroupDetail]:
+    def list_groups(self, conn: duckdb.DuckDBPyConnection) -> list[BudgetCategoryGroupDetail]:
         """
         Retrieves a list of all budgeting category groups.
 
@@ -1974,7 +1891,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        GroupAlreadyExists
+        GroupAlreadyExistsError
             If a category group with the provided `group_id` already exists.
         BudgetingError
             If the group creation fails for other reasons.
@@ -1996,9 +1913,7 @@ class BudgetCategoryAdminService:
         except duckdb.ConstraintException as exc:
             dao.rollback()
             # Handle unique constraint violation for group_id.
-            raise GroupAlreadyExists(
-                f"Group `{payload.group_id}` already exists."
-            ) from exc
+            raise GroupAlreadyExistsError(f"Group `{payload.group_id}` already exists.") from exc
         except Exception:
             dao.rollback()
             raise
@@ -2028,7 +1943,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        GroupNotFound
+        GroupNotFoundError
             If the category group with the provided `group_id` does not exist.
         """
         dao = BudgetingDAO(conn)
@@ -2041,7 +1956,7 @@ class BudgetCategoryAdminService:
                 sort_order=payload.sort_order,
             )
             if record is None:
-                raise GroupNotFound(f"Group `{group_id}` not found.")
+                raise GroupNotFoundError(f"Group `{group_id}` not found.")
             dao.commit()
             # Convert the DAO record to a Pydantic model.
             return self._record_to_group(record)
@@ -2062,7 +1977,7 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        GroupNotFound
+        GroupNotFoundError
             If the category group with the provided `group_id` does not exist.
         """
         dao = BudgetingDAO(conn)
@@ -2075,9 +1990,7 @@ class BudgetCategoryAdminService:
             dao.rollback()
             raise
 
-    def _record_to_group(
-        self, record: BudgetCategoryGroupRecord
-    ) -> BudgetCategoryGroupDetail:
+    def _record_to_group(self, record: BudgetCategoryGroupRecord) -> BudgetCategoryGroupDetail:
         """
         Converts a `BudgetCategoryGroupRecord` DAO object to a `BudgetCategoryGroupDetail` schema.
 
@@ -2125,21 +2038,17 @@ class BudgetCategoryAdminService:
 
         Raises
         ------
-        CategoryNotFound
+        CategoryNotFoundError
             If the category does not exist.
         """
         # Retrieve budget category details, coercing month_start if necessary.
-        record = dao.get_budget_category_detail(
-            category_id, self._coerce_month_start(month_start)
-        )
+        record = dao.get_budget_category_detail(category_id, self._coerce_month_start(month_start))
         if record is None:
-            raise CategoryNotFound(f"Category `{category_id}` was not found.")
+            raise CategoryNotFoundError(f"Category `{category_id}` was not found.")
         # Convert the DAO record to a BudgetCategoryDetail schema.
         return self._record_to_category(record)
 
-    def _record_to_category(
-        self, record: BudgetCategoryDetailRecord
-    ) -> BudgetCategoryDetail:
+    def _record_to_category(self, record: BudgetCategoryDetailRecord) -> BudgetCategoryDetail:
         """
         Converts a `BudgetCategoryDetailRecord` DAO object to a `BudgetCategoryDetail` schema.
 
@@ -2154,12 +2063,8 @@ class BudgetCategoryAdminService:
             A Pydantic model for displaying full budget category details.
         """
         # Cast goal types and frequencies to their specific Literal types for the schema.
-        goal_type = cast(
-            Literal["target_date", "recurring"] | None, record.goal_type
-        )
-        goal_frequency = cast(
-            Literal["monthly", "quarterly", "yearly"] | None, record.goal_frequency
-        )
+        goal_type = cast(Literal["target_date", "recurring"] | None, record.goal_type)
+        goal_frequency = cast(Literal["monthly", "quarterly", "yearly"] | None, record.goal_frequency)
         return BudgetCategoryDetail(
             category_id=record.category_id,
             group_id=record.group_id,

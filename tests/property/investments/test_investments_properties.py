@@ -9,7 +9,7 @@ and indicate where application-level logic is crucial.
 """
 
 import string
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
@@ -106,9 +106,7 @@ def _fetch_namespace(
 
 # Strategies
 # Strategy for generating valid account IDs (alphanumeric with underscores).
-account_id_strategy = st.text(
-    min_size=3, max_size=20, alphabet=string.ascii_lowercase + string.digits + "_"
-)
+account_id_strategy = st.text(min_size=3, max_size=20, alphabet=string.ascii_lowercase + string.digits + "_")
 # Strategy for generating instrument tickers.
 instrument_strategy = st.text(min_size=1, max_size=5, alphabet=string.ascii_uppercase)
 # Strategy for generating quantity of an instrument.
@@ -118,7 +116,7 @@ market_value_strategy = st.integers(min_value=1, max_value=1_000_000_00)
 
 
 @st.composite
-def investment_account_strategy(draw):
+def investment_account_strategy(draw: Callable[..., Any]) -> dict[str, Any]:
     """
     Hypothesis strategy for generating a dictionary representing an investment account.
 
@@ -146,7 +144,7 @@ def investment_account_strategy(draw):
 
 
 @st.composite
-def non_investment_account_strategy(draw):
+def non_investment_account_strategy(draw: Callable[..., Any]) -> dict[str, Any]:
     """
     Hypothesis strategy for generating a dictionary representing a non-investment account.
 
@@ -162,12 +160,8 @@ def non_investment_account_strategy(draw):
     dict
         A dictionary containing data for creating a non-investment account.
     """
-    non_investment_class = draw(
-        st.sampled_from([c for c in AccountClass.__args__ if c != "investment"])
-    )
-    account_type = (
-        "liability" if non_investment_class in ["credit", "loan"] else "asset"
-    )
+    non_investment_class = draw(st.sampled_from([c for c in AccountClass.__args__ if c != "investment"]))
+    account_type = "liability" if non_investment_class in ["credit", "loan"] else "asset"
     return {
         "account_id": draw(account_id_strategy),
         "name": "Test Non-Investment Account",
@@ -181,7 +175,7 @@ def non_investment_account_strategy(draw):
     }
 
 
-def _create_account(conn: duckdb.DuckDBPyConnection, account_data: dict[str, Any]):
+def _create_account(conn: duckdb.DuckDBPyConnection, account_data: dict[str, Any]) -> None:
     """
     Manually creates an account and its corresponding detail entry in the database.
 
@@ -198,7 +192,17 @@ def _create_account(conn: duckdb.DuckDBPyConnection, account_data: dict[str, Any
     # Insert the main account record into the accounts table.
     conn.execute(
         """
-        INSERT INTO accounts (account_id, name, account_type, account_class, account_role, current_balance_minor, currency, is_active, opened_on)
+        INSERT INTO accounts (
+            account_id,
+            name,
+            account_type,
+            account_class,
+            account_role,
+            current_balance_minor,
+            currency,
+            is_active,
+            opened_on
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         list(account_data.values()),
@@ -220,8 +224,11 @@ def _create_account(conn: duckdb.DuckDBPyConnection, account_data: dict[str, Any
 )
 @settings(max_examples=10, deadline=None)
 def test_position_uniqueness_is_not_enforced(
-    account_data, instrument, quantity, market_value
-):
+    account_data: dict[str, Any],
+    instrument: str,
+    quantity: float,
+    market_value: int,
+) -> None:
     """
     Demonstrates that the "Position Uniqueness" invariant is NOT enforced at the database level.
 
@@ -248,7 +255,10 @@ def test_position_uniqueness_is_not_enforced(
 
         # Insert the first position for the instrument.
         conn.execute(
-            "INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor) VALUES (?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
+                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+            ),
             [
                 str(uuid4()),
                 account_data["account_id"],
@@ -260,7 +270,10 @@ def test_position_uniqueness_is_not_enforced(
 
         # Insert a second, duplicate active position for the same instrument within the same account.
         conn.execute(
-            "INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor) VALUES (?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
+                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+            ),
             [
                 str(uuid4()),
                 account_data["account_id"],
@@ -273,13 +286,14 @@ def test_position_uniqueness_is_not_enforced(
         # Verify that two active positions now exist, which violates the intended invariant.
         count_row = _fetch_namespace(
             conn,
-            "SELECT COUNT(*) AS total_positions FROM positions WHERE account_id = ? AND instrument = ? AND is_active = TRUE",
+            (
+                "SELECT COUNT(*) AS total_positions FROM positions "
+                "WHERE account_id = ? AND instrument = ? AND is_active = TRUE"
+            ),
             [account_data["account_id"], instrument],
         )
 
-        assert count_row.total_positions == 2, (
-            "Duplicate active positions were not created, which is unexpected."
-        )
+        assert count_row.total_positions == 2, "Duplicate active positions were not created, which is unexpected."
 
 
 @given(
@@ -290,8 +304,11 @@ def test_position_uniqueness_is_not_enforced(
 )
 @settings(max_examples=10, deadline=None)
 def test_account_class_is_not_enforced(
-    account_data, instrument, quantity, market_value
-):
+    account_data: dict[str, Any],
+    instrument: str,
+    quantity: float,
+    market_value: int,
+) -> None:
     """
     Demonstrates that the "Account Class" invariant is NOT enforced at the database level for positions.
 
@@ -318,7 +335,10 @@ def test_account_class_is_not_enforced(
 
         # Attempt to insert an investment position for this non-investment account.
         conn.execute(
-            "INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor) VALUES (?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
+                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+            ),
             [
                 str(uuid4()),
                 account_data["account_id"],
@@ -331,7 +351,7 @@ def test_account_class_is_not_enforced(
         # Verify that the position was created, which violates the intended invariant.
         count_row = _fetch_namespace(
             conn,
-            "SELECT COUNT(*) AS total_positions FROM positions WHERE account_id = ?",
+            ("SELECT COUNT(*) AS total_positions FROM positions WHERE account_id = ?"),
             [account_data["account_id"]],
         )
 

@@ -6,14 +6,15 @@ This module contains unit tests that verify the correct behavior of the
 transfers, account and category state changes, and error handling.
 """
 
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
+from uuid import UUID
 
 import duckdb
 import pytest
 
 from dojo.budgeting.dao import BudgetingDAO
-from dojo.budgeting.errors import InvalidTransaction
+from dojo.budgeting.errors import InvalidTransactionError
 from dojo.budgeting.schemas import CategorizedTransferRequest, NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
 
@@ -117,7 +118,10 @@ def test_system_category_transactions_skip_budget_activity(
     # Further verify that no monthly state record is created for system categories.
     state_row = _fetch_namespace(
         in_memory_db,
-        "SELECT COUNT(*) AS monthly_state_count FROM budget_category_monthly_state WHERE category_id = 'opening_balance'",
+        (
+            "SELECT COUNT(*) AS monthly_state_count FROM budget_category_monthly_state "
+            "WHERE category_id = 'opening_balance'"
+        ),
         [],
     )
     assert state_row.monthly_state_count == 0
@@ -261,16 +265,16 @@ def test_edit_transaction_failure_rolls_back(
 
     def failing_insert(
         self: BudgetingDAO,
-        transaction_version_id,
-        concept_id,
-        account_id,
-        category_id,
-        transaction_date,
-        amount_minor,
-        memo,
-        status,
-        recorded_at,
-        source,
+        transaction_version_id: UUID,
+        concept_id: UUID,
+        account_id: str,
+        category_id: str,
+        transaction_date: date,
+        amount_minor: int,
+        memo: str | None,
+        status: str,
+        recorded_at: datetime,
+        source: str,
     ) -> None:
         # Raise an exception only for the specific failing command.
         if not tripped["value"] and concept_id == failing_cmd.concept_id:
@@ -342,8 +346,8 @@ def test_zero_amount_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
         category_id="groceries",
         amount_minor=0,  # Zero amount
     )
-    # Assert that an InvalidTransaction error is raised.
-    with pytest.raises(InvalidTransaction):
+    # Assert that an InvalidTransactionError error is raised.
+    with pytest.raises(InvalidTransactionError):
         service.create(in_memory_db, cmd)
 
 
@@ -432,9 +436,7 @@ def insert_account(
     )
 
 
-def insert_category(
-    conn: duckdb.DuckDBPyConnection, category_id: str, name: str
-) -> None:
+def insert_category(conn: duckdb.DuckDBPyConnection, category_id: str, name: str) -> None:
     """
     Helper function to insert a budget category directly into the database for testing.
 
@@ -570,11 +572,11 @@ def test_allocate_envelope_blocked_for_system_categories(
     month_start = date.today().replace(day=1)
 
     # Attempt to allocate to 'opening_balance' (a system category).
-    with pytest.raises(InvalidTransaction):
+    with pytest.raises(InvalidTransactionError):
         service.allocate_envelope(in_memory_db, "opening_balance", 1000, month_start)
 
     # Attempt to reallocate from 'opening_balance' (a system category).
-    with pytest.raises(InvalidTransaction):
+    with pytest.raises(InvalidTransactionError):
         service.allocate_envelope(
             in_memory_db,
             "groceries",
@@ -597,9 +599,7 @@ def test_allocate_envelope_updates_ready_to_assign(
     baseline_ready = service.ready_to_assign(in_memory_db, month_start)
 
     # Allocate funds to a category.
-    category_state = service.allocate_envelope(
-        in_memory_db, "groceries", 5000, month_start
-    )
+    category_state = service.allocate_envelope(in_memory_db, "groceries", 5000, month_start)
 
     # Assert that the category's available funds increased.
     assert category_state.available_minor == 5000
@@ -620,10 +620,8 @@ def test_allocate_envelope_blocks_when_ready_insufficient(
     # Get the current "Ready to Assign" amount.
     ready_minor = service.ready_to_assign(in_memory_db, month_start)
     # Attempt to allocate an amount greater than what's available.
-    with pytest.raises(InvalidTransaction):
-        service.allocate_envelope(
-            in_memory_db, "groceries", ready_minor + 100, month_start
-        )
+    with pytest.raises(InvalidTransactionError):
+        service.allocate_envelope(in_memory_db, "groceries", ready_minor + 100, month_start)
 
 
 def test_reassign_between_categories_updates_both_states(
@@ -665,7 +663,10 @@ def test_reassign_between_categories_updates_both_states(
     # Verify the allocation ledger entry details.
     ledger_row = _fetch_namespace(
         in_memory_db,
-        "SELECT to_category_id, from_category_id, amount_minor, memo FROM budget_allocations ORDER BY created_at DESC LIMIT 1",
+        (
+            "SELECT to_category_id, from_category_id, amount_minor, memo FROM budget_allocations "
+            "ORDER BY created_at DESC LIMIT 1"
+        ),
         [],
     )
     assert ledger_row.to_category_id == "housing"

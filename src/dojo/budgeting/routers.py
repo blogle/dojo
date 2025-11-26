@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 
 from dojo.budgeting.dao import BudgetingDAO
 from dojo.budgeting.errors import (
-    AccountAlreadyExists,
-    AccountNotFound,
+    AccountAlreadyExistsError,
+    AccountNotFoundError,
     BudgetingError,
-    CategoryAlreadyExists,
-    CategoryNotFound,
-    GroupAlreadyExists,
-    GroupNotFound,
-    InvalidTransaction,
+    CategoryAlreadyExistsError,
+    CategoryNotFoundError,
+    GroupAlreadyExistsError,
+    GroupNotFoundError,
+    InvalidTransactionError,
 )
 from dojo.budgeting.schemas import (
     AccountCreateRequest,
@@ -61,9 +61,19 @@ ALLOCATIONS_LIMIT_MAX = 500
 # Type variable for FastAPI service dependencies.
 ServiceT = TypeVar("ServiceT")
 
+# Shared dependency objects for FastAPI parameter defaults.
+
+# Query parameter helpers.
+_TRANSACTION_LIMIT_QUERY = Query(TRANSACTION_LIMIT_DEFAULT, ge=1, le=TRANSACTION_LIMIT_MAX)
+_CATEGORY_MONTH_QUERY = Query(None, description="Month start (YYYY-MM-01) for envelope state.")
+_BUDGET_MONTH_QUERY = Query(None, description="Month start (YYYY-MM-01).")
+_ALLOCATIONS_LIMIT_QUERY = Query(ALLOCATIONS_LIMIT_DEFAULT, ge=1, le=ALLOCATIONS_LIMIT_MAX)
+
 
 def _ensure_service_type(
-    service: object | None, attr: str, expected_type: type[ServiceT]
+    service: ServiceT | None,
+    attr: str,
+    expected_type: type[ServiceT],
 ) -> ServiceT:
     """
     Ensures that a service retrieved from app.state is of the expected type.
@@ -126,9 +136,7 @@ def transaction_service_dep(request: Request) -> TransactionEntryService:
         service = request.app.state.transaction_service
     except AttributeError as exc:
         # Raise an error if the attribute does not exist.
-        raise RuntimeError(
-            "TransactionEntryService not configured on app.state"
-        ) from exc
+        raise RuntimeError("TransactionEntryService not configured on app.state") from exc
     # Ensure the retrieved service is of the correct type.
     return _ensure_service_type(service, "transaction_service", TransactionEntryService)
 
@@ -192,15 +200,19 @@ def category_admin_service_dep(request: Request) -> BudgetCategoryAdminService:
         service = request.app.state.budget_category_admin_service
     except AttributeError as exc:
         # Raise an error if the attribute does not exist.
-        raise RuntimeError(
-            "BudgetCategoryAdminService not configured on app.state"
-        ) from exc
+        raise RuntimeError("BudgetCategoryAdminService not configured on app.state") from exc
     # Ensure the retrieved service is of the correct type.
     return _ensure_service_type(
         service,
         "budget_category_admin_service",
         BudgetCategoryAdminService,
     )
+
+
+_CONNECTION_DEP = Depends(connection_dep)
+_TRANSACTION_SERVICE_DEP = Depends(transaction_service_dep)
+_ACCOUNT_ADMIN_SERVICE_DEP = Depends(account_admin_service_dep)
+_CATEGORY_ADMIN_SERVICE_DEP = Depends(category_admin_service_dep)
 
 
 @router.post(
@@ -210,8 +222,8 @@ def category_admin_service_dep(request: Request) -> BudgetCategoryAdminService:
 )
 def create_transaction(
     payload: NewTransactionRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> TransactionResponse:
     """
     Creates a new transaction.
@@ -259,9 +271,9 @@ def create_transaction(
 
 @router.get("/transactions", response_model=list[TransactionListItem])
 def list_transactions(
-    limit: int = Query(TRANSACTION_LIMIT_DEFAULT, ge=1, le=TRANSACTION_LIMIT_MAX),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    limit: int = _TRANSACTION_LIMIT_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> list[TransactionListItem]:
     """
     Returns the most recent transactions.
@@ -290,7 +302,7 @@ def list_transactions(
 
 @router.get("/reference-data", response_model=ReferenceDataResponse)
 def get_reference_data(
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
 ) -> ReferenceDataResponse:
     """
     Returns lightweight reference data for the Single Page Application (SPA).
@@ -349,8 +361,8 @@ def get_reference_data(
 )
 def create_transfer(
     payload: CategorizedTransferRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> CategorizedTransferResponse:
     """
     Performs a categorized transfer, potentially involving multiple transaction legs.
@@ -382,15 +394,13 @@ def create_transfer(
         return service.transfer(conn, payload)
     except BudgetingError as exc:
         # Catch specific budgeting errors and return a 400 Bad Request.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/accounts", response_model=list[AccountDetail])
 def list_accounts(
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: AccountAdminService = Depends(account_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: AccountAdminService = _ACCOUNT_ADMIN_SERVICE_DEP,
 ) -> list[AccountDetail]:
     """
     Returns all accounts for administration flows.
@@ -414,13 +424,11 @@ def list_accounts(
     return service.list_accounts(conn)
 
 
-@router.post(
-    "/accounts", response_model=AccountDetail, status_code=status.HTTP_201_CREATED
-)
+@router.post("/accounts", response_model=AccountDetail, status_code=status.HTTP_201_CREATED)
 def create_account(
     payload: AccountCreateRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: AccountAdminService = Depends(account_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: AccountAdminService = _ACCOUNT_ADMIN_SERVICE_DEP,
 ) -> AccountDetail:
     """
     Creates a new financial account.
@@ -448,24 +456,20 @@ def create_account(
     try:
         # Attempt to create the account using the service.
         return service.create_account(conn, payload)
-    except AccountAlreadyExists as exc:
+    except AccountAlreadyExistsError as exc:
         # Handle cases where an account with the given ID already exists.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.put("/accounts/{account_id}", response_model=AccountDetail)
 def update_account(
     account_id: str,
     payload: AccountUpdateRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: AccountAdminService = Depends(account_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: AccountAdminService = _ACCOUNT_ADMIN_SERVICE_DEP,
 ) -> AccountDetail:
     """
     Updates an existing financial account.
@@ -495,23 +499,19 @@ def update_account(
     try:
         # Attempt to update the account using the service.
         return service.update_account(conn, account_id, payload)
-    except AccountNotFound as exc:
+    except AccountNotFoundError as exc:
         # Handle cases where the account to be updated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deactivate_account(
     account_id: str,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: AccountAdminService = Depends(account_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: AccountAdminService = _ACCOUNT_ADMIN_SERVICE_DEP,
 ) -> Response:
     """
     Deactivates a financial account.
@@ -541,27 +541,21 @@ def deactivate_account(
     try:
         # Attempt to deactivate the account using the service.
         service.deactivate_account(conn, account_id)
-    except AccountNotFound as exc:
+    except AccountNotFoundError as exc:
         # Handle cases where the account to be deactivated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Return a 204 No Content response for successful deactivation.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/budget-categories", response_model=list[BudgetCategoryDetail])
 def list_categories(
-    month: date | None = Query(
-        None, description="Month start (YYYY-MM-01) for envelope state."
-    ),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    month: date | None = _CATEGORY_MONTH_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> list[BudgetCategoryDetail]:
     """
     Returns a list of budgeting categories with their details.
@@ -595,11 +589,9 @@ def list_categories(
 )
 def create_category(
     payload: BudgetCategoryCreateRequest,
-    month: date | None = Query(
-        None, description="Month start (YYYY-MM-01) for envelope state."
-    ),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    month: date | None = _CATEGORY_MONTH_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryDetail:
     """
     Creates a new budgeting category.
@@ -629,27 +621,21 @@ def create_category(
     try:
         # Attempt to create the category using the service.
         return service.create_category(conn, payload, month_start=month)
-    except CategoryAlreadyExists as exc:
+    except CategoryAlreadyExistsError as exc:
         # Handle cases where a category with the given ID already exists.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.put("/budget-categories/{category_id}", response_model=BudgetCategoryDetail)
 def update_category(
     category_id: str,
     payload: BudgetCategoryUpdateRequest,
-    month: date | None = Query(
-        None, description="Month start (YYYY-MM-01) for envelope state."
-    ),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    month: date | None = _CATEGORY_MONTH_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryDetail:
     """
     Updates an existing budgeting category.
@@ -681,25 +667,19 @@ def update_category(
     try:
         # Attempt to update the category using the service.
         return service.update_category(conn, category_id, payload, month_start=month)
-    except CategoryNotFound as exc:
+    except CategoryNotFoundError as exc:
         # Handle cases where the category to be updated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.delete(
-    "/budget-categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/budget-categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deactivate_category(
     category_id: str,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> Response:
     """
     Deactivates a budgeting category.
@@ -729,24 +709,20 @@ def deactivate_category(
     try:
         # Attempt to deactivate the category using the service.
         service.deactivate_category(conn, category_id)
-    except CategoryNotFound as exc:
+    except CategoryNotFoundError as exc:
         # Handle cases where the category to be deactivated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Return a 204 No Content response for successful deactivation.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/budget-category-groups", response_model=list[BudgetCategoryGroupDetail])
 def list_groups(
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> list[BudgetCategoryGroupDetail]:
     """
     Returns a list of all budgeting category groups.
@@ -774,8 +750,8 @@ def list_groups(
 )
 def create_group(
     payload: BudgetCategoryGroupCreateRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryGroupDetail:
     """
     Creates a new budgeting category group.
@@ -803,26 +779,20 @@ def create_group(
     try:
         # Attempt to create the category group using the service.
         return service.create_group(conn, payload)
-    except GroupAlreadyExists as exc:
+    except GroupAlreadyExistsError as exc:
         # Handle cases where a group with the given ID already exists.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.put(
-    "/budget-category-groups/{group_id}", response_model=BudgetCategoryGroupDetail
-)
+@router.put("/budget-category-groups/{group_id}", response_model=BudgetCategoryGroupDetail)
 def update_group(
     group_id: str,
     payload: BudgetCategoryGroupUpdateRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryGroupDetail:
     """
     Updates an existing budgeting category group.
@@ -852,25 +822,19 @@ def update_group(
     try:
         # Attempt to update the category group using the service.
         return service.update_group(conn, group_id, payload)
-    except GroupNotFound as exc:
+    except GroupNotFoundError as exc:
         # Handle cases where the group to be updated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.delete(
-    "/budget-category-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/budget-category-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deactivate_group(
     group_id: str,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: BudgetCategoryAdminService = Depends(category_admin_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> Response:
     """
     Deactivates a budgeting category group.
@@ -900,25 +864,21 @@ def deactivate_group(
     try:
         # Attempt to deactivate the category group using the service.
         service.deactivate_group(conn, group_id)
-    except GroupNotFound as exc:
+    except GroupNotFoundError as exc:
         # Handle cases where the group to be deactivated is not found.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BudgetingError as exc:
         # Handle other specific budgeting errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Return a 204 No Content response for successful deactivation.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/budget/ready-to-assign", response_model=ReadyToAssignResponse)
 def ready_to_assign(
-    month: date | None = Query(None, description="Month start (YYYY-MM-01)."),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    month: date | None = _BUDGET_MONTH_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> ReadyToAssignResponse:
     """
     Returns the "Ready to Assign" amount for a given month.
@@ -950,9 +910,7 @@ def ready_to_assign(
     return ReadyToAssignResponse(
         month_start=month,
         ready_to_assign_minor=ready_minor,
-        ready_to_assign_decimal=Decimal(ready_minor)
-        .scaleb(-2)
-        .quantize(Decimal("0.01")),
+        ready_to_assign_decimal=Decimal(ready_minor).scaleb(-2).quantize(Decimal("0.01")),
     )
 
 
@@ -963,8 +921,8 @@ def ready_to_assign(
 )
 def allocate_budget(
     payload: BudgetAllocationRequest,
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> CategoryState:
     """
     Allocates funds to a budgeting category.
@@ -995,9 +953,7 @@ def allocate_budget(
     target_category_id = payload.to_category_id or payload.category_id
     if not target_category_id:
         # Raise an error if the target category ID is not provided.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="to_category_id is required"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_category_id is required")
     try:
         # Attempt to allocate the envelope using the service.
         return service.allocate_envelope(
@@ -1009,19 +965,17 @@ def allocate_budget(
             memo=payload.memo,
             allocation_date=payload.allocation_date,
         )
-    except (BudgetingError, InvalidTransaction) as exc:
+    except (BudgetingError, InvalidTransactionError) as exc:
         # Handle budgeting and invalid transaction errors.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/budget/allocations", response_model=BudgetAllocationsResponse)
 def list_allocations(
-    month: date | None = Query(None, description="Month start (YYYY-MM-01)."),
-    limit: int = Query(ALLOCATIONS_LIMIT_DEFAULT, ge=1, le=ALLOCATIONS_LIMIT_MAX),
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
-    service: TransactionEntryService = Depends(transaction_service_dep),
+    month: date | None = _BUDGET_MONTH_QUERY,
+    limit: int = _ALLOCATIONS_LIMIT_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> BudgetAllocationsResponse:
     """
     Lists budget allocations for a specific month.
@@ -1064,8 +1018,6 @@ def list_allocations(
         inflow_minor=inflow_minor,
         inflow_decimal=Decimal(inflow_minor).scaleb(-2).quantize(Decimal("0.01")),
         ready_to_assign_minor=ready_minor,
-        ready_to_assign_decimal=Decimal(ready_minor)
-        .scaleb(-2)
-        .quantize(Decimal("0.01")),
+        ready_to_assign_decimal=Decimal(ready_minor).scaleb(-2).quantize(Decimal("0.01")),
         allocations=allocation_models,
     )

@@ -7,6 +7,7 @@ It ensures that these endpoints work as expected in testing mode and are
 correctly disabled in non-testing (production) mode.
 """
 
+from collections.abc import Generator
 from pathlib import Path
 
 import duckdb
@@ -78,7 +79,7 @@ def non_testing_settings(test_db_path: Path) -> Settings:
 
 
 @pytest.fixture
-def client(testing_settings: Settings):
+def client(testing_settings: Settings) -> Generator[TestClient, None, None]:
     """
     Pytest fixture that provides a `TestClient` for the FastAPI application in testing mode.
 
@@ -100,7 +101,7 @@ def client(testing_settings: Settings):
     app = create_app(settings=testing_settings)
 
     # Override the `get_settings` dependency to inject the testing settings.
-    def get_test_settings():
+    def get_test_settings() -> Settings:
         return testing_settings
 
     app.dependency_overrides[get_settings] = get_test_settings
@@ -109,7 +110,7 @@ def client(testing_settings: Settings):
 
 
 @pytest.fixture
-def non_testing_client(non_testing_settings: Settings):
+def non_testing_client(non_testing_settings: Settings) -> Generator[TestClient, None, None]:
     """
     Pytest fixture that provides a `TestClient` for the FastAPI application in non-testing mode.
 
@@ -130,7 +131,7 @@ def non_testing_client(non_testing_settings: Settings):
     app = create_app(settings=non_testing_settings)
 
     # Override the `get_settings` dependency to inject the non-testing settings.
-    def get_non_test_settings():
+    def get_non_test_settings() -> Settings:
         return non_testing_settings
 
     app.dependency_overrides[get_settings] = get_non_test_settings
@@ -138,7 +139,7 @@ def non_testing_client(non_testing_settings: Settings):
         yield c
 
 
-def test_reset_db_endpoint_not_available_in_prod_mode(non_testing_client: TestClient):
+def test_reset_db_endpoint_not_available_in_prod_mode(non_testing_client: TestClient) -> None:
     """
     Verifies that the `/api/testing/reset_db` endpoint returns a 404 Not Found
     error when the application is running in non-testing (production) mode.
@@ -154,7 +155,7 @@ def test_reset_db_endpoint_not_available_in_prod_mode(non_testing_client: TestCl
     assert response.status_code == 404
 
 
-def test_seed_db_endpoint_not_available_in_prod_mode(non_testing_client: TestClient):
+def test_seed_db_endpoint_not_available_in_prod_mode(non_testing_client: TestClient) -> None:
     """
     Verifies that the `/api/testing/seed_db` endpoint returns a 404 Not Found
     error when the application is running in non-testing (production) mode.
@@ -166,13 +167,11 @@ def test_seed_db_endpoint_not_available_in_prod_mode(non_testing_client: TestCli
     non_testing_client : TestClient
         A FastAPI test client configured for non-testing mode.
     """
-    response = non_testing_client.post(
-        "/api/testing/seed_db", json={"fixture": "dummy.sql"}
-    )
+    response = non_testing_client.post("/api/testing/seed_db", json={"fixture": "dummy.sql"})
     assert response.status_code == 404
 
 
-def test_reset_db(client: TestClient, test_db_path: Path):
+def test_reset_db(client: TestClient, test_db_path: Path) -> None:
     """
     Tests the `/api/testing/reset_db` endpoint in testing mode.
 
@@ -203,7 +202,7 @@ def test_reset_db(client: TestClient, test_db_path: Path):
         assert ("schema_migrations",) in tables
 
 
-def test_seed_db(client: TestClient, test_db_path: Path):
+def test_seed_db(client: TestClient, test_db_path: Path) -> None:
     """
     Tests the `/api/testing/seed_db` endpoint with a valid fixture file.
 
@@ -237,7 +236,7 @@ def test_seed_db(client: TestClient, test_db_path: Path):
         assert ("seeded_for_test",) in tables
 
 
-def test_seed_db_file_not_found(client: TestClient):
+def test_seed_db_file_not_found(client: TestClient) -> None:
     """
     Tests the `/api/testing/seed_db` endpoint with a non-existent fixture file.
 

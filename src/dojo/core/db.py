@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # FastAPI requests from racing to open handles to the same DuckDB file,
 # which can cause binder errors during bursty UI traffic.
 _CONNECTION_LOCK = threading.Lock()
+_SETTINGS_DEP = Depends(get_settings)
 
 
 @contextmanager
@@ -49,7 +50,7 @@ def get_connection(path: Path) -> Iterator[duckdb.DuckDBPyConnection]:
 
 
 def connection_dep(
-    settings: Settings = Depends(get_settings),
+    settings: Settings = _SETTINGS_DEP,
 ) -> Iterator[duckdb.DuckDBPyConnection]:
     """
     FastAPI dependency that yields a DuckDB connection.

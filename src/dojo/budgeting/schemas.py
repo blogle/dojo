@@ -43,9 +43,7 @@ class NewTransactionRequest(BaseModel):
         Optional free-form note or description for the transaction.
     """
 
-    concept_id: UUID | None = Field(
-        default=None, description="Stable identifier for the logical transaction."
-    )
+    concept_id: UUID | None = Field(default=None, description="Stable identifier for the logical transaction.")
     transaction_date: date = Field(description="Date the transaction occurred.")
     account_id: str = Field(min_length=1, description="Account to impact.")
     category_id: str = Field(min_length=1, description="Budget category to impact.")
@@ -82,25 +80,13 @@ class CategorizedTransferRequest(BaseModel):
         Optional shared concept identifier, linking this transfer to a broader financial event.
     """
 
-    source_account_id: str = Field(
-        min_length=1, description="Account ID funds are moving from."
-    )
-    destination_account_id: str = Field(
-        min_length=1, description="Account ID funds are moving to."
-    )
-    category_id: str = Field(
-        min_length=1, description="Budget category for the budgeted leg."
-    )
-    amount_minor: int = Field(
-        gt=0, description="Positive amount in minor units to move."
-    )
+    source_account_id: str = Field(min_length=1, description="Account ID funds are moving from.")
+    destination_account_id: str = Field(min_length=1, description="Account ID funds are moving to.")
+    category_id: str = Field(min_length=1, description="Budget category for the budgeted leg.")
+    amount_minor: int = Field(gt=0, description="Positive amount in minor units to move.")
     transaction_date: date = Field(description="Date the transfer occurred.")
-    memo: str | None = Field(
-        default=None, description="Optional comment for both legs."
-    )
-    concept_id: UUID | None = Field(
-        default=None, description="Optional shared concept identifier."
-    )
+    memo: str | None = Field(default=None, description="Optional comment for both legs.")
+    concept_id: UUID | None = Field(default=None, description="Optional shared concept identifier.")
 
 
 # Defines the literal types for various account classifications.
@@ -162,9 +148,7 @@ class CategoryState(BaseModel):
     category_id: str
     name: str
     available_minor: int
-    activity_minor: int = Field(
-        default=0, description="Month-to-date activity in minor units."
-    )
+    activity_minor: int = Field(default=0, description="Month-to-date activity in minor units.")
 
 
 class TransactionResponse(BaseModel):
@@ -379,25 +363,15 @@ class BudgetAllocationRequest(BaseModel):
         Defaults to the current month if None.
     """
 
-    category_id: str | None = Field(
-        default=None, description="Deprecated alias for `to_category_id`."
-    )
-    to_category_id: str | None = Field(
-        default=None, description="Destination category receiving funds."
-    )
-    from_category_id: str | None = Field(
-        default=None, description="Optional source category providing funds."
-    )
+    category_id: str | None = Field(default=None, description="Deprecated alias for `to_category_id`.")
+    to_category_id: str | None = Field(default=None, description="Destination category receiving funds.")
+    from_category_id: str | None = Field(default=None, description="Optional source category providing funds.")
     amount_minor: int = Field(gt=0)
     allocation_date: date | None = Field(
         default=None, description="Date the allocation is recorded (defaults to today)."
     )
-    memo: str | None = Field(
-        default=None, description="Optional note for the allocation ledger."
-    )
-    month_start: date | None = Field(
-        default=None, description="Optional month override (YYYY-MM-01)."
-    )
+    memo: str | None = Field(default=None, description="Optional note for the allocation ledger.")
+    month_start: date | None = Field(default=None, description="Optional month override (YYYY-MM-01).")
 
 
 # Regular expression pattern for valid slug-like identifiers (lowercase letters, numbers, underscores).
@@ -523,9 +497,7 @@ class AccountCommand(BaseModel):
         min_length=CURRENCY_CODE_LENGTH,
         max_length=CURRENCY_CODE_LENGTH,
     )
-    opened_on: date | None = Field(
-        default=None, description="Optional account open date."
-    )
+    opened_on: date | None = Field(default=None, description="Optional account open date.")
     is_active: bool = Field(
         default=True,
         description="Marks whether the account can be used for new transactions.",
@@ -545,9 +517,7 @@ class AccountCreateRequest(AccountCommand):
         Stable identifier for the account. Must match `SLUG_PATTERN`.
     """
 
-    account_id: str = Field(
-        pattern=SLUG_PATTERN, description="Stable identifier for the account."
-    )
+    account_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the account.")
 
 
 class AccountUpdateRequest(AccountCommand):
@@ -608,16 +578,12 @@ class BudgetCategoryCommand(BaseModel):
     """
 
     name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    group_id: str | None = Field(
-        default=None, description="Parent category group ID."
-    )
+    group_id: str | None = Field(default=None, description="Parent category group ID.")
     is_active: bool = Field(default=True)
     goal_type: Literal["target_date", "recurring"] | None = Field(default=None)
     goal_amount_minor: int | None = Field(default=None)
     goal_target_date: date | None = Field(default=None)
-    goal_frequency: Literal["monthly", "quarterly", "yearly"] | None = Field(
-        default=None
-    )
+    goal_frequency: Literal["monthly", "quarterly", "yearly"] | None = Field(default=None)
 
 
 class BudgetCategoryGroupCommand(BaseModel):
@@ -655,9 +621,7 @@ class BudgetCategoryGroupCreateRequest(BudgetCategoryGroupCommand):
         Stable identifier for the group. Must match `SLUG_PATTERN`.
     """
 
-    group_id: str = Field(
-        pattern=SLUG_PATTERN, description="Stable identifier for the group."
-    )
+    group_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the group.")
 
 
 class BudgetCategoryGroupUpdateRequest(BudgetCategoryGroupCommand):
@@ -757,22 +721,12 @@ class BudgetCategoryDetail(BudgetCategoryCommand):
     group_id: str | None = None
     created_at: datetime
     updated_at: datetime
-    available_minor: int = Field(
-        default=0, description="Current available funds for the month in minor units."
-    )
-    activity_minor: int = Field(
-        default=0, description="Month-to-date activity amount in minor units."
-    )
+    available_minor: int = Field(default=0, description="Current available funds for the month in minor units.")
+    activity_minor: int = Field(default=0, description="Month-to-date activity amount in minor units.")
     allocated_minor: int = Field(
         default=0,
         description="Month-to-date allocations applied to this envelope in minor units.",
     )
-    last_month_allocated_minor: int = Field(
-        default=0, description="Allocated amount from the previous month."
-    )
-    last_month_activity_minor: int = Field(
-        default=0, description="Activity amount from the previous month."
-    )
-    last_month_available_minor: int = Field(
-        default=0, description="Available amount from the previous month."
-    )
+    last_month_allocated_minor: int = Field(default=0, description="Allocated amount from the previous month.")
+    last_month_activity_minor: int = Field(default=0, description="Activity amount from the previous month.")
+    last_month_available_minor: int = Field(default=0, description="Available amount from the previous month.")

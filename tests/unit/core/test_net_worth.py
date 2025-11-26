@@ -53,12 +53,7 @@ def test_current_snapshot_reflects_accounts_and_positions(
     assert snapshot.tangibles_minor == 850000
     # Assert calculated net worth matches the sum of assets + positions + tangibles - liabilities.
     assert snapshot.net_worth_minor == (
-        snapshot.assets_minor
-        - snapshot.liabilities_minor
-        + snapshot.positions_minor
-        + snapshot.tangibles_minor
+        snapshot.assets_minor - snapshot.liabilities_minor + snapshot.positions_minor + snapshot.tangibles_minor
     )
     # Assert decimal representation matches the calculated minor unit value.
-    assert snapshot.net_worth_decimal == Decimal(snapshot.net_worth_minor).scaleb(
-        -2
-    ).quantize(Decimal("0.01"))
+    assert snapshot.net_worth_decimal == Decimal(snapshot.net_worth_minor).scaleb(-2).quantize(Decimal("0.01"))

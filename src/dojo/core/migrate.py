@@ -56,9 +56,7 @@ def _list_sql_files(migrations_pkg: Traversable) -> Iterable[Traversable]:
     )
 
 
-def apply_migrations(
-    conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversable
-) -> None:
+def apply_migrations(conn: duckdb.DuckDBPyConnection, migrations_pkg: Traversable) -> None:
     """
     Applies unapplied SQL migration files from a package to the database.
 
@@ -80,12 +78,7 @@ def apply_migrations(
     """
     _ensure_schema(conn)
     # Fetch already applied migrations to avoid re-applying them.
-    applied = {
-        filename
-        for (filename,) in conn.execute(
-            "SELECT filename FROM schema_migrations"
-        ).fetchall()
-    }
+    applied = {filename for (filename,) in conn.execute("SELECT filename FROM schema_migrations").fetchall()}
     for sql_file in _list_sql_files(migrations_pkg):
         if sql_file.name in applied:
             logger.info("Skipping %s (already applied)", sql_file.name)

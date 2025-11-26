@@ -13,9 +13,9 @@ import duckdb
 import pytest
 
 from dojo.budgeting.errors import (
-    AccountAlreadyExists,
-    AccountNotFound,
-    CategoryNotFound,
+    AccountAlreadyExistsError,
+    AccountNotFoundError,
+    CategoryNotFoundError,
 )
 from dojo.budgeting.schemas import (
     AccountCreateRequest,
@@ -127,7 +127,7 @@ def test_credit_account_auto_creates_payment_category(
 
 def test_duplicate_account_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     """
-    Verifies that creating an account with an existing ID raises an `AccountAlreadyExists` error.
+    Verifies that creating an account with an existing ID raises an `AccountAlreadyExistsError` error.
     """
     service = AccountAdminService()
     payload = AccountCreateRequest(
@@ -140,7 +140,7 @@ def test_duplicate_account_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> 
     service.create_account(in_memory_db, payload)
 
     # Attempting to create it again with the same ID should raise an error.
-    with pytest.raises(AccountAlreadyExists):
+    with pytest.raises(AccountAlreadyExistsError):
         service.create_account(in_memory_db, payload)
 
 
@@ -150,7 +150,7 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
 
     This test checks if an account's details can be successfully updated
     and subsequently deactivated, and that attempting to update a missing
-    account raises an `AccountNotFound` error.
+    account raises an `AccountNotFoundError` error.
     """
     service = AccountAdminService()
     create_payload = AccountCreateRequest(
@@ -181,12 +181,10 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
     service.deactivate_account(in_memory_db, "needs_update")
     # Retrieve the list of accounts and check if the account's active status is False.
     refreshed = service.list_accounts(in_memory_db)
-    assert any(
-        acc.account_id == "needs_update" and acc.is_active is False for acc in refreshed
-    )
+    assert any(acc.account_id == "needs_update" and acc.is_active is False for acc in refreshed)
 
     # Attempting to update a non-existent account should raise an error.
-    with pytest.raises(AccountNotFound):
+    with pytest.raises(AccountNotFoundError):
         service.update_account(in_memory_db, "missing", update_payload)
 
 
@@ -221,10 +219,8 @@ def test_category_crud(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     service.deactivate_category(in_memory_db, "fun_money")
     # Retrieve the list of categories and check if the category's active status is False.
     refreshed = service.list_categories(in_memory_db)
-    assert any(
-        cat.category_id == "fun_money" and cat.is_active is False for cat in refreshed
-    )
+    assert any(cat.category_id == "fun_money" and cat.is_active is False for cat in refreshed)
 
     # Attempting to update a non-existent category should raise an error.
-    with pytest.raises(CategoryNotFound):
+    with pytest.raises(CategoryNotFoundError):
         service.update_category(in_memory_db, "missing", update_payload)

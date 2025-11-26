@@ -9,7 +9,7 @@ deactivating, and managing relationships for budget category groups.
 import duckdb
 import pytest
 
-from dojo.budgeting.errors import GroupAlreadyExists, GroupNotFound
+from dojo.budgeting.errors import GroupAlreadyExistsError, GroupNotFoundError
 from dojo.budgeting.schemas import (
     BudgetCategoryCreateRequest,
     BudgetCategoryGroupCreateRequest,
@@ -25,7 +25,7 @@ def test_group_crud(in_memory_db: duckdb.DuckDBPyConnection) -> None:
 
     This test covers creating a new group, updating its details,
     deactivating it, and ensures that operations on a non-existent
-    group raise an `GroupNotFound` error.
+    group raise an `GroupNotFoundError` error.
     """
     service = BudgetCategoryAdminService()
     create_payload = BudgetCategoryGroupCreateRequest(
@@ -61,13 +61,13 @@ def test_group_crud(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     assert not any(g.group_id == "monthly_bills" for g in refreshed)
 
     # Attempting to update a non-existent group should raise an error.
-    with pytest.raises(GroupNotFound):
+    with pytest.raises(GroupNotFoundError):
         service.update_group(in_memory_db, "missing", update_payload)
 
 
 def test_duplicate_group_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> None:
     """
-    Verifies that creating a category group with an existing ID raises an `GroupAlreadyExists` error.
+    Verifies that creating a category group with an existing ID raises an `GroupAlreadyExistsError` error.
     """
     service = BudgetCategoryAdminService()
     payload = BudgetCategoryGroupCreateRequest(
@@ -78,7 +78,7 @@ def test_duplicate_group_rejected(in_memory_db: duckdb.DuckDBPyConnection) -> No
     service.create_group(in_memory_db, payload)
 
     # Attempting to create it again with the same ID should raise an error.
-    with pytest.raises(GroupAlreadyExists):
+    with pytest.raises(GroupAlreadyExistsError):
         service.create_group(in_memory_db, payload)
 
 
@@ -111,16 +111,12 @@ def test_category_in_group(in_memory_db: duckdb.DuckDBPyConnection) -> None:
         group_id=None,
         is_active=True,
     )
-    updated_cat = service.update_category(
-        in_memory_db, "emergency_fund", update_payload
-    )
+    updated_cat = service.update_category(in_memory_db, "emergency_fund", update_payload)
     # Assert the category is no longer in a group.
     assert updated_cat.group_id is None
 
     # Update the category again to move it back to the original group.
     update_payload.group_id = "savings"
-    updated_cat_2 = service.update_category(
-        in_memory_db, "emergency_fund", update_payload
-    )
+    updated_cat_2 = service.update_category(in_memory_db, "emergency_fund", update_payload)
     # Assert the category is correctly reassigned to the group.
     assert updated_cat_2.group_id == "savings"

@@ -7,7 +7,7 @@ from ..core.migrate import migrate
 from .dao import get_testing_dao
 
 
-def reset_db(db_path: Path):
+def reset_db(db_path: Path) -> None:
     """
     Drops all tables in the specified database and re-runs migrations.
 
@@ -28,7 +28,7 @@ def reset_db(db_path: Path):
     migrate(db_path=db_path)
 
 
-def seed_db(db_path: Path, fixture_path: str):
+def seed_db(db_path: Path, fixture_path: str) -> None:
     """
     Seeds the database with data from a SQL fixture file.
 

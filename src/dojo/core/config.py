@@ -31,12 +31,8 @@ class Settings(BaseSettings):
         default=False,
         description="Flag to enable/disable testing-specific functionality.",
     )
-    api_host: str = Field(
-        default="0.0.0.0", description="Default host bound by API servers."
-    )
-    api_port: int = Field(
-        default=8000, description="Default port bound by API servers."
-    )
+    api_host: str = Field(default="0.0.0.0", description="Default host bound by API servers.")
+    api_port: int = Field(default=8000, description="Default port bound by API servers.")
 
     model_config = SettingsConfigDict(
         env_prefix="dojo_",

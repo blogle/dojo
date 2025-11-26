@@ -7,11 +7,12 @@ on core budgeting functionalities, ensuring that fundamental invariants
 range of generated inputs.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import date
 from importlib import resources
 from types import SimpleNamespace
+from typing import Any
 
 import duckdb
 from hypothesis import given, settings
@@ -22,6 +23,8 @@ from dojo.budgeting.schemas import BudgetAllocationRequest, NewTransactionReques
 from dojo.budgeting.services import TransactionEntryService
 from dojo.core.migrate import apply_migrations
 from dojo.testing.fixtures import apply_base_budgeting_fixture
+
+DrawFn = Callable[..., Any]
 
 
 @contextmanager
@@ -105,7 +108,7 @@ allocation_amount_strategy = st.integers(min_value=1, max_value=100_00)
 
 
 @st.composite
-def reallocation_strategy(draw):
+def reallocation_strategy(draw: DrawFn) -> BudgetAllocationRequest:
     """
     Hypothesis strategy for generating valid budget reallocation requests.
 
@@ -137,7 +140,7 @@ def reallocation_strategy(draw):
 
 @given(reallocations=st.lists(reallocation_strategy(), min_size=1, max_size=5))
 @settings(max_examples=10, deadline=None)
-def test_conservation_of_money_in_reallocation(reallocations):
+def test_conservation_of_money_in_reallocation(reallocations: list[BudgetAllocationRequest]) -> None:
     """
     Verifies the conservation of money invariant during budget reallocations.
 
@@ -168,28 +171,24 @@ def test_conservation_of_money_in_reallocation(reallocations):
             "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
             [month],
         )
-        initial_available = (
-            int(initial_available_row.total_available) if initial_available_row else 0
-        )
+        initial_available = int(initial_available_row.total_available) if initial_available_row else 0
 
         # Perform the generated reallocations.
         for reallocation in reallocations:
-            from_category_state_record = dao.get_category_month_state(
-                reallocation.from_category_id, month
-            )
+            source_category_id = reallocation.from_category_id
+            target_category_id = reallocation.to_category_id
+            if not source_category_id or not target_category_id:
+                continue
+            from_category_state_record = dao.get_category_month_state(source_category_id, month)
 
             # Only perform reallocation if the source category has sufficient funds.
-            if (
-                from_category_state_record
-                and from_category_state_record.available_minor
-                >= reallocation.amount_minor
-            ):
+            if from_category_state_record and from_category_state_record.available_minor >= reallocation.amount_minor:
                 service.allocate_envelope(
                     conn,
-                    reallocation.to_category_id,
+                    target_category_id,
                     reallocation.amount_minor,
                     month,
-                    from_category_id=reallocation.from_category_id,
+                    from_category_id=source_category_id,
                 )
 
         # Get final total available funds after all reallocations.
@@ -198,9 +197,7 @@ def test_conservation_of_money_in_reallocation(reallocations):
             "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
             [month],
         )
-        final_available = (
-            int(final_available_row.total_available) if final_available_row else 0
-        )
+        final_available = int(final_available_row.total_available) if final_available_row else 0
 
         # Assert that the total available funds remain unchanged.
         assert initial_available == final_available
@@ -215,7 +212,7 @@ allocation_amount_strategy = st.integers(min_value=1, max_value=500_00)
 
 
 @st.composite
-def inflow_transactions_strategy(draw):
+def inflow_transactions_strategy(draw: DrawFn) -> NewTransactionRequest:
     """
     Hypothesis strategy for generating inflow transaction requests.
 
@@ -242,7 +239,7 @@ def inflow_transactions_strategy(draw):
 
 
 @st.composite
-def spending_transactions_strategy(draw):
+def spending_transactions_strategy(draw: DrawFn) -> NewTransactionRequest:
     """
     Hypothesis strategy for generating spending transaction requests.
 
@@ -274,7 +271,11 @@ def spending_transactions_strategy(draw):
     allocations=st.lists(allocation_amount_strategy, min_size=1, max_size=3),
 )
 @settings(max_examples=10, deadline=None)
-def test_budget_category_cache_correctness(inflows, spendings, allocations):
+def test_budget_category_cache_correctness(
+    inflows: list[NewTransactionRequest],
+    spendings: list[NewTransactionRequest],
+    allocations: list[int],
+) -> None:
     """
     Verifies that the `budget_category_monthly_state` table (a cache)
     correctly reflects values derived directly from source tables.
@@ -296,7 +297,7 @@ def test_budget_category_cache_correctness(inflows, spendings, allocations):
         service = build_transaction_service()
         month = date.today().replace(day=1)
 
-        TARGET_CATEGORY = "groceries"
+        target_category = "groceries"
 
         # 1. Execute operations: Apply generated inflows, spendings, and allocations.
 
@@ -307,15 +308,19 @@ def test_budget_category_cache_correctness(inflows, spendings, allocations):
             service.create(conn, spending)
 
         for allocation in allocations:
-            service.allocate_envelope(conn, TARGET_CATEGORY, allocation, month)
+            service.allocate_envelope(conn, target_category, allocation, month)
 
         # 2. Manual calculation: Directly calculate expected values from source tables.
 
         # Calculate expected activity for the target category from transactions.
         expected_activity_row = _fetch_namespace(
             conn,
-            "SELECT SUM(amount_minor) AS total_activity FROM transactions WHERE category_id = ? AND strftime('%Y-%m', transaction_date) = ?",
-            [TARGET_CATEGORY, month.strftime("%Y-%m")],
+            (
+                "SELECT SUM(amount_minor) AS total_activity "
+                "FROM transactions "
+                "WHERE category_id = ? AND strftime('%Y-%m', transaction_date) = ?"
+            ),
+            [target_category, month.strftime("%Y-%m")],
         )
         raw_activity = (
             int(expected_activity_row.total_activity)
@@ -328,8 +333,12 @@ def test_budget_category_cache_correctness(inflows, spendings, allocations):
         # Calculate expected allocated amount for the target category from budget_allocations.
         expected_allocated_row = _fetch_namespace(
             conn,
-            "SELECT SUM(amount_minor) AS total_allocated FROM budget_allocations WHERE to_category_id = ? AND month_start = ?",
-            [TARGET_CATEGORY, month],
+            (
+                "SELECT SUM(amount_minor) AS total_allocated "
+                "FROM budget_allocations "
+                "WHERE to_category_id = ? AND month_start = ?"
+            ),
+            [target_category, month],
         )
         expected_allocated = (
             int(expected_allocated_row.total_allocated)
@@ -347,33 +356,29 @@ def test_budget_category_cache_correctness(inflows, spendings, allocations):
         # 3. Fetch from cache: Retrieve cached values from `budget_category_monthly_state`.
 
         cache_row = conn.execute(
-            "SELECT allocated_minor, inflow_minor, activity_minor, available_minor FROM budget_category_monthly_state WHERE category_id = ? AND month_start = ?",
-            [TARGET_CATEGORY, month],
+            (
+                "SELECT allocated_minor, inflow_minor, activity_minor, available_minor "
+                "FROM budget_category_monthly_state "
+                "WHERE category_id = ? AND month_start = ?"
+            ),
+            [target_category, month],
         ).fetchone()
 
-        assert cache_row is not None, (
-            "Cache row was not created for the target category."
-        )
+        assert cache_row is not None, "Cache row was not created for the target category."
 
         cached_allocated, cached_inflow, cached_activity, cached_available = cache_row
 
         # 4. Assertions: Compare manually calculated values with cached values.
 
-        assert cached_activity == expected_activity, (
-            "Activity mismatch between cached and calculated values."
-        )
-        assert cached_allocated == expected_allocated, (
-            "Allocated amount mismatch between cached and calculated values."
-        )
-        assert cached_inflow == expected_inflow, (
-            "Inflow mismatch between cached and calculated values."
-        )
+        assert cached_activity == expected_activity, "Activity mismatch between cached and calculated values."
+        assert cached_allocated == expected_allocated, "Allocated amount mismatch between cached and calculated values."
+        assert cached_inflow == expected_inflow, "Inflow mismatch between cached and calculated values."
         assert cached_available == expected_available, (
             "Available balance mismatch between cached and calculated values."
         )
 
 
-def test_group_category_relationship():
+def test_group_category_relationship() -> None:
     """
 
 
@@ -433,9 +438,7 @@ def test_group_category_relationship():
     with ledger_connection() as conn:
         # Fetch all category IDs and their associated group IDs.
 
-        categories = conn.execute(
-            "SELECT category_id, group_id FROM budget_categories"
-        ).fetchall()
+        categories = conn.execute("SELECT category_id, group_id FROM budget_categories").fetchall()
 
         for category_id, group_id in categories:
             # Only check categories that are assigned to a group.

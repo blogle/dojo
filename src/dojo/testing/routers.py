@@ -14,6 +14,8 @@ from . import services
 
 # Initialize the API router for testing-specific endpoints.
 router = APIRouter(tags=["testing"])
+_SETTINGS_DEP = Depends(get_settings)
+_SEED_REQUEST_BODY = Body(...)
 
 
 class SeedRequest(BaseModel):
@@ -31,7 +33,7 @@ class SeedRequest(BaseModel):
 
 
 @router.post("/testing/reset_db", status_code=status.HTTP_204_NO_CONTENT)
-def reset_database(settings: Settings = Depends(get_settings)):
+def reset_database(settings: Settings = _SETTINGS_DEP) -> None:
     """
     Resets the database to a clean state.
 
@@ -54,13 +56,11 @@ def reset_database(settings: Settings = Depends(get_settings)):
         services.reset_db(db_path=settings.db_path)
     except Exception as e:
         # Catch any exceptions during reset and return an appropriate HTTP error.
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/testing/seed_db", status_code=status.HTTP_204_NO_CONTENT)
-def seed_database(
-    payload: SeedRequest = Body(...), settings: Settings = Depends(get_settings)
-):
+def seed_database(payload: SeedRequest = _SEED_REQUEST_BODY, settings: Settings = _SETTINGS_DEP) -> None:
     """
     Seeds the database with data from a specified fixture file.
 
@@ -85,7 +85,7 @@ def seed_database(
         services.seed_db(db_path=settings.db_path, fixture_path=payload.fixture)
     except FileNotFoundError as e:
         # Handle cases where the fixture file is not found.
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         # Handle other exceptions during seeding.
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

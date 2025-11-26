@@ -52,7 +52,9 @@ export const createStore = (initialState) => {
       return currentState;
     }
     currentState = structuredCopy(nextState);
-    listeners.forEach((listener) => listener(currentState));
+    listeners.forEach((listener) => {
+      listener(currentState);
+    });
     return currentState;
   };
 

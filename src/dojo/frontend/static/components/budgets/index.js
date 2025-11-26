@@ -3,7 +3,7 @@ import { api } from "../../services/api.js";
 import { formatAmount, minorToDollars, todayISO, currentMonthStartISO, dollarsToMinor } from "../../services/format.js";
 import { populateSelect, setFormError, setButtonBusy } from "../../services/dom.js";
 import { store } from "../../store.js";
-import { filterUserFacingCategories, getCategoryDisplayName } from "../categories/utils.js";
+import { filterUserFacingCategories } from "../categories/utils.js";
 import { showToast } from "../toast.js";
 import { refreshSelectOptions } from "../reference/index.js";
 
@@ -127,9 +127,11 @@ const renderGroupRows = (grouped, body) => {
   };
 
   const state = store.getState();
-  state.budgets.groups.forEach((g) => renderGroup(grouped[g.group_id]));
-  if (grouped["uncategorized"].items.length > 0) {
-    renderGroup(grouped["uncategorized"]);
+  state.budgets.groups.forEach((g) => {
+    renderGroup(grouped[g.group_id]);
+  });
+  if (grouped.uncategorized.items.length > 0) {
+    renderGroup(grouped.uncategorized);
   }
 };
 
@@ -157,8 +159,10 @@ export const renderBudgetsPage = () => {
   }
 
   const grouped = {};
-  state.budgets.groups.forEach((g) => (grouped[g.group_id] = { ...g, items: [] }));
-  grouped["uncategorized"] = { group_id: "uncategorized", name: "Uncategorized", items: [] };
+  state.budgets.groups.forEach((g) => {
+    grouped[g.group_id] = { ...g, items: [] };
+  });
+  grouped.uncategorized = { group_id: "uncategorized", name: "Uncategorized", items: [] };
 
   state.budgets.categories.forEach((cat) => {
     const gid = cat.group_id || "uncategorized";
@@ -174,8 +178,9 @@ export const renderBudgetsPage = () => {
   body.querySelectorAll("tr[data-group-id]").forEach((row) => {
     row.addEventListener("click", () => {
       const gid = row.dataset.groupId;
-      if (gid === "uncategorized") {
-        openGroupDetailModal(grouped["uncategorized"]);
+        if (gid === "uncategorized") {
+          openGroupDetailModal(grouped.uncategorized);
+
       } else {
         const group = grouped[gid];
         if (group) openGroupDetailModal(group);
@@ -466,7 +471,9 @@ const openCategoryModal = (category = null) => {
   }
 
   const goalRadios = form.querySelectorAll("input[name='goal_type']");
-  goalRadios.forEach((radio) => (radio.checked = radio.value === "recurring"));
+  goalRadios.forEach((radio) => {
+    radio.checked = radio.value === "recurring";
+  });
   form.querySelector("[data-goal-section='target_date']").style.display = "none";
   form.querySelector("[data-goal-section='recurring']").style.display = "block";
   form.querySelector("input[name='target_date_dt']").value = "";

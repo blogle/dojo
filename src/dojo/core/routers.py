@@ -9,6 +9,7 @@ from dojo.core.schemas import NetWorthResponse
 
 # Initialize the API router with a tag for core functionalities.
 router = APIRouter(tags=["core"])
+_CONNECTION_DEP = Depends(connection_dep)
 
 
 @router.get("/health")
@@ -26,7 +27,7 @@ def health() -> dict[str, str]:
 
 @router.get("/net-worth/current", response_model=NetWorthResponse)
 def net_worth_current(
-    conn: duckdb.DuckDBPyConnection = Depends(connection_dep),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
 ) -> NetWorthResponse:
     """
     Return the current net worth snapshot.
