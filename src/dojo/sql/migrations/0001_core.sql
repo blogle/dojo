@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS budget_category_monthly_state (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (category_id, month_start),
-    FOREIGN KEY (category_id) REFERENCES budget_categories(category_id)
+    FOREIGN KEY (category_id) REFERENCES budget_categories (category_id)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -44,15 +44,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     valid_to TIMESTAMP NOT NULL DEFAULT (TIMESTAMP '9999-12-31 00:00:00'),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     source TEXT NOT NULL DEFAULT 'api',
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id),
-    FOREIGN KEY (category_id) REFERENCES budget_categories(category_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id),
+    FOREIGN KEY (category_id) REFERENCES budget_categories (category_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_concept_active
-ON transactions(concept_id, is_active);
+ON transactions (concept_id, is_active);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_account_date
-ON transactions(account_id, transaction_date);
+ON transactions (account_id, transaction_date);
 
 CREATE TABLE IF NOT EXISTS positions (
     position_id UUID PRIMARY KEY,
@@ -62,6 +62,5 @@ CREATE TABLE IF NOT EXISTS positions (
     market_value_minor BIGINT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
-

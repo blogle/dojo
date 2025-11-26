@@ -9,8 +9,8 @@ SELECT
     tc.name AS to_category_name,
     a.created_at
 FROM budget_allocations AS a
-LEFT JOIN budget_categories AS fc ON fc.category_id = a.from_category_id
-JOIN budget_categories AS tc ON tc.category_id = a.to_category_id
-WHERE a.month_start = ?
+LEFT JOIN budget_categories AS fc ON a.from_category_id = fc.category_id
+INNER JOIN budget_categories AS tc ON a.to_category_id = tc.category_id
+WHERE a.month_start = $month_start
 ORDER BY a.allocation_date DESC, a.created_at DESC
-LIMIT ?;
+LIMIT $limit_count;

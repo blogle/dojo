@@ -6,4 +6,12 @@ INSERT INTO budget_allocations (
     to_category_id,
     amount_minor,
     memo
-) VALUES (?, ?, ?, ?, ?, ?, ?);
+) VALUES (
+    $allocation_id,
+    $allocation_date,
+    $month_start,
+    $from_category_id,
+    $to_category_id,
+    $amount_minor,
+    $memo
+);

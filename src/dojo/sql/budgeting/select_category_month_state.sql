@@ -5,6 +5,7 @@ SELECT
     COALESCE(s.activity_minor, 0) AS activity_minor
 FROM budget_categories AS c
 LEFT JOIN budget_category_monthly_state AS s
-    ON s.category_id = c.category_id
-   AND s.month_start = ?
-WHERE c.category_id = ?;
+    ON
+        c.category_id = s.category_id
+        AND s.month_start = $month_start
+WHERE c.category_id = $category_id;

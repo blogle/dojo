@@ -1,6 +1,6 @@
 """Data access helpers for the budgeting domain."""
 
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -742,7 +742,11 @@ class BudgetingDAO:
         """
         self._conn = conn
 
-    def _fetchone_namespace(self, sql: str, params: Sequence[Any] | None = None) -> SimpleNamespace | None:
+    def _fetchone_namespace(
+        self,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
+    ) -> SimpleNamespace | None:
         """
         Executes a SQL query and fetches a single row, returning it as a SimpleNamespace.
 
@@ -750,16 +754,18 @@ class BudgetingDAO:
         ----------
         sql : str
             The SQL query string to execute.
-        params : Sequence[Any] | None, optional
-            A sequence of parameters to bind to the SQL query.
+        params : Sequence[Any] | Mapping[str, Any] | None, optional
+            Parameters to bind to the SQL query.
 
         Returns
         -------
         SimpleNamespace | None
             A SimpleNamespace object representing the fetched row, or None if no row is found.
         """
-        # Execute the SQL query with optional parameters.
-        cursor = self._conn.execute(sql, params or [])
+        if params is None:
+            cursor = self._conn.execute(sql)
+        else:
+            cursor = self._conn.execute(sql, params)
         # Fetch a single row from the result.
         row = cursor.fetchone()
         if row is None:
@@ -767,7 +773,11 @@ class BudgetingDAO:
         # Convert the fetched row into a SimpleNamespace for attribute-style access.
         return _row_to_namespace(cursor.description, row)
 
-    def _fetchall_namespaces(self, sql: str, params: Sequence[Any] | None = None) -> list[SimpleNamespace]:
+    def _fetchall_namespaces(
+        self,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
+    ) -> list[SimpleNamespace]:
         """
         Executes a SQL query and fetches all rows, returning them as a list of SimpleNamespace objects.
 
@@ -775,8 +785,8 @@ class BudgetingDAO:
         ----------
         sql : str
             The SQL query string to execute.
-        params : Sequence[Any] | None, optional
-            A sequence of parameters to bind to the SQL query.
+        params : Sequence[Any] | Mapping[str, Any] | None, optional
+            Parameters to bind to the SQL query.
 
         Returns
         -------
@@ -784,8 +794,10 @@ class BudgetingDAO:
             A list of SimpleNamespace objects, each representing a row from the query result.
             Returns an empty list if no rows are found.
         """
-        # Execute the SQL query with optional parameters.
-        cursor = self._conn.execute(sql, params or [])
+        if params is None:
+            cursor = self._conn.execute(sql)
+        else:
+            cursor = self._conn.execute(sql, params)
         # Fetch all rows from the result.
         rows = cursor.fetchall()
         if not rows:
@@ -862,7 +874,10 @@ class BudgetingDAO:
             An AccountRecord if an active account with the given ID is found, otherwise None.
         """
         # Execute SQL to select an active account and fetch a single row.
-        row = self._fetchone_namespace(_sql("select_active_account.sql"), [account_id])
+        row = self._fetchone_namespace(
+            _sql("select_active_account.sql"),
+            {"account_id": account_id},
+        )
         if row is None:
             return None
         # Convert the fetched row into an AccountRecord.
@@ -883,7 +898,10 @@ class BudgetingDAO:
             An AccountRecord if an account with the given ID is found, otherwise None.
         """
         # Execute SQL to select account details and fetch a single row.
-        row = self._fetchone_namespace(_sql("select_account_detail.sql"), [account_id])
+        row = self._fetchone_namespace(
+            _sql("select_account_detail.sql"),
+            {"account_id": account_id},
+        )
         if row is None:
             return None
         # Convert the fetched row into an AccountRecord.
@@ -962,17 +980,17 @@ class BudgetingDAO:
         # Execute the insert query with the provided parameters.
         self._conn.execute(
             sql,
-            [
-                account_id,
-                name,
-                account_type,
-                account_class,
-                account_role,
-                current_balance_minor,
-                currency,
-                is_active,
-                opened_on,
-            ],
+            {
+                "account_id": account_id,
+                "name": name,
+                "account_type": account_type,
+                "account_class": account_class,
+                "account_role": account_role,
+                "current_balance_minor": current_balance_minor,
+                "currency": currency,
+                "is_active": is_active,
+                "opened_on": opened_on,
+            },
         )
 
     def insert_account_detail(self, account_class: AccountClass, account_id: str) -> str:
@@ -1010,7 +1028,13 @@ class BudgetingDAO:
         # Load the specific SQL query for inserting account details.
         sql = _sql(sql_name)
         # Execute the insert query with the detail ID and account ID.
-        self._conn.execute(sql, [detail_id, account_id, account_id])
+        self._conn.execute(
+            sql,
+            {
+                "detail_id": detail_id,
+                "account_id": account_id,
+            },
+        )
         return detail_id
 
     def update_account(
@@ -1054,17 +1078,17 @@ class BudgetingDAO:
         # Execute the update query with the provided parameters.
         self._conn.execute(
             sql,
-            [
-                name,
-                account_type,
-                account_class,
-                account_role,
-                current_balance_minor,
-                currency,
-                opened_on,
-                is_active,
-                account_id,
-            ],
+            {
+                "name": name,
+                "account_type": account_type,
+                "account_class": account_class,
+                "account_role": account_role,
+                "current_balance_minor": current_balance_minor,
+                "currency": currency,
+                "opened_on": opened_on,
+                "is_active": is_active,
+                "account_id": account_id,
+            },
         )
 
     def deactivate_account(self, account_id: str) -> None:
@@ -1077,7 +1101,10 @@ class BudgetingDAO:
             The ID of the account to deactivate.
         """
         # Execute the SQL query to deactivate the specified account.
-        self._conn.execute(_sql("deactivate_account.sql"), [account_id])
+        self._conn.execute(
+            _sql("deactivate_account.sql"),
+            {"account_id": account_id},
+        )
 
     # Category queries ----------------------------------------------------
     def get_active_category(self, category_id: str) -> CategoryRecord | None:
@@ -1095,7 +1122,10 @@ class BudgetingDAO:
             A CategoryRecord if an active category with the given ID is found, otherwise None.
         """
         # Execute SQL to select an active category and fetch a single row.
-        row = self._fetchone_namespace(_sql("select_active_category.sql"), [category_id])
+        row = self._fetchone_namespace(
+            _sql("select_active_category.sql"),
+            {"category_id": category_id},
+        )
         if row is None:
             return None
         # Convert the fetched row into a CategoryRecord.
@@ -1119,7 +1149,10 @@ class BudgetingDAO:
             An active CategoryRecord if found, otherwise None.
         """
         # Execute SQL to select a category and fetch a single row.
-        row = self._fetchone_namespace(_sql("select_active_category.sql"), [category_id])
+        row = self._fetchone_namespace(
+            _sql("select_active_category.sql"),
+            {"category_id": category_id},
+        )
         if row is None:
             return None
         # Return None if the category is found but is not active.
@@ -1147,7 +1180,13 @@ class BudgetingDAO:
         # Load the SQL query for selecting category monthly state.
         sql = _sql("select_category_month_state.sql")
         # Execute the query with month_start and category_id parameters.
-        row = self._fetchone_namespace(sql, [month_start, category_id])
+        row = self._fetchone_namespace(
+            sql,
+            {
+                "month_start": month_start,
+                "category_id": category_id,
+            },
+        )
         if row is None:
             return None
         # Convert the fetched row into a CategoryMonthStateRecord.
@@ -1177,7 +1216,14 @@ class BudgetingDAO:
         # Calculate the start of the previous month for historical data.
         previous_month = _previous_month_start(month_start)
         # Execute the query with current and previous month parameters.
-        row = self._fetchone_namespace(sql, [month_start, previous_month, category_id])
+        row = self._fetchone_namespace(
+            sql,
+            {
+                "month_start": month_start,
+                "previous_month": previous_month,
+                "category_id": category_id,
+            },
+        )
         if row is None:
             return None
         # Convert the fetched row into a BudgetCategoryDetailRecord.
@@ -1202,7 +1248,10 @@ class BudgetingDAO:
         # Load the SQL query for selecting all budget categories with admin details.
         sql = _sql("select_budget_categories_admin.sql")
         # Prepare parameters for the query.
-        params = [month, previous_month]
+        params = {
+            "month": month,
+            "previous_month": previous_month,
+        }
         # Execute the query and fetch all rows.
         rows = self._fetchall_namespaces(sql, params)
         # Convert each fetched row into a BudgetCategoryDetailRecord.
@@ -1262,16 +1311,16 @@ class BudgetingDAO:
         # Execute the insert query with the provided parameters.
         self._conn.execute(
             sql,
-            [
-                category_id,
-                group_id,
-                name,
-                is_active,
-                goal_type,
-                goal_amount_minor,
-                goal_target_date,
-                goal_frequency,
-            ],
+            {
+                "category_id": category_id,
+                "group_id": group_id,
+                "name": name,
+                "is_active": is_active,
+                "goal_type": goal_type,
+                "goal_amount_minor": goal_amount_minor,
+                "goal_target_date": goal_target_date,
+                "goal_frequency": goal_frequency,
+            },
         )
 
     def update_budget_category(
@@ -1312,16 +1361,16 @@ class BudgetingDAO:
         # Execute the update query with the provided parameters.
         self._conn.execute(
             sql,
-            [
-                name,
-                group_id,
-                is_active,
-                goal_type,
-                goal_amount_minor,
-                goal_target_date,
-                goal_frequency,
-                category_id,
-            ],
+            {
+                "name": name,
+                "group_id": group_id,
+                "is_active": is_active,
+                "goal_type": goal_type,
+                "goal_amount_minor": goal_amount_minor,
+                "goal_target_date": goal_target_date,
+                "goal_frequency": goal_frequency,
+                "category_id": category_id,
+            },
         )
 
     def deactivate_budget_category(self, category_id: str) -> None:
@@ -1334,7 +1383,10 @@ class BudgetingDAO:
             The ID of the category to deactivate.
         """
         # Execute the SQL query to deactivate the specified budget category.
-        self._conn.execute(_sql("deactivate_budget_category.sql"), [category_id])
+        self._conn.execute(
+            _sql("deactivate_budget_category.sql"),
+            {"category_id": category_id},
+        )
 
     # Category groups -----------------------------------------------------
     def list_budget_category_groups(self) -> list[BudgetCategoryGroupRecord]:
@@ -1379,7 +1431,14 @@ class BudgetingDAO:
         # Load the SQL query for inserting a new budget category group.
         sql = _sql("insert_budget_category_group.sql")
         # Execute the insert query and fetch the single resulting row.
-        row = self._fetchone_namespace(sql, [group_id, name, sort_order])
+        row = self._fetchone_namespace(
+            sql,
+            {
+                "group_id": group_id,
+                "name": name,
+                "sort_order": sort_order,
+            },
+        )
         if row is None:
             return None
         # Convert the fetched row into a BudgetCategoryGroupRecord.
@@ -1411,7 +1470,14 @@ class BudgetingDAO:
         # Load the SQL query for updating a budget category group.
         sql = _sql("update_budget_category_group.sql")
         # Execute the update query and fetch the single resulting row.
-        row = self._fetchone_namespace(sql, [name, sort_order, group_id])
+        row = self._fetchone_namespace(
+            sql,
+            {
+                "name": name,
+                "sort_order": sort_order,
+                "group_id": group_id,
+            },
+        )
         if row is None:
             return None
         # Convert the fetched row into a BudgetCategoryGroupRecord.
@@ -1427,7 +1493,10 @@ class BudgetingDAO:
             The ID of the category group to deactivate.
         """
         # Execute the SQL query to deactivate the specified budget category group.
-        self._conn.execute(_sql("deactivate_budget_category_group.sql"), [group_id])
+        self._conn.execute(
+            _sql("deactivate_budget_category_group.sql"),
+            {"group_id": group_id},
+        )
 
     def get_budget_category_group(self, group_id: str) -> BudgetCategoryGroupRecord | None:
         """
@@ -1446,7 +1515,10 @@ class BudgetingDAO:
         # Load the SQL query for selecting a budget category group.
         sql = _sql("select_budget_category_group.sql")
         # Execute the query and fetch a single row.
-        row = self._fetchone_namespace(sql, [group_id])
+        row = self._fetchone_namespace(
+            sql,
+            {"group_id": group_id},
+        )
         if row is None:
             return None
         # Convert the fetched row into a BudgetCategoryGroupRecord.
@@ -1470,7 +1542,10 @@ class BudgetingDAO:
         # Load the SQL query for selecting an active transaction.
         sql = _sql("select_active_transaction.sql")
         # Execute the query and fetch a single row.
-        row = self._fetchone_namespace(sql, [str(concept_id)])
+        row = self._fetchone_namespace(
+            sql,
+            {"concept_id": str(concept_id)},
+        )
         if row is None:
             return None
         # Convert the fetched row into a TransactionVersionRecord.
@@ -1493,7 +1568,14 @@ class BudgetingDAO:
         # Load the SQL query for closing an active transaction.
         sql = _sql("close_active_transaction.sql")
         # Execute the update query with the recorded_at timestamp and concept ID.
-        self._conn.execute(sql, [recorded_at, recorded_at, str(concept_id)])
+        self._conn.execute(
+            sql,
+            {
+                "valid_to": recorded_at,
+                "recorded_at": recorded_at,
+                "concept_id": str(concept_id),
+            },
+        )
 
     def insert_transaction(
         self,
@@ -1541,19 +1623,19 @@ class BudgetingDAO:
         # Execute the insert query with all provided transaction details.
         self._conn.execute(
             sql,
-            [
-                str(transaction_version_id),
-                str(concept_id),
-                account_id,
-                category_id,
-                transaction_date,
-                amount_minor,
-                memo,
-                status,
-                recorded_at,
-                recorded_at,
-                source,
-            ],
+            {
+                "transaction_version_id": str(transaction_version_id),
+                "concept_id": str(concept_id),
+                "account_id": account_id,
+                "category_id": category_id,
+                "transaction_date": transaction_date,
+                "amount_minor": amount_minor,
+                "memo": memo,
+                "status": status,
+                "recorded_at": recorded_at,
+                "valid_from": recorded_at,
+                "source": source,
+            },
         )
 
     def update_account_balance(self, account_id: str, amount_minor: int) -> None:
@@ -1570,7 +1652,13 @@ class BudgetingDAO:
         # Load the SQL query for updating an account's balance.
         sql = _sql("update_account_balance.sql")
         # Execute the update query with the new amount and account ID.
-        self._conn.execute(sql, [amount_minor, account_id])
+        self._conn.execute(
+            sql,
+            {
+                "amount_minor": amount_minor,
+                "account_id": account_id,
+            },
+        )
 
     def upsert_category_activity(self, category_id: str, month_start: date, activity_delta: int) -> None:
         """
@@ -1591,7 +1679,14 @@ class BudgetingDAO:
         # Load the SQL query for upserting category monthly state.
         sql = _sql("upsert_category_monthly_state.sql")
         # Execute the upsert query. The `activity_delta` is used twice for UPSERT logic.
-        self._conn.execute(sql, [category_id, month_start, activity_delta, activity_delta])
+        self._conn.execute(
+            sql,
+            {
+                "category_id": category_id,
+                "month_start": month_start,
+                "activity_delta": activity_delta,
+            },
+        )
 
     def adjust_category_allocation(
         self,
@@ -1617,7 +1712,15 @@ class BudgetingDAO:
         # Load the SQL query for adjusting category allocation.
         sql = _sql("adjust_category_allocation.sql")
         # Execute the update query with the provided deltas.
-        self._conn.execute(sql, [category_id, month_start, allocated_delta, available_delta])
+        self._conn.execute(
+            sql,
+            {
+                "category_id": category_id,
+                "month_start": month_start,
+                "allocated_delta": allocated_delta,
+                "available_delta": available_delta,
+            },
+        )
 
     def adjust_category_inflow(
         self,
@@ -1643,7 +1746,15 @@ class BudgetingDAO:
         # Load the SQL query for adjusting category inflow.
         sql = _sql("adjust_category_inflow.sql")
         # Execute the update query with the provided deltas.
-        self._conn.execute(sql, [category_id, month_start, inflow_delta, available_delta])
+        self._conn.execute(
+            sql,
+            {
+                "category_id": category_id,
+                "month_start": month_start,
+                "inflow_delta": inflow_delta,
+                "available_delta": available_delta,
+            },
+        )
 
     def insert_budget_allocation(
         self,
@@ -1680,15 +1791,15 @@ class BudgetingDAO:
         # Execute the insert query with all provided allocation details.
         self._conn.execute(
             sql,
-            [
-                str(allocation_id),
-                allocation_date,
-                month_start,
-                from_category_id,
-                to_category_id,
-                amount_minor,
-                memo,
-            ],
+            {
+                "allocation_id": str(allocation_id),
+                "allocation_date": allocation_date,
+                "month_start": month_start,
+                "from_category_id": from_category_id,
+                "to_category_id": to_category_id,
+                "amount_minor": amount_minor,
+                "memo": memo,
+            },
         )
 
     def list_recent_transactions(self, limit: int) -> list[TransactionListRecord]:
@@ -1708,7 +1819,10 @@ class BudgetingDAO:
         # Load the SQL query for selecting recent transactions.
         sql = _sql("select_recent_transactions.sql")
         # Execute the query with the limit and fetch all rows.
-        rows = self._fetchall_namespaces(sql, [limit])
+        rows = self._fetchall_namespaces(
+            sql,
+            {"limit_count": limit},
+        )
         # Convert each fetched row into a TransactionListRecord.
         return [TransactionListRecord.from_row(row) for row in rows]
 
@@ -1731,7 +1845,13 @@ class BudgetingDAO:
         # Load the SQL query for selecting budget allocations.
         sql = _sql("select_budget_allocations.sql")
         # Execute the query with month_start and limit, then fetch all rows.
-        rows = self._fetchall_namespaces(sql, [month_start, limit])
+        rows = self._fetchall_namespaces(
+            sql,
+            {
+                "month_start": month_start,
+                "limit_count": limit,
+            },
+        )
         # Convert each fetched row into a BudgetAllocationRecord.
         return [BudgetAllocationRecord.from_row(row) for row in rows]
 
@@ -1755,7 +1875,10 @@ class BudgetingDAO:
         sql = _sql("select_ready_to_assign.sql")
         try:
             # Execute the query and fetch a single row.
-            row = self._fetchone_namespace(sql, [month_start])
+            row = self._fetchone_namespace(
+                sql,
+                {"month_start": month_start},
+            )
         except duckdb.CatalogException:
             # Handle cases where the required tables might not exist (e.g., initial setup).
             return 0
@@ -1782,7 +1905,10 @@ class BudgetingDAO:
         sql = _sql("sum_month_cash_inflows.sql")
         try:
             # Execute the query and fetch a single row. The month_start is used twice in the SQL for range.
-            row = self._fetchone_namespace(sql, [month_start, month_start])
+            row = self._fetchone_namespace(
+                sql,
+                {"month_start": month_start},
+            )
         except duckdb.CatalogException:
             # Handle cases where the required tables might not exist.
             return 0
@@ -1816,7 +1942,14 @@ class BudgetingDAO:
         # Load the SQL query for upserting a credit payment group.
         sql = _sql("upsert_credit_payment_group.sql")
         # Execute the upsert query with the provided details.
-        self._conn.execute(sql, [group_id, name, sort_order])
+        self._conn.execute(
+            sql,
+            {
+                "group_id": group_id,
+                "name": name,
+                "sort_order": sort_order,
+            },
+        )
 
     def upsert_credit_payment_category(
         self,
@@ -1842,4 +1975,11 @@ class BudgetingDAO:
         # Load the SQL query for upserting a credit payment category.
         sql = _sql("upsert_credit_payment_category.sql")
         # Execute the upsert query with the provided details.
-        self._conn.execute(sql, [category_id, group_id, name])
+        self._conn.execute(
+            sql,
+            {
+                "category_id": category_id,
+                "group_id": group_id,
+                "name": name,
+            },
+        )

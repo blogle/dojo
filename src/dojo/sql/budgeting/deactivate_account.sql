@@ -2,4 +2,4 @@ UPDATE accounts
 SET
     is_active = FALSE,
     updated_at = CURRENT_TIMESTAMP
-WHERE account_id = ?;
+WHERE account_id = $account_id;

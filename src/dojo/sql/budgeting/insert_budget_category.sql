@@ -10,4 +10,15 @@ INSERT INTO budget_categories (
     created_at,
     updated_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+VALUES (
+    $category_id,
+    $group_id,
+    $name,
+    $is_active,
+    $goal_type,
+    $goal_amount_minor,
+    $goal_target_date,
+    $goal_frequency,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);

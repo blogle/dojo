@@ -11,8 +11,8 @@ SELECT
     t.memo,
     t.recorded_at
 FROM transactions AS t
-JOIN accounts AS a ON a.account_id = t.account_id
-JOIN budget_categories AS c ON c.category_id = t.category_id
+INNER JOIN accounts AS a ON t.account_id = a.account_id
+INNER JOIN budget_categories AS c ON t.category_id = c.category_id
 WHERE t.is_active = TRUE
 ORDER BY t.recorded_at DESC
-LIMIT ?;
+LIMIT $limit_count;

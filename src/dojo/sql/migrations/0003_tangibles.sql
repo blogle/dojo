@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS tangible_assets (
     recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );

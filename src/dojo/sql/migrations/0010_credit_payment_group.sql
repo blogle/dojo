@@ -2,10 +2,11 @@
 INSERT INTO budget_category_groups (group_id, name, sort_order)
 VALUES ('credit_card_payments', 'Credit Card Payments', -1000)
 ON CONFLICT (group_id) DO UPDATE
-SET name = EXCLUDED.name,
-    sort_order = EXCLUDED.sort_order,
-    is_active = TRUE,
-    updated_at = NOW();
+    SET
+        name = excluded.name,
+        sort_order = excluded.sort_order,
+        is_active = TRUE,
+        updated_at = NOW();
 
 -- Backfill payment categories for all credit accounts so existing data stays consistent.
 WITH normalized_accounts AS (
@@ -14,20 +15,23 @@ WITH normalized_accounts AS (
         name,
         TRIM(BOTH '_' FROM LOWER(REGEXP_REPLACE(account_id, '[^a-z0-9]+', '_', 'g'))) AS slug
     FROM accounts
-    WHERE account_type = 'liability'
-      AND account_class = 'credit'
+    WHERE
+        account_type = 'liability'
+        AND account_class = 'credit'
 )
+
 INSERT INTO budget_categories (category_id, group_id, name, is_active, is_system)
 SELECT
     'payment_' || COALESCE(NULLIF(slug, ''), 'account') AS category_id,
-    'credit_card_payments',
+    'credit_card_payments' AS group_id,
     name,
-    TRUE,
-    FALSE
+    TRUE AS is_active,
+    FALSE AS is_system
 FROM normalized_accounts
 ON CONFLICT (category_id) DO UPDATE
-SET name = EXCLUDED.name,
-    group_id = EXCLUDED.group_id,
-    is_active = TRUE,
-    is_system = FALSE,
-    updated_at = NOW();
+    SET
+        name = excluded.name,
+        group_id = excluded.group_id,
+        is_active = TRUE,
+        is_system = FALSE,
+        updated_at = NOW();

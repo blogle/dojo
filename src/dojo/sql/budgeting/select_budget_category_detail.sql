@@ -17,9 +17,11 @@ SELECT
     COALESCE(prev.available_minor, 0) AS last_month_available_minor
 FROM budget_categories AS c
 LEFT JOIN budget_category_monthly_state AS s
-    ON s.category_id = c.category_id
-   AND s.month_start = ?
+    ON
+        c.category_id = s.category_id
+        AND s.month_start = $month_start
 LEFT JOIN budget_category_monthly_state AS prev
-    ON prev.category_id = c.category_id
-   AND prev.month_start = ?
-WHERE c.category_id = ?;
+    ON
+        c.category_id = prev.category_id
+        AND prev.month_start = $previous_month
+WHERE c.category_id = $category_id;

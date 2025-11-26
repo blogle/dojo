@@ -54,17 +54,17 @@ This separation prevents demo data from leaking into production, keeps tests fas
 
 ## Parameterization & Composition
 
-Use pure SQL with bound parameters (no free-form string interpolation):
+Use pure SQL with bound parameters (no free-form string interpolation). We prefer DuckDB's **named parameters** (`$name`) over positional ones (`?`) for clarity and better tooling support (e.g., sqlfluff).
 
 - Bind parameters from Python rather than composing literals into SQL.
-- Keep dynamic SQL limited to optional clauses that are safely toggled (e.g., adding a filter only if present).
-- Avoid heavy templating; if you must, keep a strict allow-list for identifiers and never inline raw values.
+- Keep dynamic SQL limited to optional clauses that are safely toggled.
+- Avoid heavy templating; if you must, keep a strict allow-list for identifiers.
 
-Example (good):
+Example (good - named parameters):
 
     con.execute(
-      "SELECT id, amount FROM payments WHERE merchant_id = ? AND date >= ?",
-      [merchant_id, start_date]
+      "SELECT id, amount FROM payments WHERE merchant_id = $merchant_id AND date >= $start_date",
+      {"merchant_id": merchant_id, "start_date": start_date}
     )
 
 Anti-pattern (unsafe):
@@ -262,19 +262,20 @@ Anti-pattern:
 
 - Keywords UPPERCASE; identifiers snake_case; short, meaningful aliases.
 - One major clause per line; break long SELECT lists across lines.
+- **Explicit Joins:** Always use `INNER JOIN`, `LEFT JOIN`, etc. Do not use implicit `JOIN` which defaults to inner but trips up linters (AM05).
 - Never use SELECT * in application code; be explicit.
 - Comment only non-obvious logic; keep comments high-signal.
 
 Example (readable):
 
     SELECT
-      o.order_id,
-      o.merchant_id,
-      o.dispatch_date,
-      SUM(oi.ext_price_cents) AS gross_cents
-    FROM orders o
-    JOIN order_items oi ON oi.order_id = o.order_id
-    WHERE o.dispatch_date BETWEEN ? AND ?
+        o.order_id,
+        o.merchant_id,
+        o.dispatch_date,
+        SUM(oi.ext_price_cents) AS gross_cents
+    FROM orders AS o
+    INNER JOIN order_items AS oi ON oi.order_id = o.order_id
+    WHERE o.dispatch_date BETWEEN $start_date AND $end_date
     GROUP BY o.order_id, o.merchant_id, o.dispatch_date
 
 

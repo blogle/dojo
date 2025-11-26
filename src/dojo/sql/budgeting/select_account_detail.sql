@@ -11,4 +11,4 @@ SELECT
     created_at,
     updated_at
 FROM accounts
-WHERE account_id = ?;
+WHERE account_id = $account_id;

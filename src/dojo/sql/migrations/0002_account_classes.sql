@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS cash_account_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS credit_account_details (
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS credit_account_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS accessible_asset_details (
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS accessible_asset_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS investment_account_details (
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS investment_account_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS loan_account_details (
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS loan_account_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
 CREATE TABLE IF NOT EXISTS tangible_asset_details (
@@ -90,6 +90,5 @@ CREATE TABLE IF NOT EXISTS tangible_asset_details (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(account_id)
+    FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
-
