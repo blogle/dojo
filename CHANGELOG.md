@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rolling with the Punches Cypress spec + SQL fixture validate Dining Out overspending, Groceries-to-Dining reallocations via the allocations ledger, Ready-to-Assign stability, and the cash impact on House Checking.
 - Categorized investment transfer Cypress spec + fixture prove Future Home allocations drop correctly while Checking decreases, Brokerage increases, and Ready-to-Assign stays consistent when moving funds between on-budget accounts.
 - Manual transaction lifecycle Cypress spec + fixture walk a pending debit through edit → cleared while asserting category availability, Ready-to-Assign, and account balances stay in sync.
+- Deployment pipeline & infrastructure: Nix flake now builds a minimal, layered Docker image (`:edge`); Kubernetes manifests (Kustomize) provide `Recreate`-strategy deployment for data safety; and a GitHub Actions workflow automates CI checks and GHCR publishing on push to `master` or tags.
 
 ### Changed
 - Renamed the canonical test wrapper to `scripts/run-tests`, fixed its timing helper, and refreshed `scripts/README.md`/`AGENTS.md` so agents consistently call the renamed script instead of the shell `test` builtin.
