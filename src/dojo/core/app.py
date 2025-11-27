@@ -102,6 +102,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(core_router, prefix="/api")
     app.include_router(budgeting_router, prefix="/api")
 
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        """
+        Health check endpoint for Kubernetes probes.
+        """
+        return {"status": "ok"}
+
     # Conditionally include testing routes. These provide endpoints
     # for managing test data and state, and should only be active in testing environments.
     if settings.testing:
