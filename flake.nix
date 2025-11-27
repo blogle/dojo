@@ -33,6 +33,19 @@
       overlay = workspace.mkPyprojectOverlay {
         sourcePreference = "wheel";
       };
+
+      dependencyOverlay = final: prev: {
+        multitasking = prev.multitasking.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+            final.setuptools
+          ];
+        });
+        peewee = prev.peewee.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+            final.setuptools
+          ];
+        });
+      };
         
       editableOverlay = workspace.mkEditablePyprojectOverlay {
         root = "$REPO_ROOT";
@@ -51,6 +64,7 @@
             lib.composeManyExtensions [ 
               pyproject-build-systems.overlays.wheel
               overlay
+              dependencyOverlay
             ]
           )
       );
@@ -115,8 +129,34 @@
         }
       );
 
-      packages = forAllSystems (system: {
-        default = pythonSets.${system}.mkVirtualEnv "dojo-env" workspace.deps.default;
+      packages = forAllSystems (system: 
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          pythonSet = pythonSets.${system};
+          app-env = pythonSet.mkVirtualEnv "dojo-env" workspace.deps.default;
+        in {
+        default = app-env;
+        
+        docker = pkgs.dockerTools.buildLayeredImage {
+          name = "dojo";
+          tag = "latest";
+          contents = [ 
+            app-env 
+            pkgs.busybox 
+          ];
+          config = {
+            Cmd = [ "python" "-m" "uvicorn" "dojo.core.app:create_app" "--factory" "--host" "0.0.0.0" "--port" "8000" ];
+            Env = [
+              "DOJO_DB_PATH=/data/ledger.duckdb"
+              "DOJO_ENV=production"
+            ];
+            ExposedPorts = {
+              "8000/tcp" = {};
+            };
+            User = "1000";
+            WorkingDir = "/app";
+          };
+        };
       });
     };
 }

@@ -107,7 +107,7 @@ def test_net_worth_matches_manual_computation(
                 INSERT INTO accounts (account_id, name, account_type, current_balance_minor, currency, is_active)
                 VALUES (?, ?, 'liability', ?, 'USD', TRUE)
                 """,
-                [f"liability_{idx}", f"Liability {idx}", value],
+                [f"liability_{idx}", f"Liability {idx}", -value],
             )
         # Insert generated investment positions.
         for value in positions:
@@ -124,7 +124,7 @@ def test_net_worth_matches_manual_computation(
         snapshot = current_snapshot(conn)
         # Assert that the snapshot values match the sum of the generated inputs.
         assert snapshot.assets_minor == sum(assets)
-        assert snapshot.liabilities_minor == sum(liabilities)
+        assert snapshot.liabilities_minor == -sum(liabilities)
         assert snapshot.positions_minor == sum(positions)
         # Net worth is calculated as Assets - Liabilities + Positions.
         assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(positions)
