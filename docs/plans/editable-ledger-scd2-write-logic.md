@@ -16,141 +16,137 @@ Develop a shared, reusable frontend "Editable Ledger" UI component coupled with 
 
 ---
 
-## 2. Phase 1: Frontend Development - Shared "Editable Ledger" Component
+## 2. Phase 1: Backend Foundation (Database & Schema)
 
-### Objective
-Create a reusable and configurable frontend component that allows inline editing of tabular data, supporting various input types and providing optimistic UI updates.
+### Context:
+The `transactions` table already supports SCD-2 columns (`concept_id`, `is_active`, `valid_from/to`), but the `budget_allocations` table (`0006_budget_allocations.sql`) does not. It needs to be brought up to parity to support non-destructive edits.
 
 ### Tasks
-1.  **Component Scaffolding:**
-    *   Create a base React component (`EditableLedgerTable` or similar) capable of rendering data based on a provided `columns` definition and `data` array.
-    *   Implement basic table structure and styling consistent with existing UI patterns.
-2.  **Inline Editing Implementation:**
-    *   Develop a click-to-edit mechanism for table cells.
-    *   Integrate various input widgets based on column `type` definitions:
-        *   `CurrencyInput`: For decimal precision formatting (e.g., `react-number-format` or similar).
-        *   `Dropdown`: For relational data selection (Accounts, Categories). Must include search/filtering capabilities.
-        *   `StatusToggle`: Compact `Pending/Cleared` widget.
-        *   `DatePicker`: For transaction dates.
-    *   Manage local component state for pending edits.
-3.  **Row-Level State Management:**
-    *   Ensure that when an edit occurs, the component captures the `conceptual_id` (e.g., `transaction_id`, `budget_allocation_id`) of the row, rather than the database primary key of the specific history version.
-    *   Implement a mechanism to track changes at the row level until "Save" is triggered.
-4.  **Optimistic UI Handling:**
-    *   Upon a successful API response (after a row save), update the specific row in the table with the new data and version metadata returned by the backend.
-    *   Avoid full page refreshes; ensure a smooth, localized UI update.
-    *   Implement loading indicators and error states for individual row saves.
+*   **Task 1.1: Migration for Budget Allocations SCD-2**
+    *   **Description:** Create a new SQL migration file (e.g., `0011_allocation_scd2.sql`) to alter the `budget_allocations` table.
+    *   **Requirements:**
+        *   Add column `concept_id` (UUID, Not Null). Backfill existing rows by generating new UUIDs or using `allocation_id` if suitable.
+        *   Add column `is_active` (BOOLEAN, Default TRUE).
+        *   Add column `recorded_at` (TIMESTAMP, Default CURRENT_TIMESTAMP).
+        *   Add column `valid_from` (TIMESTAMP, Default CURRENT_TIMESTAMP).
+        *   Add column `valid_to` (TIMESTAMP, Default '9999-12-31').
+        *   Create index on `(concept_id, is_active)`.
+    *   **Deliverable:** A `.sql` migration file in `src/dojo/sql/migrations/`.
 
-### Acceptance Criteria
-*   The `EditableLedgerTable` component successfully renders provided data.
-*   Users can inline-edit cells using appropriate input widgets (currency, dropdowns, toggles, date pickers).
-*   Changes are tracked per row using the conceptual ID.
-*   Successful row saves result in an optimistic UI update with new data without page refresh.
-*   Error states and loading indicators are displayed correctly during save operations.
+*   **Task 1.2: SQL Query for Atomic Transaction Updates**
+    *   **Description:** Write the SQL Transaction script to handle the "Correction Flow" for general Transactions.
+    *   **Requirements:**
+        *   Accept parameters for new values and the target `concept_id`.
+        *   Use a transaction block (`BEGIN...COMMIT`).
+        *   `UPDATE`: Set `is_active = FALSE`, `valid_to = NOW()` for the current active row matching `concept_id`.
+        *   `INSERT`: Create a new row with new values, same `concept_id`, `is_active = TRUE`.
+    *   **Deliverable:** A new SQL file `src/dojo/sql/budgeting/update_transaction_scd2.sql`.
+
+*   **Task 1.3: SQL Query for Atomic Allocation Updates**
+    *   **Description:** Write the SQL Transaction script to handle the "Correction Flow" for Budget Allocations.
+    *   **Requirements:**
+        *   Similar logic to Task 1.2 but targeting the `budget_allocations` table.
+    *   **Deliverable:** A new SQL file `src/dojo/sql/budgeting/update_allocation_scd2.sql`.
 
 ---
 
-## 3. Phase 2: Backend Development - SCD-2 Write Pattern ("The Correction Flow")
+## 3. Phase 2: Backend Logic & API
 
-### Objective
-Implement a non-destructive update mechanism in the backend using the SCD-2 pattern, ensuring data integrity and historical traceability for ledger modifications.
+### Context:
+Implement the endpoints that utilize the SQL queries from Phase 1.
 
 ### Tasks
-1.  **Identify Relevant Tables:**
-    *   Confirm the primary tables requiring SCD-2, initially `transactions` and `budget_allocations`.
-2.  **Schema Modification:**
-    *   Add SCD-2 specific columns to identified tables:
-        *   `is_active` (BOOLEAN, default TRUE): Indicates the currently active record.
-        *   `recorded_at` (TIMESTAMP WITH TIME ZONE, default NOW()): Timestamp of when the record was created/modified.
-        *   `changed_by` (TEXT): Identifier for the user or system component making the change.
-    *   Ensure proper indexing for `conceptual_id` and `is_active` for efficient querying.
-3.  **API Endpoint Design:**
-    *   Design and implement `PUT` endpoints for updating ledger rows (e.g., `PUT /transactions/{transaction_id}`, `PUT /budget_allocations/{allocation_id}`).
-    *   The payload should contain the `conceptual_id` and the new field values.
-4.  **Atomic Update Transaction Logic:**
-    *   Within a single `BEGIN...COMMIT` database transaction block:
-        *   **Lock & Fetch:** Retrieve the currently active row for the given `conceptual_id` using a row-level lock (`SELECT ... FOR UPDATE`) to prevent race conditions.
-        *   **Soft Retire:** Update the fetched active row by setting its `is_active = FALSE`.
-        *   **Insert New Version:** Insert a completely new row with:
-            *   The same `conceptual_id`.
-            *   The new user-provided values.
-            *   `is_active = TRUE`.
-            *   `recorded_at = NOW()`.
-            *   `changed_by = {current_user}`.
-    *   Handle `ROLLBACK` on any failure during the transaction.
+*   **Task 2.1: Transaction Update Service Method**
+    *   **Description:** Add a method `update_transaction` to `TransactionEntryService`.
+    *   **Requirements:**
+        *   Accept `concept_id` and a Pydantic model `TransactionUpdateRequest`.
+        *   Execute the SQL from Task 1.2.
+        *   Ensure the operation is atomic.
+    *   **Deliverable:** Python method in `src/dojo/budgeting/services.py`.
 
-### Acceptance Criteria
-*   New SCD-2 columns (`is_active`, `recorded_at`, `changed_by`) are added to relevant tables.
-*   API endpoints for ledger updates are defined and accessible.
-*   A request to "edit" a ledger row successfully executes an atomic transaction:
-    *   The previously active row is soft-retired (`is_active = FALSE`).
-    *   A new row with updated values is inserted and marked as active (`is_active = TRUE`).
-    *   `recorded_at` and `changed_by` are correctly populated.
-*   Concurrent update attempts are safely handled (e.g., via locking).
+*   **Task 2.2: PUT Endpoint for Transactions**
+    *   **Description:** Create the API route to expose the update logic.
+    *   **Requirements:**
+        *   `PUT /api/transactions/{concept_id}`.
+        *   Validate payload using `TransactionUpdateRequest` schema.
+        *   Call `service.update_transaction`.
+    *   **Deliverable:** Updated `src/dojo/budgeting/routers.py`.
+
+*   **Task 2.3: Allocation Update Service Method**
+    *   **Description:** Add a method `update_allocation` to `TransactionEntryService` (or a dedicated `BudgetingService`).
+    *   **Requirements:**
+        *   Accept `concept_id` and `BudgetAllocationUpdateRequest`.
+        *   Execute the SQL from Task 1.3.
+    *   **Deliverable:** Python method in `src/dojo/budgeting/services.py`.
+
+*   **Task 2.4: PUT Endpoint for Allocations**
+    *   **Description:** Create the API route for updating allocations.
+    *   **Requirements:**
+        *   `PUT /api/budget/allocations/{concept_id}`.
+        *   Validate payload.
+    *   **Deliverable:** Updated `src/dojo/budgeting/routers.py`.
 
 ---
 
-## 4. Phase 3: Validation Logic - "Net Impact" Rule
+## 4. Phase 3: Validation Logic ("Net Impact")
 
-### Objective
-Implement a robust validation engine that calculates the net impact of a proposed change, treating the "Old Version" as virtually credited back before debiting the "New Version," preventing false negatives in scenarios like reallocations.
+### Context:
+Prevent updates that would result in negative availability (e.g., reducing a funded category below 0).
 
 ### Tasks
-1.  **Integrate Validation:**
-    *   Place the "Net Impact" validation logic *within* the atomic update transaction in the backend, prior to the `Soft Retire` and `Insert New Version` steps. This ensures validation is based on the most current data.
-2.  **Calculate Delta:**
-    *   For a given update, calculate the `Delta` for relevant numeric fields (e.g., `amount` for transactions, `allocation_value` for budgets).
-    *   `Delta = New Value - Old Value`.
-3.  **Implement Validation Rule:**
-    *   Retrieve the `Current Available` funds/balance relevant to the transaction/allocation being modified.
-    *   Apply the validation: `Current Available - Delta` must result in a value greater than or equal to zero (or some defined minimum threshold).
-    *   If validation fails, `ROLLBACK` the entire transaction and return an appropriate error message to the frontend.
-    *   Explicitly handle the "Old Version" being virtually credited back: `Current Available - (New Value - Old Value) >= 0` effectively becomes `(Current Available + Old Value) - New Value >= 0`.
-4.  **Scenario Handling:**
-    *   Specifically address the "Reallocation with Zero Availability" scenario to ensure the logic correctly allows a reduction in allocation even if `Ready to Assign` is currently zero.
+*   **Task 3.1: Implement Net Impact Logic for Allocations**
+    *   **Description:** Within the `update_allocation` service method, strictly validate the math before committing.
+    *   **Logic:**
+        1.  Fetch currently active `amount_minor` (Old).
+        2.  Calculate `Delta = New_Amount - Old_Amount`.
+        3.  Fetch `Ready to Assign` (RTA) and `Category Available`.
+        4.  If `Delta > 0` (increasing allocation): Ensure `RTA >= Delta`.
+        5.  If `Delta < 0` (decreasing allocation): Ensure `Category Available >= abs(Delta)`. *Correction from plan: effectively "reclaiming" funds.*
+    *   **Deliverable:** Validation logic block inside the service method in `src/dojo/budgeting/services.py`.
 
-### Acceptance Criteria
-*   All ledger update requests pass through the "Net Impact" validation.
-*   The `Delta` is correctly calculated for modified fields.
-*   The validation logic correctly determines if an operation is permissible based on the `Current Available` funds and the `Net Impact` of the change.
-*   The "Reallocation with Zero Availability" scenario (reducing an allocation when available funds are zero) passes validation successfully.
-*   Invalid changes are rejected with clear error messages.
+*   **Task 3.2: Implement Net Impact Logic for Transactions**
+    *   **Description:** Validate transaction updates to prevent impossible states (though less critical than allocations, usually specific to account overdrafts if enforced).
+    *   **Logic:** Calculate `Delta` and check against account balance (optional depending on business rules) or Category Availability (critical).
+    *   **Deliverable:** Validation logic in `src/dojo/budgeting/services.py`.
 
 ---
 
-## 5. Phase 4: Testing Strategy
+## 5. Phase 4: Frontend (Shared Editable Utility)
 
-### Objective
-Ensure the correctness, robustness, and adherence to all specified requirements for both frontend and backend components.
+### Context:
+The codebase uses vanilla JS. We need to refactor the existing specific logic in `transactions/index.js` into a reusable module.
 
 ### Tasks
-1.  **Unit Tests:**
-    *   **Frontend:**
-        *   Test `EditableLedgerTable` component rendering with various data and column configurations.
-        *   Test inline editing functionality for each input type.
-        *   Verify row-level state management and conceptual ID capture.
-        *   Simulate API responses to test optimistic UI updates, loading states, and error handling.
-    *   **Backend:**
-        *   Test individual functions responsible for locking, soft-retiring, and inserting new versions in isolation.
-        *   Test `Delta` calculation logic for various inputs.
-        *   Test "Net Impact" validation logic with valid, invalid, and edge-case scenarios (e.g., zero availability reallocation).
-2.  **Integration Tests:**
-    *   **Backend API:**
-        *   Test the full `PUT` API endpoints, verifying that the atomic SCD-2 transaction correctly executes (old row `is_active=FALSE`, new row inserted `is_active=TRUE`).
-        *   Verify that "Net Impact" validation is triggered and correctly prevents/allows changes.
-        *   Test concurrent update scenarios to ensure locking mechanisms work as expected.
-    *   **Frontend-Backend Interaction:**
-        *   Use mock API calls in frontend tests or spin up a test backend to verify the full flow: user edit -> API call -> optimistic UI update -> (optional) error display.
-3.  **End-to-End (E2E) Tests (Cypress):**
-    *   Create new Cypress tests in `cypress/e2e/user-stories/` or modify existing ones to cover key user flows:
-        *   Editing a transaction's amount and category, observing the SCD-2 effect (UI updates, backend reflects new active record).
-        *   Editing a budget allocation and verifying the "Net Impact" rule, especially the reallocation scenario with zero availability.
-        *   Testing error handling when validation fails.
+*   **Task 4.1: Extract `hydrateInlineEditRow` to Utility**
+    *   **Description:** Move the logic for converting a table row `<tr>` into inputs from `components/transactions/index.js` to a new module `services/ui-ledger.js`.
+    *   **Requirements:**
+        *   Create `makeRowEditable(trElement, config)`.
+        *   `config` should map column indices to input types (`date`, `select`, `money`, `text`).
+    *   **Deliverable:** New file `src/dojo/frontend/static/services/ui-ledger.js`.
 
-### Acceptance Criteria
-*   All unit, integration, and E2E tests pass consistently.
-*   Test coverage for new/modified code meets project standards.
-*   E2E tests confirm that critical user stories for editing ledger data behave as expected from the user's perspective, including visual updates and correct validation.
+*   **Task 4.2: Create Reusable Input Renderers**
+    *   **Description:** Create helper functions to generate the HTML string for specific inputs.
+    *   **Deliverable:**
+        *   `renderDateInput(value)`
+        *   `renderMoneyInput(minorValue)`
+        *   `renderSelect(options, selectedValue)`
+    *   **Deliverable:** Functions added to `src/dojo/frontend/static/services/ui-ledger.js`.
+
+## 6. Phase 5: Frontend Integration
+
+### Tasks
+*   **Task 5.1: Refactor Transactions Page**
+    *   **Description:** Update `components/transactions/index.js` to use the new `makeRowEditable` utility from Task 4.1 instead of its custom implementation.
+    *   **Deliverable:** simplified `transactions/index.js`.
+
+*   **Task 5.2: Implement Inline Editing for Allocations**
+    *   **Description:** Update `components/allocations/index.js` to support inline editing.
+    *   **Requirements:**
+        *   Add "Edit" listeners to the allocation rows.
+        *   Use `makeRowEditable` with configuration for Date, Amount, From, To, and Memo.
+        *   Handle "Save" by calling the new `PUT /api/budget/allocations` endpoint.
+        *   Handle optimistic UI updates (replace inputs with text on success).
+    *   **Deliverable:** Updated `components/allocations/index.js`.
 
 ---
 
