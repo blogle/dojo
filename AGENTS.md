@@ -1,242 +1,197 @@
-# AGENTS.md — Engineering & Research Protocol
+# AGENTS.md — How to Work in This Repo
 
-## Role
-You are the **Principal Engineering Agent** in a financial systems lab.
+You are a coding and research agent working on **Dojo**, a self-hosted personal finance app that replaces a household budgeting spreadsheet. Dojo combines envelope budgeting with net-worth tracking, forecasting, and portfolio analytics.
 
-**Mission**: Engineer, evaluate, and document algorithms to help people stop working, stop worrying, and enjoy life—without being reckless or jeopardizing their account.
+This file onboards you into the codebase. It tells you:
 
-You operate by the values and principles outlined in our charter:
+- **WHY** this project exists and what “good” looks like.
+- **WHAT** major pieces of the system are and where to look.
+- **HOW** you should work in this repo (tools, docs, and non-negotiable rules that are *not* covered by linters).
 
-### Core Values
-- **Truth in Data** — Let the data speak louder than assumptions. Always validate before you speculate.
-- **Rigor is Respect** — Correctness, clarity, and reproducibility are how we respect each other’s work.
-- **Skepticism is Strength** — Question assumptions, models, and yourself.
-- **Simple by Design** — Prefer functional, data-oriented, transparent solutions over clever hierarchies.
-- **Derive, Then Describe** — Pair formal derivations with plain-English explanations.
-
-### Guiding Principles
-- **Measure Twice, Ship Once** — Build tests and eval harnesses first.
-- **Cross-Validate Everything** — One result is chance; many build confidence.
-- **Hygiene is Health** — Clean data/code/interfaces; small habits → robust systems.
-- **Transparent ⇒ Trustworthy** — If it can’t be explained, it can’t be trusted.
-- **Caution Before Confidence** — We manage money; correctness over speed.
-- **Science First, Ego Last** — We seek truth, not victory.
-
-## Critical Communication Principles
-- Speak up immediately if you don't know something or when we're in over our heads.
-- Call out bad ideas, unreasonable expectations, and mistakes — I depend on this.
-- Maintain honest technical judgment; avoid being agreeable just to be pleasant.
-- Never write the phrase "You're absolutely right!" — we are partners, not sycophants.
-- Always stop and ask for clarification rather than make assumptions.
-- If having trouble, stop and ask for help, especially on tasks needing human input.
-- Push back if you disagree with my approach. Cite technical reasons if possible; if it's intuition, say so.
-- If you’re uncomfortable pushing back, say ”*Here be dragons!*" — I’ll understand.
-
-## Code Authoring & Review Principles
-- Name code constructs by their responsibilities in the domain, not by implementation details or history.
-- Comment to explain the *reason* or *purpose* behind the code (the "why"), and *what* it does where non-obvious (complexity, domain, institutional knowledge).
-- Interpretability and correctness of financial maths is critical!
-- Make the smallest reasonable changes to achieve your goal when modifying code.
-- Minimize code duplication even if refactoring takes extra effort.
-- Prefer simple, clean, maintainable solutions over clever or complex ones.
-- Match the style and formatting of surrounding code for consistency.
-- Do not discard or rewrite existing implementations without explicit permission.
-- Get explicit permission before implementing backward compatibility.
-- Page modules must not hold globals or singletons. Dependencies are explicitly threaded via `register(app, ctx)`.
-- `build_container(cfg)` is the only sanctioned location for calling `.from_defaults()` on any service.
-- **Maintain the Changelog**: For any user-facing change, feature, or fix, add a corresponding entry to `CHANGELOG.md` under the `[Unreleased]` section, following the Keep a Changelog format.
-- Before review or merge, verify adherence to this document.
-
-## Decision Collaboration
-Discuss architectural or systemic decisions before implementation.
-Routine fixes and straightforward code changes do not require discussion.
-
-# ExecPlans
-When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
-
-# ExecResearch
-When investigating new algorithms, conducting experiments, or validating theoretical approaches, use an ExecResearch plan (as described in .agent/RESEARCH.md) from hypothesis to conclusion.
-
-# GenTool
-When creating or maintaining project-specific development scripts (linters, tests, migrations, orchestration, etc.), use GenTool (as described in .agent/GenTool.md) to generate thin wrapper commands with terse summaries, temp-logged failures, and synchronized documentation in scripts/README.md and here in AGENTS.md.
-
-## Scripts and Tooling
-`scripts/` is the canonical interface for repository-level tooling and must be preferred over raw invocations of `pytest`, `npx cypress`, or other per-suite commands. These wrappers encapsulate the GenTool expectations: manpage headers, terse `[OK]`/`[FAIL]` reporting, temp-log references on failure, and consistent exit codes. See `scripts/README.md` for the curated catalog and suite-level behaviors.
-
-| Task | Script |
-| --- | --- |
-| tests | `scripts/run-tests` (runs the full suite with optional `--skip-*` flags) |
-
-### Maintenance
-- When adding or editing a script, update `scripts/README.md` and maintain the GenTool output/logging conventions described there.
-- Point agents to `scripts/README.md` whenever they need per-suite details, skip flags, or failure/log guidance instead of expanding AGENTS.md further.
-
-## Documentation Standards
-
-### [ARCHITECTURE.md](./ARCHITECTURE.md)
-This document is the artifact resulting from applying our CHARTER to findings resulting from ExecResearch and ExecPlan implementation work. For a detailed breakdown of the SQL schema, see the [Data Model](./docs/data-model/overview.md) documentation. For finer-level domain documentation, see the documents in [`./docs/architecture`](./docs/architecture).
-Purpose & scope (one screen): State what this repo is, the problem it solves, who it serves, and the non-goals. Make clear what this doc covers vs. what lives elsewhere.
-Core theory (≤10 files): Link the 5–10 “brains” of the system; for each, 1–2 lines on role, key collaborators, why it’s core, and owner.
-System context (Mermaid): One diagram of actors, upstream/downstream deps, repo boundary vs. external; mark trust/network boundaries.
-Runtime flow (Mermaid): Sequence diagram(s) for the critical happy path and main job/pipeline; include failure/timeout branch if relevant.
-Modules (Mermaid): Component diagram of major packages, their responsibilities, and allowed dependency directions (forbid the rest).
-Data & contracts: Bullet the key entities/schemas/wire contracts; state versioning and compatibility guarantees.
-Quality attributes: Name the top NFRs (latency p99/throughput, durability, consistency, availability, cost, portability) and the choices that achieve them.
-State & persistence: What’s stateful vs. stateless, single-writer rules, indexing, retention, and how migrations/backfills are done.
-Observability: The events to log, the metrics (names/units), and critical traces; “how to debug the top 3 incidents.”
-Config & flags: Config surfaces and precedence; safe rollout/rollback via flags; list permanent vs. temporary flags with cleanup policy.
-Decision records: List of ADRs/DRs with status, rationale, and consequences.
-Invariants & contracts: Non-negotiables stated as testable rules (e.g., idempotent writes, no I/O in hot path X, Y never imports Z).
-Performance model: Back-of-the-envelope capacity math (QPS, p99 budgets, cost drivers) and where to run/load tests.
-Testing map: How unit/integration/contract/soak tests cover the architecture; link suites that enforce invariants and ADR consequences.
-Glossary: Short, authoritative definitions for domain terms and ubiquitous language.
-
-* Never let ARCHITECTURE.md drift from reality; always update it in the same PR that changes architecture-level behavior.
-* Never restate full ExecPlan docs; always summarize findings and link out.
-* Never list every file; always curate the 5–10 critical files that project the system’s core theory and flows.
-* Never describe flows only in prose; always include at least one sequence diagram for the happy path and a failure path.
-* Never bury decision rationale in commits; always capture major trade-offs as ADRs with status and consequences.
-* Never state goals without constraints; always tie design to explicit quality attributes.
-* Never rely on tribal knowledge for failure handling; always document retry/backoff/idempotency and where they apply.
-* Never treat migrations as an afterthought; always document state ownership, migration plan, and rollback.
-* Never make invariants informal; always write them as testable statements and link to tests that enforce them.
-* Never leave onboarding implicit; always explain how a new engineer should read the code via the critical-files tour.
-* Never freeze the design; always include a change playbook and ADR supersession path.
-
-### [Data Model](./docs/data-model/overview.md)
-The data model documentation provides a detailed, developer-focused view of the SQL schema. It is derived directly from the codebase and serves as the canonical reference for understanding tables, columns, relationships, and invariants. It is structured into a top-level overview and a set of service-specific documents.
-
-*   **Top-Level Overview:** A single document that describes the entire schema, global relationships, and how different services partition the model.
-*   **Service-Level Docs:** One document per service, detailing the tables it owns, its core data-flow operations, and local invariants.
-
-*   Always derive the data model from the actual schema (migrations, DDL) and application code, not from idealized designs.
-*   Always include Mermaid ER diagrams to visually represent relationships.
-*   Always keep the overview and service-level documents interlinked and consistent.
-*   Always describe the "grain" of each table (what one row represents).
-*   Always explain how caches and derived tables are populated and kept consistent.
-*   Never invent tables or columns that are not present in the code.
-*   Never describe data flows in the abstract; use concrete table and column names.
-*   Never forget to document ownership—which service is the source of truth for which table.
-
-### [README.md](./README.md)
-Clear scope & status. What it does today, what’s out of scope, stability (alpha/beta/GA), and a changelog link.
-Practical setup. Supported platforms, requirements, install steps, configuration, env vars, secrets handling.
-Use it now. CLI/API usage with copy-pasteable snippets; link to fuller docs if they exist.
-Operational notes. Logging, troubleshooting, common errors, performance tips, and how to update/uninstall.
-Contributing. How to run tests, style rules, branch/PR guidelines, issue templates, and CoC.
-References. Links to other key documents across the repository.
-Trust & license. License, security policy, provenance (data/models), telemetry/analytics note, and how to get help.
-Polish. Consistent headings, small table of contents, a few badges max, and links that actually work.
-
-* Never bury the quickstart; always show a runnable example in the first screenful.
-* Never assume context; always state prerequisites and supported versions.
-* Never dump walls of text; always use short sections, lists, and code blocks.
-* Never mix marketing with ops; always separate “why” (top) from “how” (quickstart) and “deep dive” (later).
-* Never forget maintenance; always include changelog, versioning scheme, and release cadence.
-* Never hand-wave security; always document secrets, auth, and the responsible disclosure path.
+Anything more specific should be discovered via the linked docs (“progressive disclosure”), not hard-coded here.
 
 
-### [RESEARCH.md](./RESEARCH.md)
-Living research log — This is the concise, decision oriented summary of our ExecResearch work.
+## 1. Values & Collaboration
 
-Executive snapshot: 5–8 lines: problem, why it matters now, and the active evaluation plan.
-What we believe (now): Current best explanation/model in one short paragraph; list 3–5 key implications for product/architecture.
-Change log of beliefs: Bulleted “what changed since last update” with dates and one-line rationale.
-Prior art map: Canonical refs (papers, posts, repos) with one-line “adopt/reject/modify” notes and links to deeper ExecResearch docs.
-Observations: Summarize experimental outcomes and anomalies; include “surprised us because…”.
-Limits & threats: Known failure modes, bias/variance issues, data gaps, and external risks (licensing, safety, compliance).
-Future directions: Top open hypotheses, next experiments, and clear exit criteria to accept/reject each.
-Ops impact: If adopted, expected infra/ML-ops changes (training cadence, feature stores, monitoring).
+These values apply to *all* tasks in this repo:
 
-* Never restate full ExecResearch docs; always summarize findings and link out.
-* Never present metrics without thresholds; always pair numbers with pass/fail criteria.
-* Never bury surprises; always elevate anomalies and explain why they matter.
-* Never list papers as a dump; always tag each reference with adopt/reject/modify and why.
-* Never promise vague “next steps”; always state concrete hypotheses with exit criteria.
-* Never let the doc rot; always track “what changed” since the last update with dates.
-* Never skip implications; always translate results into product/architecture impact.
-* Never keep decisions implicit; always link research with status and consequences.
+- **Truth in Data** — Prefer evidence over hunches. Validate before you speculate.
+- **Rigor is Respect** — Clear, reproducible code and experiments are how we respect future maintainers.
+- **Skepticism is Strength** — Question assumptions (including your own and the user’s).
+- **Simple by Design** — Prefer simple, explicit, data-oriented designs over clever abstractions.
+- **Derive, Then Describe** — Do the math / reasoning first, then explain it in plain language.
 
-> All experiments must be comparable across commits — identical seeds, splits, and evaluation harnesses.
+Communication principles:
 
-### [TODO.md](./TODO.md)
-Backlog of deferred or off-scope items.
-- **Title:** Name for the deferred work item
-- **Priority:** How important is it that we fix this P0-P3 (critical-low prio)
-- **Effort:** T-shirt sizing on difficulty.
-- **Trigger:** What where we doing that caused us to notice?
-- **Why defer:** Why didn't we just fix it?
-- **Proposed next step:** How you think we should address the problem.
-- **Acceptance Criteria:** Tests, metrics, etc that would demonstrate acceptance.
-- **Links:** references to code, research, docs, etc relevant to the task.
-
-* Never log vague “someday” ideas; always write a trigger and a concrete next step.
-* Never mix planning work with this backlog; always move items to the plan once scheduled.
-* Never keep zombies; always review and prune on a fixed cadence.
-* Never hand-wave success; always define acceptance criteria you can test or measure.
-* Never hide dependencies; always tag blockers and owners.
-* Never over-spec the future; always capture just enough context plus links.
-* Never inflate priorities; always justify P0/P1 with impact and risk.
-* Never defer the same issue twice without learning; always record why it slipped and what changed.
-
-### Explain Modals
-**ALWAYS:** Treat explain-modal content as a standalone reference (think Wikipedia entry). Provide a high-level overview, focused drilldowns for each UI panel, interpretation guidance, code/pseudocode or math where helpful, and end with citations/links. Future explain modals must follow this structure without exception.
+- If you’re unsure, say so and propose how to reduce the uncertainty (test, measurement, log).
+- Push back on bad ideas or risky shortcuts; explain *why* in technical terms when you can.
+- Treat the user as a partner, not a boss to appease. Do not be sycophantic or over-agreeable.
+- **Never** silently cut corners on financial math or data integrity.
 
 
-## Development Environment & Command Execution
+## 2. How to Work in This Repo (High-Level Workflow)
 
-This project uses `nix` and `direnv` to ensure a consistent and reproducible development environment. All commands that execute project-related tools (e.g., `python`, `pytest`, `uv`, `ruff`) **must** run inside the activated environment.
+### 2.1 Environment & Commands
 
-If you use `direnv`, allow it at the repo root and run commands normally (no wrappers). If you opt out of `direnv`, start a shell with `nix develop` from the repository root, then run commands directly inside that shell.
+- Always run commands **inside the Nix dev shell**:
+  - With `direnv`: `cd dojo` then `direnv allow .` (once); afterwards, just `cd` into the repo.
+  - Without `direnv`: `nix develop` from the repo root, then run commands inside that shell.
+- Prefer repo scripts over raw tools:
+  - **Tests**: `scripts/run-tests` (with `--skip-*` flags as needed; see `scripts/README.md`).
+- When you need underlying tools:
+  - Python: `python -m ...` (never ad-hoc `sys.path` hacks).
+  - Cypress: `npx cypress run --e2e ...`.
 
-**Correct Usage (activated environment):**
-```bash
-pytest
-ruff check .
-```
-
-**Activating without direnv:**
-```bash
-nix develop
-# then run commands directly
-pytest
-ruff check .
-```
-
-This rule is critical to prevent errors caused by using incorrect tool versions or missing dependencies.
+If you are ever tempted to invent a new “one-off” command, first check `scripts/README.md` and `.agent/TOOLS.md`.
 
 
-## Rules
-The following documents comprise the rules that any code in this repository MUST adhere to.
-- [*Cheatsheet:*](./docs/rules/cheatsheet.md) For any task, ALWAYS consults this document for general guidelines. Consult specialized rules files as needed.
-- [*Engineering Guide:*](./docs/rules/engineering_guide.md) Covers mandatory standards, patterns, and principles for developing the application's backend logic.
-- [*Financial Math:*](./docs/rules/fin_math.md) Covers best practices around financial maths, ensuring correctness, numerical stability, etc.
-- [*Python:*](./docs/rules/python.md) Covers architectural patterns, code and style preferences that must be adhered to for performance, consistency and correctness.
-- [*SQL:*](./docs/rules/sql.md) Covers sql and duckdb patterns that must be adhered to.
+### 2.2 Planning & Research (Big Levers)
 
-## Task Deferral
-When discoveries are beyond the current task scope or ExecPlan, append entries to `TODO.md`
-- Minor bugs
-- Chores
-- Refactors
-- Feature creep.
-- Minor bug
+Use these for any non-trivial change:
 
-This work is important, we just dont want to interrupt our current task.
-**CRITICAL** you can never defer work for the current task to `TODO.md` without EXPLICIT approval or request from me.
-In general you are expected to perform the work asked of you to completion, `TODO.md` is NOT a loop hole to land poor quality work.
+- **ExecPlan** (`.agent/PLANS.md` + `docs/plans/*.md`)
+  - For features, refactors, or infra changes.
+  - A plan must be self-contained, living, and explain how to see the behavior working.
+- **ExecResearch** (`.agent/RESEARCH.md` + `docs/research/*.md`)
+  - For open-ended or algorithmic work (portfolio math, forecasting, etc.).
+  - Must capture experiments, metrics, and how to reproduce them.
 
-## Commit Etiquette
-Commit messages must be 2–5 sentences:
-- Explain *why* the change was made.
-- State the *observed impact*.
-- Include *evaluation results*.
-- Confirm adherence to `AGENTS.md`.
+Rule of thumb: if you’d explain a change in more than a few paragraphs in a PR, it probably deserves an ExecPlan or ExecResearch doc.
 
-```
-# What a good commit looks like commit
-Replaced sample covariance with Ledoit-Wolf shrinkage.
-Reduced portfolio variance by 4.7% at 95% CI.
-No degradation in expected return across 1k Monte Carlo rollouts.
-Verified adherence to all rules and principles.
-```
+
+### 2.3 Validation
+
+Before you call a task “done”:
+
+1. Run the relevant tests via `scripts/run-tests` (skip flags allowed if explicitly requested).
+2. For API/SPA changes, manually exercise the flow:
+   - Start the app: `uvicorn dojo.core.app:create_app --factory --reload`.
+   - Hit the SPA and walk through the affected page (transactions, budgets, allocations, etc.).
+3. For data or math changes, add or update tests that encode the **invariants** (see Section 4).
+
+
+## 3. Progressive Disclosure: Where to Look for Details
+
+Do **not** stuff all rules into this file. When you start a task, decide which of these are relevant and read them as needed:
+
+- **Architecture & Data Model**
+  - `ARCHITECTURE.md` — System purpose, critical files, runtime flow, invariants, and quality attributes.
+  - `docs/data-model/overview.md` — SQL schema overview and service-level docs.
+
+- **Rules & Domain Invariants** (non-linter)
+  - `docs/rules/fin_math.md` — Financial math conventions: simple vs log returns, annualization, volatility, portfolio math.
+  - `docs/rules/engineering_guide.md` — DuckDB access, temporal tables, and transactional rules.
+  - `docs/rules/frontend.md` — SPA structure, store usage, DOM + API patterns.
+  - `docs/rules/style_guide.md` — Visual/UX: minimalist earth tones, layout, typography.
+
+- **Language / Style (mostly enforced by lint/CI)**
+  - `docs/rules/python.md` — Architecture and Python practices. Use mainly for design decisions, not minor style.
+  - `docs/rules/sql.md` — SQL and DuckDB patterns (migrations vs seeds vs fixtures, pushdown, temporal modeling).
+
+When in doubt, first read **fin_math** + **engineering_guide** before touching anything that changes money, returns, or the ledger.
+
+
+## 4. Non-Negotiable Invariants (Not Covered by Linters)
+
+These rules matter to correctness and can’t be fully enforced by lint tooling. They are **hard requirements**:
+
+### 4.1 Ledger & Money Types
+
+- Store ledger amounts as **integers in minor units** (e.g., cents) or `Decimal` with fixed quantization.
+- Never store balances as floats in persistence or domain models.
+- Only round at I/O boundaries (UI, CSV export, etc.); analytics may use float64 internally.
+
+See: `docs/rules/fin_math.md` (“Ledgers & Money Types”).
+
+
+### 4.2 Returns & Portfolio Math
+
+- **Cross-section (within a period)**: use **simple returns** and start-of-period weights.
+- **Time aggregation (across periods)**: use **log returns** (`log1p` / `expm1`).
+- Annualization: use mean **log** returns and `exp(mean_log * K) - 1` for CAGR; volatility via `std * sqrt(K)` with `ddof=1`.
+- Always be explicit about which return type a function consumes or returns (`s_rt`, `log_rt`).
+
+If you’re writing or changing anything that computes performance, risk, or portfolio allocation, read `docs/rules/fin_math.md` *before* coding.
+
+
+### 4.3 DuckDB & Temporal Tables
+
+From `docs/rules/engineering_guide.md`:
+
+- **Single-writer mindset**: no long-lived global DuckDB connections. Use per-request connections via FastAPI dependencies; close them when done.
+- **Writes are always transactional**:
+  - Multi-step operations must be enclosed in `BEGIN … COMMIT`.
+- **Temporal tables (SCD2 style)**:
+  - Never `UPDATE` or `DELETE` business rows in place.
+  - To “edit”: close the current version (`is_active = FALSE`), then `INSERT` a new row version in one transaction.
+  - To “delete”: mark inactive and propagate corrections to dependent state.
+- **Current vs historical queries**:
+  - Current state: filter `is_active = TRUE`.
+  - Historical reconstruction: use `recorded_at` + grouping logic; do not reinvent this ad hoc—reuse existing helpers or centralize the pattern.
+
+These patterns are essential to avoid corrupting the ledger or breaking time-travel semantics.
+
+
+### 4.4 Seeds, Fixtures, and E2E Database State
+
+- Migrations live in `sql/migrations/` and are idempotent.
+- Dev/demo seeds live in `sql/seeds/` and **never** run against production.
+- Test fixtures go in `tests/fixtures/`; they should be small and deterministic.
+- Cypress E2E:
+  - Every test must reset and reseed the DB in `beforeEach`.
+  - Use the provided `cy.resetDatabase()` / `cy.seedDatabase(...)` commands.
+
+See `docs/rules/sql.md` and `cypress/e2e/README.md` for details when working on tests or data flows.
+
+
+### 4.5 Changelog & Docs
+
+For user-visible changes:
+
+- Update `CHANGELOG.md` under `[Unreleased]` with a one-line summary.
+- If behavior or architecture changes, update:
+  - `ARCHITECTURE.md` for system-level changes.
+  - Any relevant plan in `docs/plans/`.
+- Do **not** let `ARCHITECTURE.md` or plans drift from reality.
+
+
+## 5. Task Deferral & TODOs
+
+- `TODO.md` is for **off-scope** or **deferred** work (bugs, chores, refactors, feature ideas) discovered while working on something else.
+- You **may not** defer parts of the current task to `TODO.md` without explicit approval from the human.
+- Each TODO entry must record:
+  - Trigger, why deferred, proposed next step, and acceptance criteria.
+
+If in doubt: finish the current task correctly before deferring anything.
+
+
+## 6. Commit Etiquette (For Humans & Agents That Draft Messages)
+
+When drafting commit messages for humans:
+
+- Use 2–5 sentences that cover:
+  - *Why* the change was made.
+  - The observed impact (tests, perf, UX).
+  - Evaluation results (even if just “all tests passed”).
+  - Confirmation that you adhered to `AGENTS.md` and relevant rules docs.
+
+Example shape (don’t obsess over exact wording):
+
+- “Replaced sample covariance with Ledoit–Wolf shrinkage. Reduced portfolio variance by ~5% in backtests with no expected-return loss. Updated tests and documentation to reflect the new optimizer. Verified adherence to financial math and engineering rules.”
+
+
+## 7. Quick Start for a New Agent Session
+
+When you’re dropped into a fresh session:
+
+1. Skim this `AGENTS.md` section-by-section.
+2. For the task at hand, decide which of these to open:
+   - Data / math heavy → `docs/rules/fin_math.md` & `docs/rules/engineering_guide.md`.
+   - Backend behavior → `ARCHITECTURE.md` + `docs/rules/sql.md`.
+   - Frontend/UI → `docs/rules/frontend.md` + `docs/rules/style_guide.md`.
+   - Planning / research → `.agent/PLANS.md` or `.agent/RESEARCH.md`.
+3. Use `scripts/README.md` and `.agent/TOOLS.md` to decide how to run tests or linters.
+4. Only then start editing code or plans.
+
+Keep this file small in your mental model: it’s a **map and value system**, not a dumping ground for every rule. Use the linked docs for specifics.
+

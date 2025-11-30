@@ -1,357 +1,286 @@
-SQL Best Practices for Python Codebases
+# SQL Guide — Schema, Migrations, and DuckDB Usage
+
+This guide focuses on **schema design, migrations, and correctness patterns** for DuckDB. Mechanical style (keyword case, `SELECT *`, indentation, etc.) is enforced by `sqlfluff` and formatters and should not be duplicated here.
+
+Use this document when you are:
+
+- Designing or evolving tables.
+- Writing migrations.
+- Implementing query-heavy features in Python.
 
 
-## Scope and Intent
+## 1. Where SQL Lives
 
-This document sets a pragmatic standard for writing, organizing, testing, and operating SQL—specifically with DuckDB—inside a Python project. It aims to be actionable for everyday engineering and durable enough to live in developer docs or a README. Where practices involve judgment, we provide clear decision criteria, examples, and anti-patterns. All guidance assumes a modest concurrency environment and that DuckDB tables are the curated data store for the application.
+We use a hybrid approach:
 
+- Small, one-off queries may live inline in Python.
+- Anything reusable, performance-sensitive, or contract-bearing must live in `.sql` files.
 
-## Guiding Principles
+Recommended layout:
 
-Write SQL that is explicit, testable, and composable. Prefer set-based transformations, keep data close to the compute, and evolve schemas with idempotent migrations guarded by transactions. Optimize for pushdown and minimal data movement. Make correctness measurable with unit and property tests. Where performance matters, optimize layout and materialization—not just query text.
+    src/dojo/sql/
+      migrations/      # schema evolution
+      queries/         # canonical read / write paths
+      etl/             # batch or maintenance jobs
+      seeds/           # dev/demo seeds (never prod)
+    tests/fixtures/    # test-only fixtures
 
+Rules:
 
-## Where SQL Lives (Hybrid: Inline + Files)
-
-Small, local queries may live inline in Python; reusable or complex queries must be first-class `.sql` files.
-
-Promotion rules (when a query “graduates” to a `.sql` file):
-
-- Reuse: The query is used in ≥2 places or call sites.
-- Complexity: The query has a CTE and a join, or uses window functions, or spans > ~12 logical lines.
-- Contract-bearing: Downstream jobs depend on its exact columns/semantics (e.g., a canonical view).
-- Performance-tuned: The query required EXPLAIN/ANALYZE work, layout assumptions, or materialization.
-- Write paths & migrations: All DDL and DML for ETL/migrations live in `.sql`.
-- Security/policy sensitive: The query enforces business rules or filters PII/roles.
-
-Inline is acceptable when the query is ≤ ~6 lines, read only, and tightly scoped to nearby code (e.g., fetching a single row by key).
-
-Recommended layout for package data:
-
-- src/dojo/sql/<domain>/<name>.sql
-- src/dojo/sql/migrations/VYYYYMMDD__<slug>.sql
-- src/dojo/sql/etl/<job>/<step>.sql
-- src/dojo/sql/seeds/<scenario>.sql (dev/demo data only)
-- tests/fixtures/<feature>.sql (tiny deterministic fixtures)
+- If a query is used in multiple places, is non-trivial (joins, windows, CTEs), or is performance-tuned, promote it to a `.sql` file.
+- All schema, temporal ledgers, and write-path logic must live in SQL files, not inline Python strings scattered around.
 
 
-## Migrations vs Seed Data vs Test Fixtures
+## 2. Migrations: Idempotent, Transactional, and Boring
 
-Keep three explicit tracks for schema, human-friendly demo data, and automated test fixtures.
+Migrations are the **only** place we change schema. They must be:
 
-- **Migrations (`sql/migrations/`)** define and evolve schema. They must stay idempotent, transactional, and production-safe. They may backfill or transform existing rows but must never ship demo data.
-- **Seed scripts (`sql/seeds/`)** exist for developers and demos. They insert realistic but fake accounts/categories so humans can click around. Keep them idempotent (INSERT .. ON CONFLICT) and never run them in production.
-- **Fixtures (`tests/fixtures/`)** back tests only. They should be tiny, deterministic datasets loaded during test setup. Never reuse dev/demo seeds here—tests deserve purpose-built data so failures are obvious.
+- Idempotent: safe to run more than once.
+- Transactional: wrapped in a transaction that fully succeeds or fully fails.
+- Logged: recorded in a `schema_migrations` (or equivalent) table.
 
-Workflow:
+Rules:
 
-1. Run migrations to create or upgrade a database.
-2. Optionally run one or more seed scripts locally/staging to populate fake data.
-3. During tests, apply migrations, then load only the minimal fixture files needed for that test suite.
+1. One migration file per change, under `sql/migrations/` with a timestamped name, for example:
 
-This separation prevents demo data from leaking into production, keeps tests fast, and makes it trivial to start with a clean slate.
+       sql/migrations/V20251130_01_add_transactions_table.sql
 
+2. Use `IF [NOT] EXISTS` defensively:
 
-## Parameterization & Composition
+       BEGIN;
 
-Use pure SQL with bound parameters (no free-form string interpolation). We prefer DuckDB's **named parameters** (`$name`) over positional ones (`?`) for clarity and better tooling support (e.g., sqlfluff).
+       CREATE TABLE IF NOT EXISTS transactions (
+           transaction_id      TEXT PRIMARY KEY,
+           account_id          TEXT NOT NULL,
+           amount_minor        BIGINT NOT NULL,
+           transaction_date    DATE NOT NULL,
+           recorded_at         TIMESTAMP NOT NULL,
+           is_active           BOOLEAN NOT NULL
+       );
 
-- Bind parameters from Python rather than composing literals into SQL.
-- Keep dynamic SQL limited to optional clauses that are safely toggled.
-- Avoid heavy templating; if you must, keep a strict allow-list for identifiers.
+       ALTER TABLE transactions
+           ADD COLUMN IF NOT EXISTS memo TEXT;
 
-Example (good - named parameters):
+       COMMIT;
 
-    con.execute(
-      "SELECT id, amount FROM payments WHERE merchant_id = $merchant_id AND date >= $start_date",
-      {"merchant_id": merchant_id, "start_date": start_date}
-    )
+3. Never mix schema changes with demo or dev data. Migrations are allowed to:
 
-Anti-pattern (unsafe):
+   - Create/alter tables and indexes.
+   - Backfill or transform existing rows as part of a schema change.
+   - Update audit columns as needed.
 
-    con.execute(f"SELECT id FROM payments WHERE merchant_id = {merchant_id}")
+   Migrations are not allowed to:
 
+   - Insert demo accounts or sample households.
+   - Seed example budgets, categories, or test data.
 
-## Performance in DuckDB: Posture and Heuristics
+   Those belong in seeds/fixtures.
 
-DuckDB executes vectorized, columnar plans with strong predicate/projection pushdown. Speed comes from reading fewer columns/rows, minimizing materializations, and maintaining helpful sort/layout characteristics.
+4. Always wrap multi-step changes (backfills, table rewrites, index creation) in a transaction and roll back on failure.
 
-Adopt these in priority order:
+5. Use a `schema_migrations` table to track applied versions. The Python migration runner is a thin orchestrator that:
 
-1) Pushdown-first (always)
-- Select explicit columns; avoid SELECT * in app code.
-- Filter early; push predicates into the scan when possible.
-- Prefer EXISTS over IN for correlated membership checks.
-
-2) Data-layout aware (for curated tables)
-- Create/refresh curated tables with intentional ordering to support common groupings/filters.
-- Choose compact types and consistent encodings; avoid unnecessary casting churn.
-- Pre-aggregate hot rollups used in dashboards or repetitive reports.
-
-3) Views + cache tables (selectively)
-- Define canonical views for logic clarity.
-- Materialize heavy views as tables where latency/SLA requires; refresh via stage-then-swap (see Transactions).
-
-About DuckDB indexes:
-
-- DuckDB supports explicit indexes (e.g., on sort keys or selective predicates). Use them judiciously for point lookups or selective filters on curated tables.
-- For analytics, sorted/clustered layout plus pushdown typically dominates; verify index benefit with EXPLAIN/ANALYZE, not assumption.
-
-Minimal EXPLAIN habit:
-
-- Keep a small fixture dataset and occasionally verify that expensive queries exhibit predicate/column pushdown and avoid unnecessary re-scans.
+   - Reads unapplied `V*.sql` files in order.
+   - Executes each inside a transaction.
+   - Records success/failure in `schema_migrations`.
 
 
-## Compute Placement: SQL vs Pandas/Numpy vs Python UDFs
+## 3. Seeds vs Fixtures vs Production Data
 
-Default to SQL for set-based operations; use Pandas/Numpy for specialized math on small, post-aggregated frames; reach for Python UDFs sparingly.
+We separate three concepts:
 
-Decision cues:
+1. Migrations (`sql/migrations/`)
 
-- Joins, filters, group-bys, window functions, pivots: SQL.
-- Iterative algorithms, specialized numeric routines, branchy row-wise transforms: reduce in SQL first, then Pandas/Numpy on the smaller result.
-- Must stay in SQL but need custom logic: consider a Python UDF only when its scope is small and measured.
+   - Define and evolve schema.
+   - Idempotent, production-safe.
+   - No demo or test-only data.
 
-Examples:
+2. Dev/demo seeds (`sql/seeds/`)
 
-- Good (pushdown first):
+   - Insert realistic but fake data for humans to play with.
+   - May include sample households, accounts, budgets.
+   - Must be idempotent (`INSERT ... ON CONFLICT` or equivalent).
+   - Never run in production.
 
-    -- Curate minimal columns before Python
-    WITH base AS (
-      SELECT order_id, merchant_id, dispatch_date, total_cents
-      FROM orders
-      WHERE dispatch_date BETWEEN ? AND ?
-        AND merchant_id = ?
-    )
-    SELECT merchant_id, dispatch_date, SUM(total_cents) AS gross_cents
-    FROM base
-    GROUP BY merchant_id, dispatch_date
+3. Test fixtures (`tests/fixtures/*.sql`)
 
-- Anti-pattern (shipping the world to Python):
+   - Minimal, deterministic datasets used in automated tests.
+   - Tailored to each test suite; not shared across unrelated tests.
+   - Loaded by test harnesses (Python or Cypress) before tests run.
 
-    -- Avoid selecting wide fact tables to Pandas only to re-group there
-    SELECT * FROM orders
+Rules:
+
+- Do not reuse dev seeds as test fixtures. Test fixtures should be tiny and explicit so failures are easy to reason about.
+- Do not reference fixture tables from production code. Fixtures are for tests only.
 
 
-## Migrations & Schema Evolution (SQL-First, Python-Orchestrated)
+## 4. Temporal and Auditable Tables
 
-All migrations are idempotent `.sql` files executed by a thin Python runner that adds pre/post assertions and transaction control.
+The ledger is temporal: we treat important tables as **append-only with versions**, not mutable rows.
 
-Practices:
+For temporal tables (for example, `transactions`, `positions`):
 
-- Use IF NOT EXISTS/IF EXISTS where appropriate.
-- Maintain a schema_migrations table recording applied versions.
-- Wrap each migration in a transaction; fail closed.
-- Add pre-checks (does input table exist? columns?) and post-checks (row counts, nullability).
-- Keep data backfills in separate, explicit steps.
+- Each logical entity has:
+  - A stable conceptual ID (`transaction_id`, `position_id`).
+  - A `recorded_at` timestamp (system time of the version).
+  - An `is_active` flag or `[valid_from, valid_to)` pair.
 
-Example (idempotent DDL):
+- Never overwrite or delete rows to “edit” history. Instead:
+  - Close the prior version (`is_active = FALSE` or `valid_to = now()`).
+  - Insert a new version with the updated values.
+
+Example pattern (simplified SCD2):
 
     BEGIN;
-    CREATE TABLE IF NOT EXISTS payments (
-      id            BIGINT PRIMARY KEY,
-      merchant_id   INTEGER NOT NULL,
-      amount_cents  BIGINT NOT NULL,
-      created_at    TIMESTAMP NOT NULL,
-      updated_at    TIMESTAMP NOT NULL
+
+    UPDATE transactions
+    SET is_active = FALSE
+    WHERE transaction_id = $transaction_id
+      AND is_active = TRUE;
+
+    INSERT INTO transactions (
+        transaction_id,
+        account_id,
+        amount_minor,
+        transaction_date,
+        recorded_at,
+        is_active
+    )
+    VALUES (
+        $transaction_id,
+        $account_id,
+        $amount_minor,
+        $transaction_date,
+        now(),
+        TRUE
     );
-    ALTER TABLE payments
-      ADD COLUMN IF NOT EXISTS currency VARCHAR NOT NULL DEFAULT 'USD';
+
     COMMIT;
 
-Anti-pattern:
+When querying:
 
-    -- Blind “CREATE TABLE” without IF NOT EXISTS; no transaction; no checks.
+- For “current state”, filter `WHERE is_active = TRUE`.
+- For “as-of” reconstructions, pick the row with the latest `recorded_at <= AS_OF` per conceptual ID and respect `is_active` (or `valid_to > AS_OF` for range-based tables).
+
+Implement complex as-of logic once and reuse it (views or canonical queries under `sql/queries/`).
 
 
-## Transactions & Safety (Stage-Then-Swap)
+## 5. Transactions and Stage-Then-Swap
 
-Default to transactions for small updates; use stage-then-swap for heavy rewrites or refreshes to avoid partial reads.
+For small updates, a regular `BEGIN; ... COMMIT;` is enough.
+
+For heavy rewrites (for example, rebuilding a summary table):
+
+- Write into a staging table.
+- Validate.
+- Swap in a single transaction.
 
 Pattern:
 
-- Write results to table__staging.
-- Validate: counts, sums/hashes, min/max ranges.
-- Swap inside a single transaction:
+    -- Build staging table
+    CREATE OR REPLACE TABLE balances__staging AS
+    SELECT
+        account_id,
+        SUM(amount_minor) AS balance_minor
+    FROM transactions
+    WHERE is_active = TRUE
+    GROUP BY account_id;
+
+    -- Optional: validate counts, ranges, etc.
 
     BEGIN;
-    DROP TABLE IF EXISTS table__backup;
-    ALTER TABLE table RENAME TO table__backup;
-    ALTER TABLE table__staging RENAME TO table;
+
+    DROP TABLE IF EXISTS balances__backup;
+    ALTER TABLE balances RENAME TO balances__backup;
+    ALTER TABLE balances__staging RENAME TO balances;
+
     COMMIT;
 
-If validation fails, ROLLBACK and investigate. Prefer a dedicated staging schema or a naming convention; keep swaps predictable and scripted.
+Rules:
+
+- Never silently truncate or rewrite a core table in place without a staging/backup step.
+- Always validate (counts, sums, ranges) before or immediately after the swap.
+- Keep swaps fast to minimize lock times.
 
 
-## Testing Strategy (Unit + Properties)
+## 6. Compute Placement: SQL vs Python
 
-Unit tests (fixtures):
+Default posture:
 
-- Use an in-memory DuckDB or a temporary file.
-- Seed small, deterministic fixtures (including nulls and duplicates).
-- Assert schema, key uniqueness, specific cell values, and edge-case behavior.
+- Use SQL for joins, filters, group-bys, windows, and aggregations.
+- Use Python (Pandas/Numpy) for specialized math on small, aggregated result sets.
 
-Property tests (invariants):
+Rules:
 
-- Key uniqueness and non-negativity, conservation (credits = debits), monotonic timestamps, no future dates, controlled null rates, bounded ranges.
-- For floats, use explicit tolerances.
-
-Optional (nice to have):
-
-- Perf smoke on fixtures to catch accidental quadratic plans or missing pushdown.
+- Avoid pulling large raw tables into Python just to group or aggregate; do that in SQL and return a small, tidy result.
+- Only reach for DuckDB Python UDFs when:
+  - You can’t express the logic in SQL reasonably, and
+  - The data volume is small enough that the UDF cost is acceptable.
+- When you do use UDFs, test them specifically and document their semantics.
 
 
-## Data Modeling & Layout
+## 7. Query Contracts and Reuse
 
-We assume curated data lives in DuckDB tables (no external Parquet). Optimize the layout you materialize:
+For core flows (ledger, budgets, net worth):
 
-- Define surrogate keys where appropriate; document business keys.
-- Choose minimal column types; avoid accidental BIGINT/DOUBLE creep.
-- For hot tables, load or rebuild with ORDER BY on frequent group/filter keys.
-- Consider summary marts (daily/weekly rollups) for repeated aggregations, refreshed via stage-then-swap.
+- Define canonical queries in `sql/queries/` and call them via DAOs.
+- Avoid “just one little inline query” in random modules for important behavior.
 
-Example (curated rebuild):
+Examples:
 
-    CREATE OR REPLACE TABLE orders_curated AS
-    SELECT
-      CAST(id AS BIGINT)               AS order_id,
-      CAST(merchant_id AS INTEGER)     AS merchant_id,
-      CAST(total_cents AS BIGINT)      AS total_cents,
-      CAST(dispatch_date AS DATE)      AS dispatch_date,
-      created_at,
-      updated_at
-    FROM orders_raw
-    WHERE status = 'complete'
-    ORDER BY merchant_id, dispatch_date;
+- Canonical query for current balances.
+- Canonical query for month-to-date activity by category.
+- Canonical query for net worth over time.
+
+When you need a new core behavior, either:
+
+- Extend an existing canonical query, or
+- Add a new one and wire it through a DAO so it’s discoverable and testable.
 
 
-## Observability: Audit Columns and Temporal (Valid-Time) Tables
+## 8. Auditing and Observability
 
-Audit columns:
+Important tables (for example, ledger-related tables) should include:
 
-- created_at, updated_at, source, job_id, version, and optionally a row_hash for integrity.
-- Populate/refresh in ETL steps; never backfill silently.
+- `created_at` and `updated_at`.
+- `source` (where the row came from: API, import job, seed).
+- `job_id` or similar for batch jobs.
+- Optional `row_hash` when you need strong integrity checks.
 
-Valid-time (SCD2-style) tables:
+Rules:
 
-- Add valid_from (NOT NULL) and valid_to (NOT NULL, sentinel '9999-12-31'), and a generated is_current flag.
-- On change, close the prior version (valid_to = now()) and insert a new row with valid_from = now().
-- Point-in-time queries filter: valid_from <= t AND valid_to > t.
-
-Example (upsert pattern):
-
-    -- Close current version
-    UPDATE user_config
-      SET valid_to = now(), updated_at = now()
-    WHERE user_id = ?
-      AND valid_to = '9999-12-31';
-
-    -- Insert new version
-    INSERT INTO user_config (
-      user_id, setting_a, setting_b,
-      valid_from, valid_to, created_at, updated_at, source, job_id
-    )
-    VALUES (?, ?, ?, now(), '9999-12-31', now(), now(), ?, ?);
-
-Anti-pattern:
-
-    -- Overwriting “current” rows in place without closing valid_to; breaks time travel.
+- Populate audit columns in migrations and seeds where relevant.
+- When backfilling, record a clear `source` (for example, `migration_20251130_add_positions`).
+- Don’t silently overwrite audit columns; treat them as part of the contract.
 
 
-## Style & Readability
+## 9. What Linters Cover (So We Don’t Repeat It Here)
 
-- Keywords UPPERCASE; identifiers snake_case; short, meaningful aliases.
-- One major clause per line; break long SELECT lists across lines.
-- **Explicit Joins:** Always use `INNER JOIN`, `LEFT JOIN`, etc. Do not use implicit `JOIN` which defaults to inner but trips up linters (AM05).
-- Never use SELECT * in application code; be explicit.
-- Comment only non-obvious logic; keep comments high-signal.
+The following are enforced by `sqlfluff` / formatters and should not be duplicated as prose rules:
 
-Example (readable):
+- Keyword casing and consistent spacing.
+- Avoiding `SELECT *` in app code where the linter is configured to forbid it.
+- Disallowing unparameterized literals where we expect binds.
+- Style conventions (snake_case, clause-per-line, etc.).
 
-    SELECT
-        o.order_id,
-        o.merchant_id,
-        o.dispatch_date,
-        SUM(oi.ext_price_cents) AS gross_cents
-    FROM orders AS o
-    INNER JOIN order_items AS oi ON oi.order_id = o.order_id
-    WHERE o.dispatch_date BETWEEN $start_date AND $end_date
-    GROUP BY o.order_id, o.merchant_id, o.dispatch_date
+If a mechanical SQL pattern bothers you, first check whether we can enforce it via linter configuration. This doc should stay focused on **schema design, migrations, temporal semantics, and transaction patterns**.
 
 
-## Tooling & CI
+## 10. Testing SQL
 
-- Use a SQL formatter/linter in CI to enforce style and safe patterns; allow an autofix bot to apply formatting so it doesn’t block human review.
-- Keep unit/property tests mandatory in CI; optionally include a small EXPLAIN/perf smoke.
-- Treat formatting as automation: the doc states rules; the linter encodes them.
+When adding or changing SQL:
 
-Practical tips:
+- Add tests (Python or DuckDB-only) that:
+  - Load small fixture `.sql` files.
+  - Exercise the query or migration.
+  - Assert on specific rows or aggregates, not just “no exception”.
 
-- Mark inline SQL strings clearly (e.g., with a preceding comment) so linters can target them.
-- Fail CI on unsafe patterns (e.g., SELECT * in app code) and on parsing errors.
+For migrations that change data:
 
+- Include tests that:
+  - Start from a pre-migration fixture.
+  - Apply the migration.
+  - Assert that schema matches expectations and that key invariants hold (no lost transactions, no negative balances beyond what is allowed, etc.).
 
-## Patterns Library (Suggested Contents)
-
-Keep short, prose-first pattern pages with a rationale and a compact example:
-
-- Surrogate key generation and de-duplication.
-- Stage-then-swap refresh workflow.
-- Temporal (valid-time) table upserts and time-travel queries.
-- Window function idioms: first/last per group, retention, rolling metrics, percentiles.
-- EXISTS vs IN: when and why EXISTS tends to outperform for correlated checks.
-- Materialization cues: when to cache a view into a table and how to refresh safely.
-
-
-## Examples & Anti-Patterns
-
-Selective retrieval (good):
-
-    SELECT id, created_at, amount_cents
-    FROM payments
-    WHERE merchant_id = ?
-      AND created_at >= ?
-    ORDER BY created_at DESC
-    LIMIT 500
-
-Anti-pattern: broad scans and late filters:
-
-    -- Selects everything, then filters later in Python
-    SELECT * FROM payments
-
-Join ordering for clarity and pushdown (good):
-
-    SELECT
-      m.merchant_id,
-      d.dispatch_date,
-      SUM(o.total_cents) AS gross_cents
-    FROM merchants m
-    JOIN orders o ON o.merchant_id = m.merchant_id
-    JOIN dispatches d ON d.order_id = o.order_id
-    WHERE d.dispatch_date BETWEEN ? AND ?
-    GROUP BY m.merchant_id, d.dispatch_date
-
-Anti-pattern: mixing logic between SQL and Python without reason:
-
-    -- Compute partial sums in SQL, finish aggregations in Python for the same grain
-    -- (push the full aggregation into SQL unless you truly need Python-only math)
-
-
-## FAQ-Style Notes
-
-- “Do we need indexes?”  
-  Consider them when repeated selective filters benefit measurably; validate with EXPLAIN/ANALYZE. For many analytics workloads, sorted layout + pushdown + pre-aggregation yield bigger wins.
-
-- “When do we cache a view as a table?”  
-  When it’s hot, latency-sensitive, or composes several joins/windows repeatedly. Refresh with stage-then-swap and test the row counts/hashes.
-
-- “When should I move code from Pandas back to SQL?”  
-  If the Pandas step starts reading large frames only to do group-bys/joins/filters, move that work into SQL and return a small result to Python.
-
-
-## Closing
-
-Favor explicit, pushdown-friendly SQL and intentional data layout. Keep migrations idempotent and guarded by transactions. Test correctness with unit and property checks. Materialize selectively when performance or stability requires it. Use automation to enforce style; use patterns to share the winning playbooks.
-
-This standard should evolve with real metrics and post-mortems—tune the rules where evidence merits, but keep the core principles: explicitness, testability, and pushdown.
+This is how we prove that migrations and queries are safe, not just syntactically valid.
 
