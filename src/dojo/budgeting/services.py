@@ -650,6 +650,11 @@ class TransactionEntryService:
             else:
                 # Source is RTA
                 rta_new = dao.ready_to_assign(new_month_start)
+                
+                # If we are in the same month, we can count the refund from the old allocation
+                if old_month_start == new_month_start:
+                    rta_new += old_amount
+                
                 if rta_new < cmd.amount_minor:
                     raise BudgetingError(
                         f"Insufficient Ready-to-Assign ({rta_new}) in {new_month_start} "
