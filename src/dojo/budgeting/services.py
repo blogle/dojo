@@ -680,14 +680,10 @@ class TransactionEntryService:
                         raise BudgetingError(f"Insufficient Ready-to-Assign ({rta}) for increase of {delta}.")
 
             elif delta < 0:
-                # Decreasing allocation. Dest gives back to Source.
-                reclaim = abs(delta)
-                dest_state = self._category_state_for_month(dao, cmd.to_category_id, new_month_start)
-                if dest_state.available_minor < reclaim:
-                    raise BudgetingError(
-                        f"Destination category has insufficient funds ({dest_state.available_minor}) "
-                        f"to reduce allocation by {reclaim}."
-                    )
+                # Decreasing allocation. Funds are returned to Source (or RTA).
+                # We allow this even if it results in negative availability (overspending),
+                # as the user may intend to use the reclaimed funds elsewhere.
+                pass
 
         # Execute SCD-2 update
         with dao.transaction():
