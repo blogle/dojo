@@ -705,6 +705,18 @@ class TransactionEntryService:
                 },
             )
 
+            # 3. Revert old allocation impact on monthly state
+            dao.adjust_category_allocation(old_to_category_id, old_month_start, -old_amount, -old_amount)
+            if from_category_id:
+                # Revert outflow from source
+                dao.adjust_category_allocation(from_category_id, old_month_start, old_amount, old_amount)
+
+            # 4. Apply new allocation impact on monthly state
+            dao.adjust_category_allocation(cmd.to_category_id, new_month_start, cmd.amount_minor, cmd.amount_minor)
+            if from_category_id:
+                # Apply outflow from source
+                dao.adjust_category_allocation(from_category_id, new_month_start, -cmd.amount_minor, -cmd.amount_minor)
+
         return self._category_state_for_month(dao, cmd.to_category_id, new_month_start)
 
     def list_recent(
