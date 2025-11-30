@@ -1,3 +1,4 @@
+-- Insert a new version of a budget allocation
 INSERT INTO budget_allocations (
     allocation_id,
     concept_id,
@@ -9,10 +10,11 @@ INSERT INTO budget_allocations (
     memo,
     is_active,
     valid_from,
+    valid_to,
     recorded_at
 ) VALUES (
-    $allocation_id,
-    $allocation_id, -- concept_id defaults to allocation_id for new entries
+    uuid(),
+    $concept_id,
     $allocation_date,
     $month_start,
     $from_category_id,
@@ -21,5 +23,6 @@ INSERT INTO budget_allocations (
     $memo,
     TRUE,
     CURRENT_TIMESTAMP,
+    CAST('9999-12-31 00:00:00' AS TIMESTAMP),
     CURRENT_TIMESTAMP
 );

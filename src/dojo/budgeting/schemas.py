@@ -54,6 +54,19 @@ class NewTransactionRequest(BaseModel):
     memo: str | None = Field(default=None, description="Optional free-form note.")
 
 
+class TransactionUpdateRequest(BaseModel):
+    """
+    Payload for updating an existing transaction (correction flow).
+    """
+
+    transaction_date: date
+    account_id: str
+    category_id: str
+    amount_minor: int
+    memo: str | None = None
+
+
+
 class CategorizedTransferRequest(BaseModel):
     """
     Payload describing a double-entry transfer between accounts, potentially categorized.
@@ -374,6 +387,18 @@ class BudgetAllocationRequest(BaseModel):
     month_start: date | None = Field(default=None, description="Optional month override (YYYY-MM-01).")
 
 
+class BudgetAllocationUpdateRequest(BaseModel):
+    """
+    Payload for updating an existing budget allocation (correction flow).
+    """
+
+    allocation_date: date
+    to_category_id: str
+    amount_minor: int
+    memo: str | None = None
+
+
+
 # Regular expression pattern for valid slug-like identifiers (lowercase letters, numbers, underscores).
 SLUG_PATTERN = r"^[a-z0-9_]+$"
 
@@ -408,6 +433,7 @@ class BudgetAllocationEntry(BaseModel):
     """
 
     allocation_id: UUID
+    concept_id: UUID
     allocation_date: date
     amount_minor: int
     from_category_id: str | None

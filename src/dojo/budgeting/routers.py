@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import TypeVar
+from uuid import UUID
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -26,6 +27,7 @@ from dojo.budgeting.schemas import (
     BudgetAllocationEntry,
     BudgetAllocationRequest,
     BudgetAllocationsResponse,
+    BudgetAllocationUpdateRequest,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
     BudgetCategoryGroupCreateRequest,
@@ -40,6 +42,7 @@ from dojo.budgeting.schemas import (
     ReferenceDataResponse,
     TransactionListItem,
     TransactionResponse,
+    TransactionUpdateRequest,
 )
 from dojo.budgeting.services import (
     AccountAdminService,
@@ -267,6 +270,46 @@ def create_transaction(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+
+
+@router.put(
+    "/transactions/{concept_id}",
+    response_model=TransactionResponse,
+)
+def update_transaction(
+    concept_id: UUID,
+    payload: TransactionUpdateRequest,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
+) -> TransactionResponse:
+    """
+    Updates an existing transaction using SCD-2 logic (correction flow).
+
+    Parameters
+    ----------
+    concept_id : UUID
+        The concept ID of the transaction to update.
+    payload : TransactionUpdateRequest
+        The update payload.
+    conn : duckdb.DuckDBPyConnection
+        Dependency that provides a DuckDB connection.
+    service : TransactionEntryService
+        Dependency that provides the transaction entry service.
+
+    Returns
+    -------
+    TransactionResponse
+        The updated transaction details.
+
+    Raises
+    ------
+    HTTPException
+        400 Bad Request for budgeting-related errors (e.g., invalid input, not found).
+    """
+    try:
+        return service.update_transaction(conn, concept_id, payload)
+    except BudgetingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/transactions", response_model=list[TransactionListItem])
@@ -967,6 +1010,46 @@ def allocate_budget(
         )
     except (BudgetingError, InvalidTransactionError) as exc:
         # Handle budgeting and invalid transaction errors.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put(
+    "/budget/allocations/{concept_id}",
+    response_model=CategoryState,
+)
+def update_allocation(
+    concept_id: UUID,
+    payload: BudgetAllocationUpdateRequest,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
+) -> CategoryState:
+    """
+    Updates an existing budget allocation using SCD-2 logic.
+
+    Parameters
+    ----------
+    concept_id : UUID
+        The concept ID of the allocation to update.
+    payload : BudgetAllocationUpdateRequest
+        The update payload.
+    conn : duckdb.DuckDBPyConnection
+        Dependency that provides a DuckDB connection.
+    service : TransactionEntryService
+        Dependency that provides the transaction entry service.
+
+    Returns
+    -------
+    CategoryState
+        The updated state of the destination category.
+
+    Raises
+    ------
+    HTTPException
+        400 Bad Request for budgeting-related errors.
+    """
+    try:
+        return service.update_allocation(conn, concept_id, payload)
+    except (BudgetingError, InvalidTransactionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 

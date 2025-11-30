@@ -37,6 +37,8 @@ export const api = {
     list: async (limit = 100) => fetchJSON(`/api/transactions?limit=${limit}`),
     create: async (payload) =>
       fetchJSON("/api/transactions", { method: "POST", headers: defaultHeaders, body: JSON.stringify(payload) }),
+    update: async (conceptId, payload) =>
+      fetchJSON(`/api/transactions/${conceptId}`, { method: "PUT", headers: defaultHeaders, body: JSON.stringify(payload) }),
   },
   transfers: {
     create: async (payload) =>
@@ -71,6 +73,8 @@ export const api = {
     allocations: async (month) => fetchJSON(`/api/budget/allocations?month=${month}`),
     createAllocation: async (payload) =>
       fetchJSON("/api/budget/allocations", { method: "POST", headers: defaultHeaders, body: JSON.stringify(payload) }),
+    updateAllocation: async (conceptId, payload) =>
+      fetchJSON(`/api/budget/allocations/${conceptId}`, { method: "PUT", headers: defaultHeaders, body: JSON.stringify(payload) }),
   },
 };
 

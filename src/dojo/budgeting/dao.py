@@ -685,6 +685,7 @@ class BudgetAllocationRecord:
     """
 
     allocation_id: UUID
+    concept_id: UUID
     allocation_date: date
     amount_minor: int
     memo: str | None
@@ -711,6 +712,7 @@ class BudgetAllocationRecord:
         """
         return cls(
             allocation_id=UUID(str(row.allocation_id)),
+            concept_id=UUID(str(row.concept_id)),
             allocation_date=row.allocation_date,
             amount_minor=int(row.amount_minor),
             memo=str(row.memo) if row.memo is not None else None,

@@ -3,8 +3,9 @@ import { api } from "../../services/api.js";
 import { formatAmount, dollarsToMinor, todayISO, currentMonthStartISO } from "../../services/format.js";
 import { setFormError, setButtonBusy } from "../../services/dom.js";
 import { store } from "../../store.js";
-import { getCategoryAvailableMinor, getCategoryDisplayName } from "../categories/utils.js";
+import { getCategoryAvailableMinor, getCategoryDisplayName, getCategoryOptions } from "../categories/utils.js";
 import { showToast } from "../toast.js";
+import { makeRowEditable } from "../../services/ui-ledger.js";
 
 let loadBudgetsData = async () => {};
 let renderBudgetsPage = () => {};
@@ -33,6 +34,85 @@ export const loadAllocationsData = async () => {
   }
 };
 
+const startEditingAllocation = (allocation) => {
+  store.setState((prev) => ({
+    ...prev,
+    editingAllocationId: allocation.concept_id,
+  }));
+  renderAllocationsPage();
+};
+
+const cancelEditingAllocation = () => {
+  store.setState((prev) => ({
+    ...prev,
+    editingAllocationId: null,
+  }));
+  renderAllocationsPage();
+};
+
+const handleInlineAllocationSave = async (row, allocation) => {
+  const dateInput = row.querySelector("[name='allocation_date']");
+  const amountInput = row.querySelector("[name='amount_minor']");
+  const toInput = row.querySelector("[name='to_category_id']");
+  const memoInput = row.querySelector("[name='memo']");
+
+  const payload = {
+    allocation_date: dateInput.value,
+    to_category_id: toInput.value,
+    amount_minor: Math.abs(dollarsToMinor(amountInput.value)),
+    memo: memoInput.value,
+  };
+
+  try {
+    await api.budgets.updateAllocation(allocation.concept_id, payload);
+    store.setState((prev) => ({ ...prev, editingAllocationId: null }));
+    await Promise.all([loadAllocationsData(), loadBudgetsData(), refreshAccountsPage()]);
+    renderAllocationsPage();
+    renderBudgetsPage();
+    showToast("Allocation updated");
+  } catch (err) {
+    console.error(err);
+    showToast("Failed to update allocation");
+  }
+};
+
+const setupInlineAllocationEdit = (row, entry) => {
+  const config = [
+    { type: "date", key: "allocation_date", name: "allocation_date" },
+    { type: "money", key: "amount_minor", name: "amount_minor", attrs: { placeholder: "0.00" } },
+    {
+      type: "html",
+      html: entry.from_category_name || getCategoryDisplayName(entry.from_category_id) || "Ready to Assign",
+    },
+    {
+      type: "select",
+      key: "to_category_id",
+      name: "to_category_id",
+      options: getCategoryOptions(),
+      valueKey: "category_id",
+      labelKey: "name",
+    },
+    { type: "text", key: "memo", name: "memo" },
+  ];
+
+  makeRowEditable(row, entry, config);
+
+  const amountInput = row.querySelector("[name='amount_minor']");
+  if (amountInput) {
+    amountInput.focus();
+  }
+
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleInlineAllocationSave(row, entry);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      cancelEditingAllocation();
+    }
+  });
+};
+
 export const renderAllocationsPage = () => {
   const state = store.getState();
   const inflowEl = document.querySelector(selectors.allocationInflowValue);
@@ -57,13 +137,18 @@ export const renderAllocationsPage = () => {
     } else {
       state.allocations.entries.forEach((entry) => {
         const row = document.createElement("tr");
-        row.innerHTML = `
+        if (state.editingAllocationId === entry.concept_id) {
+          setupInlineAllocationEdit(row, entry);
+        } else {
+          row.innerHTML = `
           <td>${entry.allocation_date || "—"}</td>
           <td class="amount-cell">${formatAmount(entry.amount_minor ?? 0)}</td>
           <td>${entry.from_category_name || getCategoryDisplayName(entry.from_category_id)}</td>
           <td>${entry.to_category_name || getCategoryDisplayName(entry.to_category_id)}</td>
           <td>${entry.memo || "—"}</td>
         `;
+          row.addEventListener("click", () => startEditingAllocation(entry));
+        }
         body.appendChild(row);
       });
     }

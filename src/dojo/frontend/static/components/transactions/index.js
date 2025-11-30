@@ -5,6 +5,7 @@ import { setFormError, setButtonBusy, populateSelect } from "../../services/dom.
 import { store } from "../../store.js";
 import { getCategoryOptions } from "../categories/utils.js";
 import { refreshSelectOptions } from "../reference/index.js";
+import { makeRowEditable } from "../../services/ui-ledger.js";
 
 let transactionsBodyEl = null;
 let detachInlineEscHandler = null;
@@ -139,44 +140,83 @@ const cancelInlineTransactionEdit = () => {
   renderTransactions(transactionsBodyEl, store.getState().transactions);
 };
 
-const hydrateInlineEditRow = (row, transaction) => {
+const setupInlineEdit = (row, transaction) => {
   if (!row || !transaction) {
     return;
   }
-  row.classList.add("inline-edit-row");
+  const state = store.getState();
+
+  const config = [
+    { type: "date", key: "transaction_date", name: "transaction_date", attrs: { "data-inline-date": "" } },
+    {
+      type: "select",
+      key: "account_id",
+      name: "account_id",
+      options: [...state.reference.accounts].sort((a, b) => a.name.localeCompare(b.name)),
+      valueKey: "account_id",
+      labelKey: "name",
+      placeholder: "Select account",
+      attrs: { "data-inline-account": "" },
+    },
+    {
+      type: "select",
+      key: "category_id",
+      name: "category_id",
+      options: getCategoryOptions({ includeSystem: true }),
+      valueKey: "category_id",
+      labelKey: "name",
+      placeholder: "Select category",
+      attrs: { "data-inline-category": "" },
+    },
+    {
+      type: "custom",
+      render: (d) => `
+          <input type="text" name="memo" value="${d.memo || ""}" placeholder="Optional memo" class="table-input" data-inline-memo />
+          <p class="inline-row-feedback" data-inline-error aria-live="polite"></p>
+        `,
+    },
+    {
+      type: "money",
+      key: "amount_minor",
+      name: "outflow",
+      class: "amount-cell",
+      getValue: (d) => (d.amount_minor < 0 ? d.amount_minor : null),
+      attrs: { "data-inline-outflow": "", placeholder: "0.00", "aria-label": "Outflow amount" },
+    },
+    {
+      type: "money",
+      key: "amount_minor",
+      name: "inflow",
+      class: "amount-cell",
+      getValue: (d) => (d.amount_minor >= 0 ? d.amount_minor : null),
+      attrs: { "data-inline-inflow": "", placeholder: "0.00", "aria-label": "Inflow amount" },
+    },
+    {
+      type: "custom",
+      render: (d) => `
+              <button
+                type="button"
+                class="status-toggle-badge ${d.status === "cleared" ? "is-cleared" : "is-pending"}"
+                data-inline-status-toggle
+                data-state="${d.status === "cleared" ? "cleared" : "pending"}"
+                role="switch"
+                aria-checked="${d.status === "cleared"}"
+                tabindex="0"
+              >
+                ${statusToggleIcons}
+              </button>
+         `,
+    },
+  ];
+
+  makeRowEditable(row, transaction, config);
+
   const errorEl = row.querySelector("[data-inline-error]");
   setFormError(errorEl, "");
-  const state = store.getState();
-  const accountSelect = row.querySelector("[data-inline-account]");
-  if (accountSelect) {
-    const sortedAccounts = [...state.reference.accounts].sort((a, b) => a.name.localeCompare(b.name));
-    populateSelect(accountSelect, sortedAccounts, { valueKey: "account_id", labelKey: "name" }, "Select account");
-    accountSelect.value = transaction.account_id || "";
-  }
-  const categorySelect = row.querySelector("[data-inline-category]");
-  if (categorySelect) {
-    const categories = getCategoryOptions({ includeSystem: true });
-    populateSelect(categorySelect, categories, { valueKey: "category_id", labelKey: "name" }, "Select category");
-    categorySelect.value = transaction.category_id || "";
-  }
-  const dateInput = row.querySelector("[data-inline-date]");
-  if (dateInput) {
-    dateInput.value = transaction.transaction_date || todayISO();
-  }
-  const memoInput = row.querySelector("[data-inline-memo]");
-  if (memoInput) {
-    memoInput.value = transaction.memo || "";
-  }
+
   const inflowInput = row.querySelector("[data-inline-inflow]");
   const outflowInput = row.querySelector("[data-inline-outflow]");
   if (inflowInput || outflowInput) {
-    const amountMinor = transaction.amount_minor ?? 0;
-    if (outflowInput) {
-      outflowInput.value = amountMinor < 0 ? minorToDollars(Math.abs(amountMinor)) : "";
-    }
-    if (inflowInput) {
-      inflowInput.value = amountMinor >= 0 ? minorToDollars(Math.abs(amountMinor)) : "";
-    }
     const enforceExclusiveAmount = (source, target) => {
       if (!source || !target) {
         return;
@@ -190,6 +230,7 @@ const hydrateInlineEditRow = (row, transaction) => {
     enforceExclusiveAmount(inflowInput, outflowInput);
     enforceExclusiveAmount(outflowInput, inflowInput);
   }
+
   const statusToggle = row.querySelector("[data-inline-status-toggle]");
   initializeStatusToggle(statusToggle, transaction.status === "cleared" ? "cleared" : "pending");
 
@@ -201,6 +242,7 @@ const hydrateInlineEditRow = (row, transaction) => {
     }
   };
   row.addEventListener("keydown", keyHandler);
+  const dateInput = row.querySelector("[data-inline-date]");
   window.requestAnimationFrame(() => {
     dateInput?.focus();
   });
@@ -320,57 +362,7 @@ const renderTransactions = (bodyEl, transactions) => {
     const row = document.createElement("tr");
     const isEditing = state.editingTransactionId === tx.transaction_version_id;
     if (isEditing) {
-      row.innerHTML = `
-        <td><input type="date" data-inline-date /></td>
-        <td>
-          <select data-inline-account>
-            <option value="" disabled>Select account</option>
-          </select>
-        </td>
-        <td>
-          <select data-inline-category>
-            <option value="" disabled>Select category</option>
-          </select>
-        </td>
-        <td>
-          <input type="text" data-inline-memo placeholder="Optional memo" />
-          <p class="inline-row-feedback" data-inline-error aria-live="polite"></p>
-        </td>
-        <td class="amount-cell amount-edit-cell">
-          <input
-            type="number"
-            step="0.01"
-            inputmode="decimal"
-            placeholder="0.00"
-            data-inline-outflow
-            aria-label="Outflow amount"
-          />
-        </td>
-        <td class="amount-cell amount-edit-cell">
-          <input
-            type="number"
-            step="0.01"
-            inputmode="decimal"
-            placeholder="0.00"
-            data-inline-inflow
-            aria-label="Inflow amount"
-          />
-        </td>
-        <td>
-          <button
-            type="button"
-            class="status-toggle-badge is-pending"
-            data-inline-status-toggle
-            data-state="pending"
-            role="switch"
-            aria-checked="false"
-            tabindex="0"
-          >
-            ${statusToggleIcons}
-          </button>
-        </td>
-      `;
-      hydrateInlineEditRow(row, tx);
+      setupInlineEdit(row, tx);
     } else {
       const statusValue = tx.status === "cleared" ? "cleared" : "pending";
       const amountMinor = tx.amount_minor ?? 0;

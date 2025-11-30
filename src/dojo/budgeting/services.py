@@ -37,6 +37,7 @@ from dojo.budgeting.schemas import (
     AccountRole,
     AccountState,
     AccountUpdateRequest,
+    BudgetAllocationUpdateRequest,
     BudgetCategoryCreateRequest,
     BudgetCategoryDetail,
     BudgetCategoryGroupCreateRequest,
@@ -50,7 +51,9 @@ from dojo.budgeting.schemas import (
     NewTransactionRequest,
     TransactionListItem,
     TransactionResponse,
+    TransactionUpdateRequest,
 )
+from dojo.budgeting.sql import load_sql
 
 
 def derive_payment_category_id(account_id: str) -> str:
@@ -222,6 +225,110 @@ class TransactionEntryService:
                 account=account_state,
                 category=category_state,
             )
+
+    def update_transaction(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        concept_id: UUID,
+        cmd: TransactionUpdateRequest,
+    ) -> TransactionResponse:
+        """
+        Updates an existing transaction using SCD-2 logic (correction flow).
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            The DuckDB connection object.
+        concept_id : UUID
+            The concept ID of the transaction to update.
+        cmd : TransactionUpdateRequest
+            The update payload.
+
+        Returns
+        -------
+        TransactionResponse
+            The updated transaction details.
+        """
+        if cmd.amount_minor == 0:
+            raise InvalidTransactionError("amount_minor must be non-zero.")
+
+        dao = BudgetingDAO(conn)
+        # Check if transaction exists
+        existing = dao.get_active_transaction(concept_id)
+        if not existing:
+            raise InvalidTransactionError("Transaction not found or not active.")
+
+        # Net Impact Validation (Transactions)
+        # Ensure the update doesn't result in negative category availability (strict mode).
+        new_month = cmd.transaction_date.replace(day=1)
+        # Only check if the category tracks budget (not system)
+        cat_record = self._require_active_category(dao, cmd.category_id)
+        if self._should_track_budget_activity(cat_record):
+            cat_state = self._category_state_for_month(dao, cmd.category_id, new_month)
+            simulated_available = cat_state.available_minor
+
+            # Revert old effect if it was in the same bucket
+            old_month = existing.transaction_date.replace(day=1)
+            if existing.category_id == cmd.category_id and old_month == new_month:
+                simulated_available -= existing.amount_minor
+            
+            # Apply new effect
+            simulated_available += cmd.amount_minor
+            
+            # If simulated available < 0, we verify if we made it worse.
+            # If it was already negative, we might allow it if we are improving it?
+            # But simple rule: don't allow making it negative.
+            if simulated_available < 0:
+                 # Check if we are making it worse than it would be without this tx?
+                 # Or just strict check?
+                 # "Prevent ... negative availability".
+                 raise BudgetingError(
+                     f"Transaction update results in negative availability ({simulated_available}) in {cat_state.name}."
+                 )
+
+        # Execute SCD-2 update
+        with dao.transaction():
+            # 1. Retire old version
+            conn.execute(
+                load_sql("scd2_retire_transaction.sql"),
+                {"concept_id": concept_id},
+            )
+            # 2. Insert new version
+            conn.execute(
+                load_sql("scd2_insert_transaction.sql"),
+                {
+                    "concept_id": concept_id,
+                    "account_id": cmd.account_id,
+                    "category_id": cmd.category_id,
+                    "transaction_date": cmd.transaction_date,
+                    "amount_minor": cmd.amount_minor,
+                    "memo": cmd.memo,
+                    "changed_by": "user",
+                },
+            )
+
+        # Retrieve updated record
+        new_tx = dao.get_active_transaction(concept_id)
+        if not new_tx:
+            raise BudgetingError("Failed to retrieve updated transaction.")
+
+        # Get states
+        account_state = self._account_state_from_record(self._require_active_account(dao, cmd.account_id))
+        category_state = self._category_state_from_month(
+            dao.get_category_month_state(cmd.category_id, cmd.transaction_date.replace(day=1)),
+            cmd.category_id,
+        )
+
+        return TransactionResponse(
+            transaction_version_id=new_tx.transaction_version_id,
+            concept_id=concept_id,
+            amount_minor=new_tx.amount_minor,
+            transaction_date=new_tx.transaction_date,
+            status=cast(Literal["pending", "cleared"], new_tx.status),
+            memo=new_tx.memo,
+            account=account_state,
+            category=category_state,
+        )
 
     def transfer(
         self,
@@ -468,6 +575,138 @@ class TransactionEntryService:
             category_state = self._category_state_for_month(dao, destination_category_id, month)
         return category_state
 
+    def update_allocation(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        concept_id: UUID,
+        cmd: BudgetAllocationUpdateRequest,
+    ) -> CategoryState:
+        """
+        Updates an existing budget allocation using SCD-2 logic.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            The DuckDB connection object.
+        concept_id : UUID
+            The concept ID of the allocation.
+        cmd : BudgetAllocationUpdateRequest
+            The update payload.
+
+        Returns
+        -------
+        CategoryState
+            The updated state of the destination category.
+        """
+        if cmd.amount_minor <= 0:
+            raise InvalidTransactionError("amount_minor must be positive.")
+
+        dao = BudgetingDAO(conn)
+        # Fetch current active state
+        row = conn.execute(
+            """
+            SELECT amount_minor, month_start, from_category_id, to_category_id
+            FROM budget_allocations
+            WHERE concept_id = ? AND is_active = TRUE
+            """,
+            [concept_id],
+        ).fetchone()
+
+        if not row:
+            raise InvalidTransactionError("Allocation not found or not active.")
+
+        old_amount, old_month_start, from_category_id, old_to_category_id = row
+
+        # Derive new month_start from the new allocation date
+        new_month_start = cmd.allocation_date.replace(day=1)
+
+        # Net Impact Validation
+        if new_month_start != old_month_start or cmd.to_category_id != old_to_category_id:
+            # Complex move: Treat as Revert Old + Apply New
+            # 1. Check if Old Dest can give up funds
+            dest_state_old = self._category_state_for_month(dao, old_to_category_id, old_month_start)
+            if dest_state_old.available_minor < old_amount:
+                raise BudgetingError(
+                    f"Cannot move allocation. {dest_state_old.name} only has "
+                    f"{dest_state_old.available_minor} available, needs {old_amount}."
+                )
+            
+            # 2. Check if New Source (or RTA) can provide funds
+            if from_category_id:
+                # Source is a category
+                # Note: If Source == Old Dest (reallocation), we just checked it has funds?
+                # No, Source is where funds come FROM. Dest is where they go TO.
+                
+                # If Source is same as Old Dest (e.g. moving funds out of a category back to it?), rare.
+                # Standard case: Check Source in New Month.
+                src_state_new = self._category_state_for_month(dao, from_category_id, new_month_start)
+                # If source and dest are same category in different months?
+                # Just check simple availability.
+                if src_state_new.available_minor < cmd.amount_minor:
+                    raise BudgetingError(
+                        f"Source category has insufficient funds ({src_state_new.available_minor}) "
+                        f"for {cmd.amount_minor}."
+                    )
+            else:
+                # Source is RTA
+                rta_new = dao.ready_to_assign(new_month_start)
+                if rta_new < cmd.amount_minor:
+                    raise BudgetingError(
+                        f"Insufficient Ready-to-Assign ({rta_new}) in {new_month_start} "
+                        f"for {cmd.amount_minor}."
+                    )
+
+        else:
+            # Simple update (same month, same dest)
+            delta = cmd.amount_minor - old_amount
+
+            if delta > 0:
+                # Increasing allocation. Need more from Source.
+                if from_category_id:
+                    src_state = self._category_state_for_month(dao, from_category_id, new_month_start)
+                    if src_state.available_minor < delta:
+                        raise BudgetingError(
+                            f"Source category has insufficient funds ({src_state.available_minor}) "
+                            f"for increase of {delta}."
+                        )
+                else:
+                    rta = dao.ready_to_assign(new_month_start)
+                    if rta < delta:
+                        raise BudgetingError(f"Insufficient Ready-to-Assign ({rta}) for increase of {delta}.")
+
+            elif delta < 0:
+                # Decreasing allocation. Dest gives back to Source.
+                reclaim = abs(delta)
+                dest_state = self._category_state_for_month(dao, cmd.to_category_id, new_month_start)
+                if dest_state.available_minor < reclaim:
+                    raise BudgetingError(
+                        f"Destination category has insufficient funds ({dest_state.available_minor}) "
+                        f"to reduce allocation by {reclaim}."
+                    )
+
+        # Execute SCD-2 update
+        with dao.transaction():
+            # 1. Retire old version
+            conn.execute(
+                load_sql("scd2_retire_allocation.sql"),
+                {"concept_id": concept_id},
+            )
+            # 2. Insert new version
+            conn.execute(
+                load_sql("scd2_insert_allocation.sql"),
+                {
+                    "concept_id": concept_id,
+                    "allocation_date": cmd.allocation_date,
+                    "month_start": new_month_start,
+                    "from_category_id": from_category_id,
+                    "to_category_id": cmd.to_category_id,
+                    "amount_minor": cmd.amount_minor,
+                    "memo": cmd.memo,
+                },
+            )
+
+        return self._category_state_for_month(dao, cmd.to_category_id, new_month_start)
+
     def list_recent(
         self,
         conn: duckdb.DuckDBPyConnection,
@@ -569,6 +808,7 @@ class TransactionEntryService:
         """
         return {
             "allocation_id": record.allocation_id,
+            "concept_id": record.concept_id,
             "allocation_date": record.allocation_date,
             "amount_minor": record.amount_minor,
             "memo": record.memo,
