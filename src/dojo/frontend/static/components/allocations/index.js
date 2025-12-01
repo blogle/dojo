@@ -5,6 +5,7 @@ import { setFormError, setButtonBusy } from "../../services/dom.js";
 import { store } from "../../store.js";
 import { getCategoryAvailableMinor, getCategoryDisplayName, getCategoryOptions } from "../categories/utils.js";
 import { showToast } from "../toast.js";
+import { notifyAllocationEnd, notifyAllocationStart } from "../../services/allocationTracker.js";
 import { makeRowEditable } from "../../services/ui-ledger.js";
 
 let loadBudgetsData = async () => {};
@@ -63,11 +64,11 @@ const handleInlineAllocationSave = async (row, allocation) => {
     memo: memoInput.value,
   };
 
-  try {
-    await api.budgets.updateAllocation(allocation.concept_id, payload);
-    store.setState((prev) => ({ ...prev, editingAllocationId: null }));
-    await Promise.all([loadAllocationsData(), loadBudgetsData(), refreshAccountsPage()]);
-    renderAllocationsPage();
+    try {
+      await api.budgets.updateAllocation(allocation.concept_id, payload);
+      store.setState((prev) => ({ ...prev, editingAllocationId: null }));
+      await Promise.all([loadAllocationsData(), loadBudgetsData({ skipPendingCheck: true }), refreshAccountsPage()]);
+      renderAllocationsPage();
     renderBudgetsPage();
     showToast("Allocation updated");
   } catch (err) {
@@ -184,6 +185,7 @@ const handleAllocationFormSubmit = async (event) => {
   const memo = (formData.get("memo") || "").toString().trim();
   const amountMinor = Math.abs(dollarsToMinor(formData.get("amount")));
   const errorEl = document.querySelector(selectors.allocationError);
+  let allocationTracked = false;
   setFormError(errorEl, "");
   if (!toCategoryId) {
     setFormError(errorEl, "Choose the destination category.");
@@ -225,6 +227,8 @@ const handleAllocationFormSubmit = async (event) => {
       },
     }));
     setButtonBusy(button, true);
+    notifyAllocationStart();
+    allocationTracked = true;
     await api.budgets.createAllocation(payload);
     const amountInput = form.querySelector("input[name='amount']");
     if (amountInput) {
@@ -232,7 +236,7 @@ const handleAllocationFormSubmit = async (event) => {
       amountInput.focus();
     }
     setFormError(errorEl, "");
-    await Promise.all([loadAllocationsData(), loadBudgetsData(), refreshAccountsPage()]);
+    await Promise.all([loadAllocationsData(), loadBudgetsData({ skipPendingCheck: true }), refreshAccountsPage()]);
     renderAllocationsPage();
     renderBudgetsPage();
     const fromLabel = getCategoryDisplayName(fromCategoryId);
@@ -242,6 +246,9 @@ const handleAllocationFormSubmit = async (event) => {
     console.error(error);
     setFormError(errorEl, error.message || "Allocation failed.");
   } finally {
+    if (allocationTracked) {
+      notifyAllocationEnd();
+    }
     store.setState((prev) => ({
       ...prev,
       forms: {

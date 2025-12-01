@@ -111,7 +111,10 @@ should_run_suite() {
 
 suite_pattern() {
     local suite="$1"
-    [[ -n "${FILTERS_PATTERN[$suite]+x}" ]] && printf '%s' "${FILTERS_PATTERN[$suite]}"
+    if [[ -n "${FILTERS_PATTERN[$suite]+x}" ]]; then
+        printf '%s' "${FILTERS_PATTERN[$suite]}"
+    fi
+    return 0
 }
 
 sanitize_label() {

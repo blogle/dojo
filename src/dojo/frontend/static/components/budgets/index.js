@@ -6,6 +6,7 @@ import { store } from "../../store.js";
 import { filterUserFacingCategories } from "../categories/utils.js";
 import { showToast } from "../toast.js";
 import { refreshSelectOptions } from "../reference/index.js";
+import { waitForPendingAllocations } from "../../services/allocationTracker.js";
 
 let categorySlugDirty = false;
 let loadAllocationsData = async () => {};
@@ -18,7 +19,10 @@ const refreshReadyToAssign = (ready) => {
   store.setState((prev) => ({ ...prev, readyToAssign: ready }));
 };
 
-export const loadBudgetsData = async () => {
+export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
+  if (!skipPendingCheck) {
+    await waitForPendingAllocations();
+  }
   const month = currentMonthStartISO();
   try {
     const [categories, groups, ready] = await Promise.all([
@@ -214,14 +218,15 @@ const handleQuickAllocation = async (categoryId, amountMinor, memo = "Quick allo
     allocation_date: todayISO(),
     memo,
   };
-  try {
-    await api.budgets.createAllocation(payload);
-    closeBudgetDetailModal();
-    await Promise.all([loadBudgetsData(), loadAllocationsData(), refreshAccountsPage()]);
-    renderBudgetsPage();
-    renderAllocationsPage();
-    showToast(`Allocated ${formatAmount(amountMinor)}`);
-  } catch (error) {
+    try {
+      await api.budgets.createAllocation(payload);
+      closeBudgetDetailModal();
+      await Promise.all([loadBudgetsData({ skipPendingCheck: true }), loadAllocationsData(), refreshAccountsPage()]);
+      renderBudgetsPage();
+      renderAllocationsPage();
+      showToast(`Allocated ${formatAmount(amountMinor)}`);
+    } catch (error) {
+
     console.error(error);
     alert(error.message || "Allocation failed.");
   }
@@ -238,21 +243,22 @@ const handleGroupQuickAllocation = async (allocations, label) => {
     return;
   }
 
-  try {
-    for (const alloc of allocations) {
-      await api.budgets.createAllocation({
-        to_category_id: alloc.category_id,
-        amount_minor: alloc.amount_minor,
-        allocation_date: todayISO(),
-        memo: alloc.memo,
-      });
-    }
-    closeGroupDetailModal();
-    await Promise.all([loadBudgetsData(), loadAllocationsData(), refreshAccountsPage()]);
-    renderBudgetsPage();
-    renderAllocationsPage();
-    showToast(`${label} (${formatAmount(totalNeeded)})`);
-  } catch (error) {
+    try {
+      for (const alloc of allocations) {
+        await api.budgets.createAllocation({
+          to_category_id: alloc.category_id,
+          amount_minor: alloc.amount_minor,
+          allocation_date: todayISO(),
+          memo: alloc.memo,
+        });
+      }
+      closeGroupDetailModal();
+      await Promise.all([loadBudgetsData({ skipPendingCheck: true }), loadAllocationsData(), refreshAccountsPage()]);
+      renderBudgetsPage();
+      renderAllocationsPage();
+      showToast(`${label} (${formatAmount(totalNeeded)})`);
+    } catch (error) {
+
     console.error(error);
     alert(error.message || "Partial failure during group allocation.");
     await loadBudgetsData();
