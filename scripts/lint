@@ -205,6 +205,7 @@ parse_args "$@"
 run_tool "ruff" ruff check .
 run_tool "sqlfluff" sqlfluff lint --dialect duckdb src/dojo/sql
 run_tool "biome" biome lint src/dojo/frontend
+run_tool "actionlint" actionlint
 run_sql_string_guard
 
 if [[ "$had_failure" -ne 0 ]]; then
