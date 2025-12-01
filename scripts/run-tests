@@ -20,15 +20,19 @@ SKIP_PROPERTY=0
 SKIP_INTEGRATION=0
 SKIP_E2E=0
 
+declare -A FILTERS_PATTERN=()
+FILTERED=0
+
 usage() {
     cat <<EOF
 NAME
     ${SCRIPT_NAME} - run pytest suites and Cypress e2e with unified reporting
 SYNOPSIS
-    scripts/${SCRIPT_NAME} [--skip-property] [--skip-integration] [--skip-e2e] [-h|--help]
+    scripts/${SCRIPT_NAME} [--skip-property] [--skip-integration] [--skip-e2e] [--filter SUITE[:PATTERN]] [-h|--help]
 DESCRIPTION
     Runs unit, property, integration, and e2e suites (Cypress with Chrome) and prints a
     terse [OK]/[FAIL] summary per suite. Failures reference a temp log for the full output.
+    Use --filter to target a single suite (e.g., --filter unit:budgeting or --filter e2e:01-payday-assignment).
 EOF
 }
 
@@ -51,6 +55,20 @@ parse_args() {
                 SKIP_E2E=1
                 shift
                 ;;
+            --filter)
+                shift
+                if [[ $# -eq 0 ]]; then
+                    echo "--filter requires an argument" >&2
+                    usage
+                    exit 1
+                fi
+                add_filter "$1"
+                shift
+                ;;
+            --filter=*)
+                add_filter "${1#*=}"
+                shift
+                ;;
             *)
                 echo "Unknown option: $1" >&2
                 usage
@@ -58,6 +76,42 @@ parse_args() {
                 ;;
         esac
     done
+}
+
+add_filter() {
+    local raw="$1"
+    local suite pattern
+    if [[ "$raw" == *:* ]]; then
+        suite="${raw%%:*}"
+        pattern="${raw#*:}"
+    else
+        suite="$raw"
+        pattern=""
+    fi
+    suite="$(printf '%s' "$suite" | tr '[:upper:]' '[:lower:]')"
+    case "$suite" in
+        unit|property|integration|e2e)
+            ;;
+        *)
+            echo "Invalid filter suite: $suite" >&2
+            exit 1
+            ;;
+    esac
+    FILTERS_PATTERN["$suite"]="$pattern"
+    FILTERED=1
+}
+
+should_run_suite() {
+    local suite="$1"
+    if [[ "$FILTERED" -eq 0 ]]; then
+        return 0
+    fi
+    [[ -n "${FILTERS_PATTERN[$suite]+x}" ]]
+}
+
+suite_pattern() {
+    local suite="$1"
+    [[ -n "${FILTERS_PATTERN[$suite]+x}" ]] && printf '%s' "${FILTERS_PATTERN[$suite]}"
 }
 
 sanitize_label() {
@@ -128,30 +182,69 @@ run_suite() {
 parse_args "$@"
 
 pids=()
-run_suite "unit tests" python -m pytest tests/unit &
-pids+=($!)
+if should_run_suite unit; then
+    unit_cmd=(python -m pytest tests/unit)
+    unit_pattern=$(suite_pattern unit)
+    if [[ -n "$unit_pattern" ]]; then
+        unit_cmd+=(-k "$unit_pattern")
+    fi
+    run_suite "unit tests" "${unit_cmd[@]}" &
+    pids+=($!)
+else
+    echo "[SKIP] unit tests (filtered)"
+fi
 
 if [[ "$SKIP_PROPERTY" -eq 1 ]]; then
     echo "[SKIP] property tests (--skip-property)"
-else
-    run_suite "property tests" python -m pytest tests/property &
+elif should_run_suite property; then
+    prop_cmd=(python -m pytest tests/property)
+    prop_pattern=$(suite_pattern property)
+    if [[ -n "$prop_pattern" ]]; then
+        prop_cmd+=(-k "$prop_pattern")
+    fi
+    run_suite "property tests" "${prop_cmd[@]}" &
     pids+=($!)
+else
+    echo "[SKIP] property tests (filtered)"
 fi
 
 if [[ "$SKIP_INTEGRATION" -eq 1 ]]; then
     echo "[SKIP] integration tests (--skip-integration)"
 elif [[ ! -d tests/integration ]]; then
     echo "[SKIP] integration tests (tests/integration missing)"
-else
-    run_suite "integration tests" python -m pytest tests/integration &
+elif should_run_suite integration; then
+    int_cmd=(python -m pytest tests/integration)
+    int_pattern=$(suite_pattern integration)
+    if [[ -n "$int_pattern" ]]; then
+        int_cmd+=(-k "$int_pattern")
+    fi
+    run_suite "integration tests" "${int_cmd[@]}" &
     pids+=($!)
+else
+    echo "[SKIP] integration tests (filtered)"
 fi
 
 if [[ "$SKIP_E2E" -eq 1 ]]; then
     echo "[SKIP] e2e tests (--skip-e2e)"
-else
-    run_suite "e2e tests (cypress)" npx cypress run --e2e --browser chrome &
+elif should_run_suite e2e; then
+    e2e_cmd=(npx cypress run --e2e --browser chrome)
+    e2e_pattern=$(suite_pattern e2e)
+    if [[ -n "$e2e_pattern" ]]; then
+        if [[ "$e2e_pattern" == */* ]]; then
+            spec="$e2e_pattern"
+        else
+            spec="cypress/e2e/user-stories/${e2e_pattern}.cy.js"
+        fi
+        if [[ ! -f "$spec" ]]; then
+            echo "[FAIL] e2e spec not found: $spec" >&2
+            exit 1
+        fi
+        e2e_cmd+=(--spec "$spec")
+    fi
+    run_suite "e2e tests (cypress)" "${e2e_cmd[@]}" &
     pids+=($!)
+else
+    echo "[SKIP] e2e tests (filtered)"
 fi
 
 for pid in "${pids[@]}"; do

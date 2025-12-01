@@ -23,6 +23,7 @@ the progressive-disclosure and logging conventions defined by GenTool.
   - `--skip-property`: omit the Hypothesis-heavy property suite
   - `--skip-integration`: omit the integration PyTest suite (or skip if no suite directory)
   - `--skip-e2e`: omit the Cypress end-to-end run
+  - `--filter SUITE[:PATTERN]`: target a single suite; e.g. `--filter unit:budgeting` or `--filter e2e:01-payday-assignment`
   - `-h`/`--help`: show the manpage-style header
 - **Behavior**:
   - Shrinks verbose logs on success by deleting per-suite temp files.
