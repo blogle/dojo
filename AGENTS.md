@@ -38,6 +38,7 @@ Communication principles:
   - Without `direnv`: `nix develop` from the repo root, then run commands inside that shell.
 - Prefer repo scripts over raw tools:
   - **Tests**: `scripts/run-tests` (with `--skip-*` flags as needed; see `scripts/README.md`).
+  - **Releases**: `scripts/release --bump {patch|minor|major}` (add `--notes-llm codex|gemini|none` as needed) to bump `pyproject.toml`, roll `CHANGELOG.md`, tag, and push; never hand-edit versions or changelog for a release.
 - When you need underlying tools:
   - Python: `python -m ...` (never ad-hoc `sys.path` hacks).
   - Cypress: `npx cypress run --e2e ...`.
@@ -50,6 +51,7 @@ If you are ever tempted to invent a new “one-off” command, first check `scri
 Use these for any non-trivial change:
 
 - **ExecPlan** (`.agent/PLANS.md` + `docs/plans/*.md`)
+  - When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
   - For features, refactors, or infra changes.
   - A plan must be self-contained, living, and explain how to see the behavior working.
 - **ExecResearch** (`.agent/RESEARCH.md` + `docs/research/*.md`)
@@ -194,4 +196,3 @@ When you’re dropped into a fresh session:
 4. Only then start editing code or plans.
 
 Keep this file small in your mental model: it’s a **map and value system**, not a dumping ground for every rule. Use the linked docs for specifics.
-

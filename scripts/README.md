@@ -38,6 +38,28 @@ scripts/run-tests --skip-integration
 scripts/run-tests --skip-property --skip-integration
 ```
 
+### `scripts/release`
+
+- **Description**: Preflight guardrails (fetch tags, ensure on `master`, clean tree), bumps semantic version (`--bump patch|minor|major`), rolls `CHANGELOG.md` by moving the `[Unreleased]` section into a dated `vX.Y.Z` entry, optionally generates release notes via an LLM (`codex` by default, `gemini` as an alternative), updates `pyproject.toml`, creates an annotated git tag, and pushes branch + tag. Dry-run mode computes everything without touching the working tree.
+- **Options**:
+  - `--bump {patch|minor|major}` (default: patch)
+  - `--dry-run` to preview changes only
+  - `--notes-file PATH` to save the release notes extracted from the changelog
+  - `--notes-llm {codex|gemini|none}` to pick the LLM provider (default: `codex`; `none` skips LLM generation and uses the changelog or commit fallback directly)
+- **Behavior**:
+  - Aborts if the current branch is not `master` or the git tree is dirty.
+  - Fetches tags before measuring upstream so the script knows the last published release.
+  - Emits logfmt lines for each step (preflight, version, changelog, done) and records whether release notes came from the LLM, `CHANGELOG.md`, or the commit history.
+  - Uses the LLM output when available, otherwise falls back to `[Unreleased]` or the commit summary, and leaves `[Unreleased]` populated with the template sections after rolling.
+
+#### Example usage
+
+```
+scripts/release --dry-run --bump patch
+scripts/release --bump minor
+scripts/release --bump patch --notes-file /tmp/dojo-release-notes.md
+```
+
 ## Notes for Agents
 
 1. When asked to run tests, call `scripts/run-tests` (with optional skip flags) instead of invoking `pytest`, `npx cypress`, or other tooling directly.

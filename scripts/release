@@ -1,0 +1,424 @@
+#!/usr/bin/env python3
+"""Release helper for Dojo.
+
+Runs guardrails, bumps version, rolls CHANGELOG.md, creates an annotated git tag,
+and pushes branch + tag. Supports dry-run mode to preview all changes without
+touching the working tree. Release notes are generated from the `[Unreleased]`
+section or (by default) an LLM such as `codex`/`gemini`, with a deterministic
+fallback when the LLM output is unavailable.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as _dt
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Tuple
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PYPROJECT = REPO_ROOT / "pyproject.toml"
+CHANGELOG = REPO_ROOT / "CHANGELOG.md"
+
+UNRELEASED_PLACEHOLDER = (
+    "\n### Added\n- None yet.\n\n"
+    "### Changed\n- None yet.\n\n"
+    "### Deprecated\n- None yet.\n\n"
+    "### Removed\n- None yet.\n\n"
+    "### Fixed\n- None yet.\n\n"
+    "### Security\n- None yet.\n\n"
+)
+
+RELEASE_HEADINGS = ("Added", "Changed", "Fixed", "Breaking")
+ADDED_PREFIXES = ("feat", "feature", "add", "adds", "introduce", "introduces")
+FIXED_PREFIXES = (
+    "fix",
+    "bug",
+    "patch",
+    "repair",
+    "correct",
+    "resolve",
+    "resolv",
+    "address",
+)
+BREAKING_KEYWORDS = ("breaking change", "breaking", "breaks")
+LLM_PROVIDER_CHOICES = ("codex", "gemini", "none")
+LLM_COMMIT_LIMIT = 40
+UNRELEASED_MAX_CHARS = 4000
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def run(cmd, check: bool = True) -> str:
+    result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    if check and result.returncode != 0:
+        sys.stderr.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        raise SystemExit(result.returncode)
+    return result.stdout.strip()
+
+
+def ensure_clean_master(dry_run: bool) -> Tuple[str, str]:
+    if not dry_run:
+        run(["git", "fetch", "--tags"], check=False)
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    status = run(["git", "status", "--porcelain"])
+    if branch != "master":
+        raise SystemExit(f"step=preflight status=error reason=branch branch={branch}")
+    if status:
+        raise SystemExit("step=preflight status=error reason=dirty-tree")
+    upstream = run(["git", "rev-parse", "--abbrev-ref", "@{u}"], check=False)
+    if upstream:
+        ahead = run(["git", "rev-list", "@{u}..HEAD", "--count"], check=False) or "0"
+        behind = run(["git", "rev-list", "HEAD..@{u}", "--count"], check=False) or "0"
+        log(f"step=preflight status=ok branch={branch} ahead={ahead} behind={behind}")
+    else:
+        log(f"step=preflight status=ok branch={branch} upstream=missing")
+    return branch, status
+
+
+def current_version() -> str:
+    text = PYPROJECT.read_text()
+    m = re.search(r'^version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', text, re.MULTILINE)
+    if not m:
+        raise SystemExit("step=version status=error reason=version-not-found")
+    return m.group(1)
+
+
+def bump_version(ver: str, bump: str) -> str:
+    major, minor, patch = map(int, ver.split("."))
+    if bump == "major":
+        return f"{major + 1}.0.0"
+    if bump == "minor":
+        return f"{major}.{minor + 1}.0"
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def update_pyproject(new_version: str, dry_run: bool) -> None:
+    text = PYPROJECT.read_text()
+    new_text = re.sub(
+        r'(^version\s*=\s*")(.*?)("\s*$)',
+        rf"\g<1>{new_version}\3",
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if new_text == text:
+        raise SystemExit("step=version status=error reason=substitution-failed")
+    if not dry_run:
+        PYPROJECT.write_text(new_text)
+
+
+def extract_unreleased(changelog: str) -> Tuple[int, int, str]:
+    header = re.search(r'^## \[Unreleased\]\s*$', changelog, re.MULTILINE)
+    if not header:
+        raise SystemExit("step=changelog status=error reason=missing-unreleased")
+    start = header.end()
+    next_section = re.search(r'^## \[', changelog[start:], re.MULTILINE)
+    end = start + next_section.start() if next_section else len(changelog)
+    body = changelog[start:end]
+    if not body.strip():
+        raise SystemExit("step=changelog status=error reason=empty-unreleased")
+    return start, end, body
+
+
+def previous_tag() -> str | None:
+    tag = run(["git", "describe", "--tags", "--abbrev=0"], check=False)
+    return tag or None
+
+
+def commit_messages_since(tag: str | None) -> list[str]:
+    cmd = ["git", "log", "--pretty=format:%s", "--no-merges", "--reverse"]
+    if tag:
+        cmd.append(f"{tag}..HEAD")
+    else:
+        cmd.append("HEAD")
+    output = run(cmd, check=False)
+    if not output:
+        return []
+    return [line for line in output.splitlines() if line.strip()]
+
+
+def classify_commit(message: str) -> str:
+    stripped = message.strip()
+    if not stripped:
+        return "Changed"
+    prefix = stripped.split(":", 1)[0].strip()
+    lower = stripped.lower()
+    if prefix.endswith("!") or any(keyword in lower for keyword in BREAKING_KEYWORDS):
+        return "Breaking"
+    normalized_prefix = prefix.lower()
+    if normalized_prefix.startswith(ADDED_PREFIXES):
+        return "Added"
+    if normalized_prefix.startswith(FIXED_PREFIXES):
+        return "Fixed"
+    return "Changed"
+
+
+def categorize_commits(messages: list[str]) -> dict[str, list[str]]:
+    categories = {heading: [] for heading in RELEASE_HEADINGS}
+    for message in messages:
+        heading = classify_commit(message)
+        categories.setdefault(heading, []).append(message)
+    return categories
+
+
+def format_release_notes(categories: dict[str, list[str]]) -> str:
+    lines: list[str] = []
+    for heading in RELEASE_HEADINGS:
+        entries = categories.get(heading, [])
+        lines.append(f"### {heading}")
+        if entries:
+            lines.extend(f"- {entry}" for entry in entries)
+        else:
+            lines.append("- None yet.")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def is_unreleased_placeholder(body: str) -> bool:
+    stripped = body.strip()
+    return not stripped or stripped == UNRELEASED_PLACEHOLDER.strip()
+
+
+def truncate_text(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n... (truncated)\n"
+
+
+def build_llm_prompt(
+    new_tag: str,
+    release_date: str,
+    prev_tag: str | None,
+    unreleased_body: str,
+    commits: list[str],
+) -> str:
+    snippet = truncate_text(unreleased_body.strip(), UNRELEASED_MAX_CHARS)
+    commit_sample = commits[-LLM_COMMIT_LIMIT :]
+    commit_section = "\n".join(f"- {c}" for c in commit_sample)
+    if not commit_section:
+        commit_section = "- (no commits were found)"
+    prompt = (
+        "You are Dojo's release engineer. Compose release notes for version {tag} dated {date} using "
+        "Keep a Changelog style. Provide sections for Added, Changed, Fixed, and Breaking, each with bulleted entries. "
+        "If the Unreleased section contains useful detail, base the notes on that text; otherwise rely on the commits below. "
+        "Avoid extraneous explanation, include only the sections and their bullets, and keep the formatting consistent with the project's changelog.\n\n"
+        "Unreleased draft:\n{snippet}\n\n"
+        "Commits since {prev}:\n{commits}\n"
+    )
+    return prompt.format(
+        tag=new_tag,
+        date=release_date,
+        snippet=snippet or "(empty)",
+        prev=prev_tag or "the previous release",
+        commits=commit_section,
+    )
+
+
+def try_invoke_llm(provider: str, prompt: str) -> tuple[str | None, str]:
+    if provider == "codex":
+        return invoke_codex(prompt)
+    if provider == "gemini":
+        return invoke_gemini(prompt)
+    return None, "unknown-provider"
+
+
+def invoke_codex(prompt: str) -> tuple[str | None, str]:
+    binary = shutil.which("codex")
+    if not binary:
+        return None, "missing-binary"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as handle:
+        tmp_path = Path(handle.name)
+    try:
+        result = subprocess.run(
+            [
+                binary,
+                "exec",
+                "--full-auto",
+                "--output-last-message",
+                str(tmp_path),
+                prompt,
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return None, "codex-failed"
+        output = tmp_path.read_text().strip()
+        if not output:
+            return None, "empty-output"
+        return output, "ok"
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+def invoke_gemini(prompt: str) -> tuple[str | None, str]:
+    binary = shutil.which("gemini")
+    if not binary:
+        return None, "missing-binary"
+    result = subprocess.run(
+        [binary, "--output-format", "text", prompt],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None, "gemini-failed"
+    cleaned = result.stdout.strip()
+    if not cleaned:
+        return None, "empty-output"
+    return cleaned, "ok"
+
+
+def select_release_body(unreleased_body: str, commits: list[str]) -> tuple[str, str]:
+    if not is_unreleased_placeholder(unreleased_body):
+        return unreleased_body.rstrip("\n"), "changelog"
+    fallback = format_release_notes(categorize_commits(commits))
+    return fallback, "commits"
+
+
+def determine_release_body(
+    unreleased_body: str,
+    prev_tag: str | None,
+    new_tag: str,
+    release_date: str,
+    commits: list[str],
+    llm_provider: str,
+) -> tuple[str, str, str | None, str]:
+    reason = "manual"
+    if llm_provider != "none":
+        prompt = build_llm_prompt(new_tag, release_date, prev_tag, unreleased_body, commits)
+        body, reason = try_invoke_llm(llm_provider, prompt)
+        if body:
+            return body.strip(), "llm", llm_provider, reason
+    fallback_body, fallback_source = select_release_body(unreleased_body, commits)
+    return fallback_body, fallback_source, None, reason
+
+
+def roll_changelog(
+    text: str,
+    start: int,
+    end: int,
+    release_body: str,
+    new_tag: str,
+    release_date: str,
+    dry_run: bool,
+) -> str:
+    release_header = f"## [{new_tag}] - {release_date}\n"
+    new_body = (
+        text[:start]
+        + UNRELEASED_PLACEHOLDER
+        + release_header
+        + release_body.rstrip("\n")
+        + "\n\n"
+        + text[end:]
+    )
+    if not dry_run:
+        CHANGELOG.write_text(new_body)
+    return new_body
+
+
+def extract_section(changelog: str, tag: str) -> str:
+    pattern = rf"^## \[{re.escape(tag)}\].*$"
+    match = re.search(pattern, changelog, re.MULTILINE)
+    if not match:
+        raise SystemExit(f"step=notes status=error reason=missing-section tag={tag}")
+    next_section = re.search(r"^## \[", changelog[match.end():], re.MULTILINE)
+    end = match.end() + next_section.start() if next_section else len(changelog)
+    return changelog[match.start():end].strip() + "\n"
+
+
+def stage_and_commit(new_version: str, dry_run: bool) -> None:
+    if dry_run:
+        return
+    run(["git", "add", str(PYPROJECT), str(CHANGELOG)])
+    commit_msg = (
+        f"Release v{new_version}\n\n"
+        f"Bump version to v{new_version}, roll the changelog, and prepare annotated tag for GHCR publish. "
+        f"Release tag enables GHCR image pushes and GitHub Release notes generation."
+    )
+    run(["git", "commit", "-m", commit_msg])
+
+
+def tag_and_push(new_tag: str, dry_run: bool) -> None:
+    if dry_run:
+        return
+    run(["git", "tag", "-a", new_tag, "-m", f"Release {new_tag}"])
+    run(["git", "push"])
+    run(["git", "push", "origin", new_tag])
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Cut a Dojo release with changelog + tag automation.")
+    parser.add_argument("--bump", choices=["patch", "minor", "major"], default="patch")
+    parser.add_argument("--dry-run", action="store_true", help="Compute everything but do not modify files or git.")
+    parser.add_argument("--notes-file", help="Optional path to write release notes for inspection.")
+    parser.add_argument(
+        "--notes-llm",
+        choices=LLM_PROVIDER_CHOICES,
+        default="codex",
+        help="Use an LLM (codex/gemini) to craft release notes; set to 'none' to skip the LLM step.",
+    )
+    args = parser.parse_args()
+
+    ensure_clean_master(args.dry_run)
+
+    prev_tag = previous_tag()
+    log(f"step=prev-tag status=ok tag={prev_tag or 'none'}")
+
+    commits = commit_messages_since(prev_tag)
+
+    current = current_version()
+    new_version = bump_version(current, args.bump)
+    new_tag = f"v{new_version}"
+    today = _dt.date.today().isoformat()
+    log(f"step=version status=ok current={current} bump={args.bump} new={new_version}")
+
+    changelog_text = CHANGELOG.read_text()
+    start, end, unreleased_body = extract_unreleased(changelog_text)
+    release_body, release_source, provider_used, notes_reason = determine_release_body(
+        unreleased_body,
+        prev_tag,
+        new_tag,
+        today,
+        commits,
+        args.notes_llm,
+    )
+
+    if release_source == "llm":
+        log(
+            f"step=notes status=ok source=llm provider={provider_used} commits={len(commits)} reason={notes_reason}"
+        )
+    else:
+        log(
+            f"step=notes status=fallback source={release_source} commits={len(commits)} reason={notes_reason}"
+        )
+
+    updated_changelog = roll_changelog(changelog_text, start, end, release_body, new_tag, today, args.dry_run)
+    log("step=changelog status=ok")
+
+    update_pyproject(new_version, args.dry_run)
+
+    if args.notes_file:
+        Path(args.notes_file).write_text(extract_section(updated_changelog, new_tag))
+
+    stage_and_commit(new_version, args.dry_run)
+    tag_and_push(new_tag, args.dry_run)
+
+    if args.dry_run:
+        log("step=done mode=dry-run status=ok")
+    else:
+        log(f"step=done status=ok tag={new_tag}")
+
+
+if __name__ == "__main__":
+    main()

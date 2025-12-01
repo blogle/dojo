@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Renamed the canonical test wrapper to `scripts/run-tests`, fixed its timing helper, and refreshed `scripts/README.md`/`AGENTS.md` so agents consistently call the renamed script instead of the shell `test` builtin.
 - Updated `docs/rules/sql.md` to recommend storing SQL files inside the application source (`src/dojo/sql/`) to align with the established practice of packaging data files within the Python namespace.
+- Rebuilt CI/release automation: new GitHub Actions workflows publish GHCR images on `master` using Nix builds, tag-based releases push versioned + SHA tags and create GitHub Releases from `CHANGELOG.md`, and a `scripts/release` helper enforces clean-release guardrails.
+- The release helper now invites `codex` or `gemini` to draft release notes (with a deterministic changelog/commit fallback) before rolling the `[Unreleased]` section.
 
 ### Changed
 - Normalized budgeting schema limits, pagination guardrails, net worth rounding precision, and API host/port configuration behind named constants so the statics-over-dynamics rule holds for these knobs.
