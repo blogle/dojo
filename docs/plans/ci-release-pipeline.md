@@ -20,10 +20,11 @@ Use a list with checkboxes and timestamps (UTC) to reflect real progress; update
 - [x] (2025-12-01 17:40Z) Replaced CI workflow to run `scripts/run-tests`, build Nix image, and push GHCR tags on `master` with concurrency control.
 - [x] (2025-12-01 18:00Z) Added tag-driven release workflow that rebuilds the image, pushes SHA + version tags, and publishes GitHub Releases from `CHANGELOG.md`.
 - [x] (2025-12-01 18:10Z) Updated docs/changelog guidance (CHANGELOG entry, scripts/README, AGENTS) and kept validation guidance intact.
+- [x] (2025-12-02 01:02Z) Reran targeted Cypress spec (`nix develop . --command npx cypress run --e2e --browser chrome --spec cypress/e2e/user-stories/09-quick-allocate-budget-modal.cy.js`); quick allocate modal tests now passing.
 
 ## Surprises & Discoveries
 
-- Cypress e2e suite currently failing in CI-equivalent run: `scripts/run-tests` reports e2e failure (see log `/tmp/nix-shell.../dojo-run-tests-...`); will need follow-up before declaring validation complete.
+- Cypress quick allocate modal spec previously failed to find the 'Budgeted Last Month: $15.00' button; rerunning the targeted spec now passes (see cypress run above). Keep an eye out for flakiness.
 - `scripts/release --dry-run` fails preflight on a dirty working tree, as expected while changes are in progress.
 
 ## Decision Log

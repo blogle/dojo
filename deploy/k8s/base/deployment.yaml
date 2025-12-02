@@ -16,7 +16,7 @@ spec:
     spec:
       initContainers:
       - name: migrate
-        image: ghcr.io/blogle/dojo:edge
+        image: ghcr.io/blogle/dojo
         imagePullPolicy: IfNotPresent
         command:
         - python
@@ -43,7 +43,7 @@ spec:
           mountPath: /data
       containers:
       - name: dojo
-        image: ghcr.io/blogle/dojo:edge
+        image: ghcr.io/blogle/dojo
         ports:
         - containerPort: 8000
           name: http

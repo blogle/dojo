@@ -75,6 +75,7 @@ scripts/release --bump patch --notes-file /tmp/dojo-release-notes.md
 
 ## Notes for Agents
 
-1. When asked to run tests, call `scripts/run-tests` (with optional skip flags) instead of invoking `pytest`, `npx cypress`, or other tooling directly.
-2. Treat `[FAIL]` lines as the authoritative failure signal: read the referenced temp log (`tail`, `cat`, `rg`, etc.) instead of re-running the underlying command until a fix is in place.
-3. Document any new or changed scripts in this README and follow the manpage/summary/logging conventions before updating `AGENTS.md`.
+1. When asked to run tests, call `run-tests` (with optional skip flags) instead of invoking `pytest`, `npx cypress`, or other tooling directly.
+2. Direnv loads the Nix dev shell automatically in this repo; assume scripts in `scripts/` are already on `PATH` (no need to prefix with `nix develop` or `./scripts/`).
+3. Treat `[FAIL]` lines as the authoritative failure signal: read the referenced temp log (`tail`, `cat`, `rg`, etc.) instead of re-running the underlying command until a fix is in place.
+4. Document any new or changed scripts in this README and follow the manpage/summary/logging conventions before updating `AGENTS.md`.

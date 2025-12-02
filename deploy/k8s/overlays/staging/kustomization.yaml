@@ -8,4 +8,4 @@ resources:
 
 images:
 - name: ghcr.io/blogle/dojo
-  newTag: edge
+  newTag: latest

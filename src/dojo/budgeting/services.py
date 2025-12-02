@@ -271,63 +271,30 @@ class TransactionEntryService:
             old_month = existing.transaction_date.replace(day=1)
             if existing.category_id == cmd.category_id and old_month == new_month:
                 simulated_available -= existing.amount_minor
-            
+
             # Apply new effect
             simulated_available += cmd.amount_minor
-            
-            # If simulated available < 0, we verify if we made it worse.
-            # If it was already negative, we might allow it if we are improving it?
-            # But simple rule: don't allow making it negative.
+
             if simulated_available < 0:
-                 # Check if we are making it worse than it would be without this tx?
-                 # Or just strict check?
-                 # "Prevent ... negative availability".
-                 raise BudgetingError(
-                     f"Transaction update results in negative availability ({simulated_available}) in {cat_state.name}."
-                 )
+                raise BudgetingError(
+                    f"Transaction update results in negative availability ({simulated_available}) in {cat_state.name}."
+                )
 
-        # Execute SCD-2 update
-        with dao.transaction():
-            # 1. Retire old version
-            conn.execute(
-                load_sql("scd2_retire_transaction.sql"),
-                {"concept_id": concept_id},
-            )
-            # 2. Insert new version
-            conn.execute(
-                load_sql("scd2_insert_transaction.sql"),
-                {
-                    "concept_id": concept_id,
-                    "account_id": cmd.account_id,
-                    "category_id": cmd.category_id,
-                    "transaction_date": cmd.transaction_date,
-                    "amount_minor": cmd.amount_minor,
-                    "memo": cmd.memo,
-                    "changed_by": "user",
-                },
-            )
-
-        # Retrieve updated record
-        new_tx = dao.get_active_transaction(concept_id)
-        if not new_tx:
-            raise BudgetingError("Failed to retrieve updated transaction.")
-
-        # Get states
-        account_state = self._account_state_from_record(self._require_active_account(dao, cmd.account_id))
-        category_state = self._category_state_from_month(
-            dao.get_category_month_state(cmd.category_id, cmd.transaction_date.replace(day=1)),
-            cmd.category_id,
-        )
-
-        return TransactionResponse(
-            transaction_version_id=new_tx.transaction_version_id,
-            concept_id=concept_id,
-            amount_minor=new_tx.amount_minor,
-            transaction_date=new_tx.transaction_date,
-            status=cast(Literal["pending", "cleared"], new_tx.status),
-            memo=new_tx.memo,
-            account=account_state,
-            category=category_state,
+        existing_memo = getattr(existing, "memo", None)
+        memo = cmd.memo if cmd.memo is not None else existing_memo
+        # Reuse the creation flow to ensure balances, category activity, and payment reserves
+        # are reversed and reapplied consistently.
+        return self.create(
+            conn,
+            NewTransactionRequest(
+                concept_id=concept_id,
+                transaction_date=cmd.transaction_date,
+                account_id=cmd.account_id,
+                category_id=cmd.category_id,
+                amount_minor=cmd.amount_minor,
+                status=cast(Literal["pending", "cleared"], existing.status),
+                memo=memo,
+            ),
         )
 
     def transfer(
@@ -630,13 +597,13 @@ class TransactionEntryService:
                     f"Cannot move allocation. {dest_state_old.name} only has "
                     f"{dest_state_old.available_minor} available, needs {old_amount}."
                 )
-            
+
             # 2. Check if New Source (or RTA) can provide funds
             if from_category_id:
                 # Source is a category
                 # Note: If Source == Old Dest (reallocation), we just checked it has funds?
                 # No, Source is where funds come FROM. Dest is where they go TO.
-                
+
                 # If Source is same as Old Dest (e.g. moving funds out of a category back to it?), rare.
                 # Standard case: Check Source in New Month.
                 src_state_new = self._category_state_for_month(dao, from_category_id, new_month_start)
@@ -650,15 +617,14 @@ class TransactionEntryService:
             else:
                 # Source is RTA
                 rta_new = dao.ready_to_assign(new_month_start)
-                
+
                 # If we are in the same month, we can count the refund from the old allocation
                 if old_month_start == new_month_start:
                     rta_new += old_amount
-                
+
                 if rta_new < cmd.amount_minor:
                     raise BudgetingError(
-                        f"Insufficient Ready-to-Assign ({rta_new}) in {new_month_start} "
-                        f"for {cmd.amount_minor}."
+                        f"Insufficient Ready-to-Assign ({rta_new}) in {new_month_start} for {cmd.amount_minor}."
                     )
 
         else:

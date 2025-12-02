@@ -35,7 +35,10 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
     cy.get("#allocations-body tr.is-editing").as("editRow");
     
     // Use selectall to replace content in one go, avoiding potential detachments between clear and type
-    cy.get("@editRow").find("input[name='amount_minor']").type("{selectall}600{enter}");
+    cy.get("@editRow")
+      .find("input[name='amount_minor']")
+      .should("be.enabled")
+      .type("{selectall}600{enter}");
 
     cy.wait("@updateAllocation").its("response.statusCode").should("eq", 200);
     cy.wait("@fetchAllocations");
@@ -52,7 +55,10 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
     
     cy.get("#allocations-body tr.is-editing").as("editRow2");
 
-    cy.get("@editRow2").find("input[name='amount_minor']").type("{selectall}200{enter}");
+    cy.get("@editRow2")
+      .find("input[name='amount_minor']")
+      .should("be.enabled")
+      .type("{selectall}200{enter}");
 
     cy.wait("@updateAllocation").its("response.statusCode").should("eq", 200);
     cy.wait("@fetchAllocations");

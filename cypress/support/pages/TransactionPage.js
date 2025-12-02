@@ -73,7 +73,12 @@ class TransactionPage {
     }
 
     setInlineOutflow(amount) {
-        cy.get("[data-inline-outflow]").clear().type(amount);
+        cy.get("[data-inline-outflow]")
+            .should("be.enabled")
+            .clear({ force: true });
+        cy.get("[data-inline-outflow]")
+            .should("be.enabled")
+            .type(amount, { force: true });
     }
 
     editOutflowAmount(amount) {
@@ -85,7 +90,9 @@ class TransactionPage {
     }
 
     saveInlineEdit() {
-        cy.get("[data-inline-outflow]").type("{enter}");
+        cy.get("[data-inline-outflow]")
+            .should("be.enabled")
+            .type("{enter}", { force: true });
     }
 
     verifyTransactionStatus(rowIndex, status) {

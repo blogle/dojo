@@ -24,13 +24,24 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     const visaAccount = "Visa Signature";
     const mastercardAccount = "Mastercard Rewards";
 
+    const expectAvailable = (categoryName, expectedAmount) => {
+      budgetPage
+        .categoryRow(categoryName)
+        .find("td.amount-cell")
+        .eq(2)
+        .should(($cell) => {
+          const normalized = $cell.text().trim();
+          expect(normalized).to.eq(expectedAmount);
+        });
+    };
+
     // Initial state verification
     budgetPage.visit();
     cy.wait("@fetchBudgets");
     cy.wait("@fetchReady");
-    budgetPage.verifyAvailableAmount(diningOutCategory, "$300.00");
-    budgetPage.verifyAvailableAmount("Visa Signature Payment", "$1,000.00");
-    budgetPage.verifyAvailableAmount("Mastercard Rewards Payment", "$500.00");
+    expectAvailable(diningOutCategory, "$300.00");
+    expectAvailable("Visa Signature Payment", "$1,000.00");
+    expectAvailable("Mastercard Rewards Payment", "$500.00");
 
     accountPage.visit();
     cy.wait("@fetchAccounts");
@@ -48,12 +59,31 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     transactionPage.verifyTransactionRowAmount(0, transactionAmount);
 
     // Verify budgets after initial (wrong) transaction
+    const monthStart = new Date().toISOString().slice(0, 7) + "-01";
+    const expectBudgetApi = ({ diningOut, visaPayment, masterPayment }) => {
+      cy.request("GET", `/api/budget-categories?month=${monthStart}`).then(({ body }) => {
+        const amounts = Object.fromEntries(body.map((c) => [c.name, c.available_minor]));
+        cy.log(`api_budget_state=${JSON.stringify(amounts)}`);
+        if (diningOut !== undefined) {
+          expect(amounts[diningOutCategory]).to.eq(diningOut);
+        }
+        if (visaPayment !== undefined) {
+          expect(amounts["Visa Signature Payment"]).to.eq(visaPayment);
+        }
+        if (masterPayment !== undefined) {
+          expect(amounts["Mastercard Rewards Payment"]).to.eq(masterPayment);
+        }
+      });
+    };
+
+    expectBudgetApi({ diningOut: 28000, visaPayment: 102000, masterPayment: 50000 });
+
     budgetPage.visit();
     cy.wait("@fetchBudgets");
     cy.wait("@fetchReady");
-    budgetPage.verifyAvailableAmount(diningOutCategory, "$280.00"); // 300 - 20
-    budgetPage.verifyAvailableAmount("Visa Signature Payment", "$1,020.00"); // 1000 + 20
-    budgetPage.verifyAvailableAmount("Mastercard Rewards Payment", "$500.00");
+    expectAvailable(diningOutCategory, "$280.00"); // 300 - 20
+    expectAvailable("Visa Signature Payment", "$1,020.00"); // 1000 + 20
+    expectAvailable("Mastercard Rewards Payment", "$500.00");
 
     // Verify account balances and net worth after initial transaction
     accountPage.visit();
@@ -74,12 +104,14 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     cy.wait("@fetchTransactions");
 
     // Verify budgets after correction
+    expectBudgetApi({ diningOut: 28000, visaPayment: 100000, masterPayment: 52000 });
+
     budgetPage.visit();
     cy.wait("@fetchBudgets");
     cy.wait("@fetchReady");
-    budgetPage.verifyAvailableAmount(diningOutCategory, "$280.00"); // Should still be 280
-    budgetPage.verifyAvailableAmount("Visa Signature Payment", "$1,000.00"); // Back to initial
-    budgetPage.verifyAvailableAmount("Mastercard Rewards Payment", "$520.00"); // 500 + 20
+    expectAvailable(diningOutCategory, "$280.00"); // Should still be 280
+    expectAvailable("Visa Signature Payment", "$1,000.00"); // Back to initial
+    expectAvailable("Mastercard Rewards Payment", "$520.00"); // 500 + 20
 
     // Verify account balances and net worth after correction
     accountPage.visit();
