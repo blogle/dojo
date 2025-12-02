@@ -24,7 +24,8 @@ jobs:
       - name: Run migrations check (upgrade from 0010)
         run: |
           set -euo pipefail
-          DB=$(mktemp /tmp/dojo-upgrade-XXXX.duckdb)
+          DB=$(mktemp -u /tmp/dojo-upgrade-XXXX.duckdb)
+          rm -f "$DB"
           nix develop . --command python -m dojo.core.migrate --database "$DB" --target 0010_credit_payment_group.sql --log-plan
           nix develop . --command python -m dojo.core.migrate --database "$DB" --log-plan
           rm -f "$DB"
