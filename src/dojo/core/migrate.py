@@ -5,7 +5,7 @@ import logging
 import re
 import shutil
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 
 # Simple regexes to classify statements; conservative on purpose.
 INDEX_RE = re.compile(r"^\s*CREATE\s+(UNIQUE\s+)?INDEX", re.IGNORECASE)
-DML_RE = re.compile(r"^\s*(INSERT|UPDATE|DELETE|MERGE|CREATE\s+TABLE|ALTER\s+TABLE)", re.IGNORECASE)
+DML_RE = re.compile(r"^\s*(INSERT|UPDATE|DELETE|MERGE)", re.IGNORECASE)
+DDL_RE = re.compile(
+    r"^\s*(CREATE\s+(TABLE|VIEW|SCHEMA)|ALTER\s+(TABLE|VIEW|SCHEMA)|DROP\s+(TABLE|VIEW|SCHEMA))",
+    re.IGNORECASE,
+)
 
 
 def _ensure_schema(conn: duckdb.DuckDBPyConnection) -> None:
@@ -91,6 +95,28 @@ def _log_plan(filename: str, statements: Sequence[str]) -> None:
         logger.info("plan statement=%d file=%s sql=%s", idx, filename, stmt)
 
 
+def _is_transient_error(exc: Exception) -> bool:
+    message = str(exc)
+    transient_patterns = (
+        "TransactionContext Error",
+        "another transaction has altered this table",
+        "Serialization Error",
+    )
+    return any(pattern in message for pattern in transient_patterns)
+
+
+def _run_with_retry(action: Callable[[], None], *, context: str, attempts: int = 3, delay: float = 0.25) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            action()
+            return
+        except Exception as exc:  # noqa: BLE001 -- propagate non-transient errors after retries
+            if not _is_transient_error(exc) or attempt == attempts:
+                raise
+            logger.warning("retrying file=%s attempt=%d/%d error=%s", context, attempt, attempts, exc)
+            time.sleep(delay * attempt)
+
+
 def _execute_statements(
     conn: duckdb.DuckDBPyConnection,
     filename: str,
@@ -103,30 +129,47 @@ def _execute_statements(
         logger.info("dry-run file=%s skipping execution", filename)
         return
 
-    in_tx = False
     dml_buffer: list[str] = []
 
+    def execute_single_statement(stmt: str) -> None:
+        def action() -> None:
+            conn.execute("BEGIN")
+            try:
+                conn.execute(stmt)
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+        _run_with_retry(action, context=f"{filename}:{stmt[:32]}")
+
     def flush_dml() -> None:
-        nonlocal in_tx, dml_buffer
+        nonlocal dml_buffer
         if not dml_buffer:
             return
-        if not in_tx:
+
+        def action() -> None:
             conn.execute("BEGIN")
-            in_tx = True
-        for stmt in dml_buffer:
-            conn.execute(stmt)
-        conn.execute("COMMIT")
-        in_tx = False
+            try:
+                for stmt in dml_buffer:
+                    conn.execute(stmt)
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+        _run_with_retry(action, context=f"{filename}:dml_batch")
         dml_buffer = []
 
     for stmt in statements:
         if INDEX_RE.match(stmt):
             flush_dml()
-            conn.execute("BEGIN")
-            conn.execute(stmt)
-            conn.execute("COMMIT")
+            execute_single_statement(stmt)
             continue
-        # DML or DDL stays buffered to preserve order within a transaction
+        if DDL_RE.match(stmt):
+            flush_dml()
+            execute_single_statement(stmt)
+            continue
         dml_buffer.append(stmt)
 
     flush_dml()
