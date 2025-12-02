@@ -22,10 +22,8 @@ Use a list with checkboxes to summarize granular steps. Every stopping point mus
     - [x] Verify local build with `nix build .#docker`.
     - [x] Verify image loads into Docker and runs `uvicorn`.
 - [x] **Milestone 2: Kubernetes Manifests**
-    - [x] Create `deploy/k8s/base` (Deployment, Service, PVC, Kustomization).
-    - [x] Create `deploy/k8s/overlays/dev` (Local overrides).
-    - [x] Create `deploy/k8s/overlays/staging` (Staging environment).
-    - [x] Create `deploy/k8s/overlays/production` (Production environment).
+    - [x] Create `deploy/k8s/base` (Deployment, Service, Kustomization; storage supplied by consumers).
+    - [x] Document that environment overlays live in infra repos consuming the base.
     - [x] Validate manifests with `kubectl kustomize`.
 - [x] **Milestone 3: CI/CD Pipeline**
     - [x] Create `.github/workflows/ci.yml` for testing.
@@ -74,14 +72,11 @@ We will modify `flake.nix` to add a `docker` package. This package will use `pkg
 We will implement the Kustomize structure described in the architecture doc.
 
 **`deploy/k8s/base`**:
-- `deployment.yaml`: One replica, `strategy: Recreate`. Mounts `/data`.
+- `deployment.yaml`: One replica, `strategy: Recreate`. Mounts `/data` and expects a PVC named `dojo-data` supplied by the consumer.
 - `service.yaml`: ClusterIP service exposing port 80 -> 8000.
-- `pvc.yaml`: `ReadWriteOnce` claim for `dojo-data`.
 - `kustomization.yaml`: Aggregates the above.
 
-**`deploy/k8s/overlays/{dev,staging,production}`**:
-- Each will have a `kustomization.yaml` that references `../../base`.
-- `staging` and `production` will set specific image tags and namespaces.
+Environment overlays (namespaces, PVC definitions, ingress, image tags) are provided by downstream infrastructure repos that reference `deploy/k8s/base` via Kustomize Git URLs.
 
 ### 3. Create GitHub Actions Workflow
 
@@ -104,15 +99,14 @@ We will create `.github/workflows/ci.yml`.
 2.  **Scaffold K8s**:
     ```bash
     mkdir -p deploy/k8s/base
-    mkdir -p deploy/k8s/overlays/{dev,staging,production}
     ```
-    Create the YAML files in these directories.
+    Create the YAML files in this directory; downstream infra repos will layer their own overlays.
 
 3.  **Validate K8s**:
     ```bash
-    kubectl kustomize deploy/k8s/overlays/production
+    kubectl kustomize deploy/k8s/base
     ```
-    Expect to see the rendered YAML with the correct image placeholder and namespace.
+    Expect to see the rendered YAML with the correct deployment/service skeleton.
 
 4.  **Create Workflow**:
     Create `.github/workflows/ci.yml` with the content specified.

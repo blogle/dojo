@@ -94,22 +94,13 @@ When used in CI, the tarball is loaded and then re-tagged according to branch or
 Kubernetes manifests live under `deploy/k8s` in the `dojo` repository:
 
     deploy/k8s/
-    ├── base/
-    │   ├── deployment.yaml
-    │   ├── service.yaml
-    │   ├── pvc.yaml
-    │   └── kustomization.yaml
-    └── overlays/
-        ├── dev/
-        │   └── kustomization.yaml
-        ├── staging/
-        │   └── kustomization.yaml
-        └── production/
-            └── kustomization.yaml
+    └── base/
+        ├── deployment.yaml
+        ├── service.yaml
+        └── kustomization.yaml
 
-- `base/` holds the canonical deployment definition.
-- `overlays/` apply environment-specific overrides.
-- A separate infrastructure repository is expected to reference the overlays via Kustomize and Git URLs.
+- `base/` holds the canonical deployment definition (no namespaces, PVCs, or ingress).
+- A separate infrastructure repository should layer its own Kustomize overlays on top of `deploy/k8s/base` to provide environment-specific concerns (namespace, ingress, PVC/storage class, secrets, image tags, etc.).
 
 ### 2.2. Base: Deployment
 
@@ -137,20 +128,12 @@ Rationale:
   - The deployment always runs exactly one replica.
   - `strategy.type` is set to `Recreate` so that the old pod is fully terminated (and releases the file lock) before the new pod starts.
 
-### 2.3. Base: PersistentVolumeClaim
+### 2.3. Base: Storage expectations
 
-The base defines a PVC named `dojo-data`:
+The base `Deployment` expects a volume named `data` backed by a PVC called `dojo-data`, but this repository does **not** define the PVC. Consumers must provide their own storage class, size, and access mode in their overlay (or via an existing cluster claim) and ensure it is compatible with DuckDB’s single-writer constraint.
 
-- Access mode: `ReadWriteOnce`.
-- Storage: cluster default storage class.
-- Size: e.g. `5Gi` (adjustable).
-- Mount path in the pod: `/data`.
-
-Notes:
-
-- This ensures the DuckDB database file persists across pod restarts.
-- On multi-node clusters, the `ReadWriteOnce` PVC may restrict the pod to a single node; the scheduler and storage class handle that detail.
-- The `Recreate` deployment strategy ensures that there is never more than one pod attempting to use the PVC concurrently.
+- Typical overlay choice: `ReadWriteOnce`, 5–10Gi, storage class set per cluster.
+- The `Recreate` strategy in the base keeps a single writer for the DuckDB file.
 
 ### 2.4. Base: Service
 
@@ -212,57 +195,23 @@ Base manifests may define ConfigMap and Secret references but should not contain
 
 ---
 
-## 3. Environment Overlays
+## 3. Consuming the base from infrastructure overlays
 
-The overlays under `deploy/k8s/overlays` provide environment-specific configuration mounted on top of the `base` manifests via Kustomize.
+Environment-specific wiring (namespace, ingress, PVC definitions, secrets, image tags) should live in an infrastructure repo that layers its own Kustomize overlay on top of `github.com/blogle/dojo//deploy/k8s/base`. This keeps the application repo focused on the portable runtime definition while allowing each cluster to control storage classes, domains, and tagging policies.
 
-### 3.1. Dev Overlay
+Typical overlay responsibilities:
 
-The `dev` overlay is intended for local or experimental use. Typical characteristics:
-
-- Uses `imagePullPolicy: IfNotPresent` or `Never` for local clusters.
-- May use an `emptyDir` volume instead of a PVC for `/data` so state is ephemeral.
-- Sets `DOJO_ENV=dev` and `DOJO_LOG_LEVEL=debug`.
-- May disable resource limits or set very low values for convenience.
-
-This overlay is optional and primarily for local development or ad hoc testing.
-
-### 3.2. Staging Overlay
-
-The `staging` overlay is used for testing changes before promoting them to production:
-
-- References the base manifests.
-- Overrides:
-  - Namespace (e.g. `dojo-staging`).
-  - Image tag (e.g. `ghcr.io/blogle/dojo:edge` or a specific SHA tag).
-  - Ingress/host configuration (e.g. `staging-dojo.example.com`).
-- Uses a PVC for `/data` for persistence across staging deployments.
-- Configuration is generally similar to production but may have reduced resource limits.
-
-Staging can track:
-
-- The `edge` image (latest from `main`).
-- Or specific commit-based tags (e.g. `sha-<commit>`), depending on desired safety.
-
-### 3.3. Production Overlay
-
-The `production` overlay is intended for stable, pinned releases:
-
-- References the base manifests.
-- Overrides:
-  - Namespace (e.g. `dojo-prod`).
-  - Image tag: pinned to a specific version, e.g. `ghcr.io/blogle/dojo:v0.1.0`.
-  - Ingress/host configuration (e.g. `dojo.example.com`).
-- Uses a PVC for `/data` with appropriate storage class and size.
-- May set stricter resource limits and any production-specific environment variables.
-
-The production overlay should not track `edge`. It should be updated only when promoting a verified release.
+- Set `namespace` and any labels/annotations needed by the cluster.
+- Provide the PVC backing `dojo-data` (size, storage class, access mode) or swap to an `emptyDir` for ephemeral environments.
+- Pin the image tag (`edge`, `sha-<commit>`, or release tags like `v0.1.0`).
+- Add ingress or service mesh configuration.
+- Inject secrets and non-sensitive config (ConfigMaps or env vars).
 
 ---
 
 ## 4. GitOps Integration Example
 
-A recommended pattern is to manage actual environment deployments from a separate infrastructure repository. That repository can reference the overlays from the `dojo` repo via Kustomize’s Git URL support.
+A recommended pattern is to manage actual environment deployments from a separate infrastructure repository. That repository should reference the `dojo` base manifests via Kustomize’s Git URL support, then layer the environment-specific pieces there.
 
 Example `kustomization.yaml` in an infrastructure repo for a production environment:
 
@@ -272,7 +221,9 @@ Example `kustomization.yaml` in an infrastructure repo for a production environm
     namespace: dojo-prod
 
     resources:
-      - github.com/blogle/dojo//deploy/k8s/overlays/production?ref=v0.1.0
+      - github.com/blogle/dojo//deploy/k8s/base?ref=v0.1.0
+      - pvc.yaml
+      - ingress.yaml
 
     images:
       - name: ghcr.io/blogle/dojo
@@ -280,22 +231,22 @@ Example `kustomization.yaml` in an infrastructure repo for a production environm
 
     patchesJson6902:
       - target:
-          group: networking.k8s.io
           version: v1
-          kind: Ingress
+          kind: Service
           name: dojo
         patch: |-
-          - op: replace
-            path: /spec/rules/0/host
-            value: dojo.example.com
+          - op: add
+            path: /metadata/annotations
+            value:
+              external-dns.alpha.kubernetes.io/hostname: dojo.example.com
 
 Key points:
 
-- `resources` references the production overlay at a specific Git tag (`ref=v0.1.0`).
-- `images` ensures the `image:` tag inside the manifests is pinned to `v0.1.0`.
-- `patchesJson6902` customizes the Ingress host (and any other fields as needed).
+- `resources` pulls the app base from this repo at a tag (`ref=v0.1.0`) and adds infra-owned manifests (PVC, ingress, etc.).
+- `images` pins the deployed image tag per environment.
+- `patchesJson6902` shows how to layer service/ingress tweaks without modifying the base.
 
-This pattern allows each environment (e.g. `staging`, `prod`) to be fully defined and promoted via Git changes in the infrastructure repo.
+This pattern keeps the application repo portable while letting each environment define storage, ingress, and configuration in its own Git history.
 
 ---
 
@@ -412,17 +363,17 @@ Staging can be configured in the infra repo to track:
 Promotion to staging is a Git change in the staging `kustomization.yaml`:
 
 - Update the `images` section to point at a new tag (e.g. `ghcr.io/blogle/dojo:v0.1.0` or `sha-<commit>`).
-- Optionally update the overlay `ref` if staging should track a different Git tag for manifests.
+- Optionally update the base `ref` if staging should track a different Git tag for manifests.
 
 ### 6.3. Promoting to Production
 
 Production promotion is also driven by Git:
 
 1. In the production `kustomization.yaml` (in the infra repo):
-   - Update the `resources` reference to point to the new Git tag:
+   - Update the `resources` reference to point to the new Git tag of the base:
 
          resources:
-           - github.com/blogle/dojo//deploy/k8s/overlays/production?ref=v0.1.0
+           - github.com/blogle/dojo//deploy/k8s/base?ref=v0.1.0
 
    - Update the image tag to match:
 
