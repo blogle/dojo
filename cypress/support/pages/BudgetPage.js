@@ -67,11 +67,11 @@ class BudgetPage {
     }
 
     verifyCategoryAmount(label, amount) {
-        this.categoryRow(label).find("td.amount-cell").eq(0).should("contain", amount);
+        this.categoryRow(label).find('[data-testid="budget-col-budgeted"]').should("contain", amount);
     }
 
     verifyAvailableAmount(label, amount) {
-        this.categoryRow(label).find("td.amount-cell").eq(2).should("contain", amount);
+        this.categoryRow(label).find('[data-testid="budget-col-available"]').should("contain", amount);
     }
 
     verifyCategoryDoesNotExist(label) {
@@ -166,7 +166,7 @@ class BudgetPage {
     }
 
     verifyBudgetedAmount(name, amount) {
-        this.categoryRow(name).find("td.amount-cell").eq(0).should("contain", amount);
+        this.categoryRow(name).find('[data-testid="budget-col-budgeted"]').should("contain", amount);
     }
 
     verifyToast(message) {

@@ -9,6 +9,7 @@ import { makeRowEditable } from "../../services/ui-ledger.js";
 
 let transactionsBodyEl = null;
 let detachInlineEscHandler = null;
+let isRefreshing = false;
 
 const computeCurrentMonthSpend = (transactions) => {
   const now = new Date();
@@ -369,13 +370,13 @@ const renderTransactions = (bodyEl, transactions) => {
       const outflowDisplay = amountMinor < 0 ? formatAmount(Math.abs(amountMinor)) : "—";
       const inflowDisplay = amountMinor >= 0 ? formatAmount(Math.abs(amountMinor)) : "—";
       row.innerHTML = `
-        <td>${tx.transaction_date || "N/A"}</td>
-        <td>${tx.account_name || "N/A"}</td>
-        <td>${tx.category_name || "N/A"}</td>
-        <td>${tx.memo || "—"}</td>
-        <td class="amount-cell">${outflowDisplay}</td>
-        <td class="amount-cell">${inflowDisplay}</td>
-        <td>
+        <td data-testid="transaction-col-date">${tx.transaction_date || "N/A"}</td>
+        <td data-testid="transaction-col-account">${tx.account_name || "N/A"}</td>
+        <td data-testid="transaction-col-category">${tx.category_name || "N/A"}</td>
+        <td data-testid="transaction-col-memo">${tx.memo || "—"}</td>
+        <td class="amount-cell" data-testid="transaction-col-outflow">${outflowDisplay}</td>
+        <td class="amount-cell" data-testid="transaction-col-inflow">${inflowDisplay}</td>
+        <td data-testid="transaction-col-status">
           <button
             type="button"
             class="status-toggle-badge"
@@ -405,15 +406,23 @@ export const refreshTransactions = async (bodyEl = transactionsBodyEl) => {
   if (!bodyEl) {
     return;
   }
-  const data = await api.transactions.list(100);
-  const sorted = (data || []).sort((a, b) => {
-    const dateA = a.transaction_date ? new Date(a.transaction_date) : 0;
-    const dateB = b.transaction_date ? new Date(b.transaction_date) : 0;
-    return dateB - dateA;
-  });
-  store.setState((prev) => ({ ...prev, transactions: sorted }));
-  renderTransactions(bodyEl, sorted);
-  updateHeaderStats();
+  if (isRefreshing) {
+    return;
+  }
+  try {
+    isRefreshing = true;
+    const data = await api.transactions.list(100);
+    const sorted = (data || []).sort((a, b) => {
+      const dateA = a.transaction_date ? new Date(a.transaction_date) : 0;
+      const dateB = b.transaction_date ? new Date(b.transaction_date) : 0;
+      return dateB - dateA;
+    });
+    store.setState((prev) => ({ ...prev, transactions: sorted }));
+    renderTransactions(bodyEl, sorted);
+    updateHeaderStats();
+  } finally {
+    isRefreshing = false;
+  }
 };
 
 const setTransactionFlow = (flow) => {

@@ -86,11 +86,10 @@ describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
       openBudgetModal(categoryName);
       clickQuickAllocateButton(quickAllocateLabel);
 
-      cy.wait(500);
+      cy.get("@alertStub").should("have.been.calledWith", "Not enough Ready to Assign funds.");
       cy.wrap(null).then(() => {
         expect(allocationCalled).to.be.false;
       });
-      cy.get("@alertStub").should("have.been.calledWith", "Not enough Ready to Assign funds.");
 
       budgetPage.verifyReadyToAssign(initialRTA);
       budgetPage.verifyAvailableAmount(categoryName, initialAvailable);

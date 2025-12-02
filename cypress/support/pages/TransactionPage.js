@@ -46,9 +46,10 @@ class TransactionPage {
 
     verifyTransactionRow(rowIndex, account, category, amount) {
         this.elements.transactionTableRows().eq(rowIndex).within(() => {
-            cy.contains("td", account).should("exist");
-            cy.contains("td", category).should("exist");
-            cy.contains("td", amount).should("exist");
+            cy.get('[data-testid="transaction-col-account"]').should("contain", account);
+            cy.get('[data-testid="transaction-col-category"]').should("contain", category);
+            // Amount can be in outflow or inflow, check both or just contain text
+            cy.contains('[class*="amount-cell"]', amount).should("exist");
         });
     }
 
@@ -73,12 +74,10 @@ class TransactionPage {
     }
 
     setInlineOutflow(amount) {
-        cy.get("[data-inline-outflow]")
+        cy.get("tr.is-editing [data-inline-outflow]")
+            .should("be.visible")
             .should("be.enabled")
-            .clear({ force: true });
-        cy.get("[data-inline-outflow]")
-            .should("be.enabled")
-            .type(amount, { force: true });
+            .type("{selectall}{backspace}" + amount);
     }
 
     editOutflowAmount(amount) {

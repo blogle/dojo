@@ -5,11 +5,13 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_credit_transaction_correction_workflow.sql";
+const FIXED_NOW = new Date("2024-01-15T12:00:00Z").getTime();
 
 describe("User Story 16 — Credit Transaction Correction Workflow", () => {
   beforeEach(() => {
     cy.resetDatabase();
     cy.seedDatabase(FIXTURE);
+    cy.clock(FIXED_NOW);
     cy.intercept("POST", "/api/transactions").as("mutateTransaction");
     cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
     cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
@@ -25,14 +27,7 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     const mastercardAccount = "Mastercard Rewards";
 
     const expectAvailable = (categoryName, expectedAmount) => {
-      budgetPage
-        .categoryRow(categoryName)
-        .find("td.amount-cell")
-        .eq(2)
-        .should(($cell) => {
-          const normalized = $cell.text().trim();
-          expect(normalized).to.eq(expectedAmount);
-        });
+      budgetPage.verifyAvailableAmount(categoryName, expectedAmount);
     };
 
     // Initial state verification
@@ -59,7 +54,8 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     transactionPage.verifyTransactionRowAmount(0, transactionAmount);
 
     // Verify budgets after initial (wrong) transaction
-    const monthStart = new Date().toISOString().slice(0, 7) + "-01";
+    const today = new Date(FIXED_NOW);
+    const monthStart = today.toISOString().slice(0, 7) + "-01";
     const expectBudgetApi = ({ diningOut, visaPayment, masterPayment }) => {
       cy.request("GET", `/api/budget-categories?month=${monthStart}`).then(({ body }) => {
         const amounts = Object.fromEntries(body.map((c) => [c.name, c.available_minor]));
@@ -97,7 +93,8 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
     // Edit the transaction to correct the account (from Visa to Mastercard)
     transactionPage.visit();
     cy.wait("@fetchTransactions");
-    transactionPage.editTransaction(0); // Assuming it's the first row
+    // Use row index 0 as it's the newest transaction (time frozen)
+    transactionPage.editTransaction(0);
     transactionPage.selectInlineAccount(mastercardAccount);
     transactionPage.saveInlineEdit();
     cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);

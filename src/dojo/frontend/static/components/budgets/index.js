@@ -99,7 +99,7 @@ const renderGroupRows = (grouped, body) => {
       }
 
       row.innerHTML = `
-        <td>
+        <td data-testid="budget-col-name">
           <div class="category-row">
             <div>
               <span>${cat.name}</span>
@@ -107,9 +107,9 @@ const renderGroupRows = (grouped, body) => {
             </div>
           </div>
         </td>
-        <td class="amount-cell">${formatAmount(cat.allocated_minor)}</td>
-        <td class="amount-cell">${formatAmount(cat.activity_minor)}</td>
-        <td class="amount-cell">
+        <td class="amount-cell" data-testid="budget-col-budgeted">${formatAmount(cat.allocated_minor)}</td>
+        <td class="amount-cell" data-testid="budget-col-activity">${formatAmount(cat.activity_minor)}</td>
+        <td class="amount-cell" data-testid="budget-col-available">
           <span class="${cat.available_minor < 0 ? "form-error" : ""}">${formatAmount(cat.available_minor)}</span>
         </td>
       `;

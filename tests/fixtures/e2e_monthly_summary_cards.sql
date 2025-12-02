@@ -62,7 +62,7 @@ VALUES (
     '00000000-0000-0000-0000-0000000f1401',
     'house_checking',
     'opening_balance',
-    CURRENT_DATE,
+    DATE '2024-01-15',
     300000,
     'Opening balance import',
     'cleared',
@@ -95,7 +95,7 @@ VALUES (
     '00000000-0000-0000-0000-0000000f1402',
     'house_checking',
     'groceries',
-    CURRENT_DATE,
+    DATE '2024-01-15',
     -15000,
     'Groceries run',
     'cleared',
@@ -110,11 +110,11 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 UPDATE accounts
 SET
     current_balance_minor = 285000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2024-01-15 12:00:00'
 WHERE account_id = 'house_checking';
 
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2024-01-01' AS month_start
 )
 INSERT INTO budget_category_monthly_state (
     category_id,
@@ -133,7 +133,7 @@ SET
     available_minor = EXCLUDED.available_minor;
 
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2024-01-01' AS month_start
 )
 INSERT INTO budget_category_monthly_state (
     category_id,
