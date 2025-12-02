@@ -26,6 +26,7 @@ Use a list with checkboxes and timestamps (UTC) to reflect real progress; update
 
 - Cypress quick allocate modal spec previously failed to find the 'Budgeted Last Month: $15.00' button; rerunning the targeted spec now passes (see cypress run above). Keep an eye out for flakiness.
 - `scripts/release --dry-run` fails preflight on a dirty working tree, as expected while changes are in progress.
+- `scripts/release` was initially too strict, aborting on an empty `[Unreleased]` section even when fallback to commits was desired. This was fixed during the audit (2025-12-02).
 
 ## Decision Log
 
