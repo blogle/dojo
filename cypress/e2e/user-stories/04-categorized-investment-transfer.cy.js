@@ -8,8 +8,8 @@ const FIXTURE = "tests/fixtures/e2e_categorized_investment_transfer.sql";
 
 describe("User Story 04 — Categorized Investment Transfer", () => {
   beforeEach(() => {
-    cy.request("POST", "/api/testing/reset_db");
-    cy.request("POST", "/api/testing/seed_db", { fixture: FIXTURE });
+    cy.resetDatabase();
+    cy.seedDatabase(FIXTURE);
   });
 
   it("moves funds from checking into brokerage while tagging Future Home", () => {

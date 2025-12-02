@@ -14,8 +14,8 @@ const SYSTEM_CATEGORY_LABELS = [
 
 describe("User Story 01 — Payday Assignment", () => {
   beforeEach(() => {
-    cy.request("POST", "/api/testing/reset_db");
-    cy.request("POST", "/api/testing/seed_db", { fixture: PAYDAY_FIXTURE });
+    cy.resetDatabase();
+    cy.seedDatabase(PAYDAY_FIXTURE);
   });
 
   it("records a paycheck and assigns it across envelopes", () => {

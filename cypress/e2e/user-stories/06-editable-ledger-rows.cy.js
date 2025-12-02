@@ -5,9 +5,12 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_editable_ledger_rows.sql";
+// Fixed date: Nov 15, 2025
+const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 06 — Editable Ledger Rows", () => {
   beforeEach(() => {
+    cy.clock(FIXED_NOW);
     cy.resetDatabase();
     cy.seedDatabase(FIXTURE);
   });
@@ -18,12 +21,7 @@ describe("User Story 06 — Editable Ledger Rows", () => {
     cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
     cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
-    const today = new Date();
-    const correctedDateObj = new Date(today.getTime());
-    if (today.getDate() > 1) {
-      correctedDateObj.setDate(today.getDate() - 1);
-    }
-    const correctedDate = correctedDateObj.toISOString().slice(0, 10);
+    const correctedDate = "2025-11-14";
 
     budgetPage.visit();
     cy.wait("@fetchBudgets");

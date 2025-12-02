@@ -5,11 +5,14 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_manual_transaction_lifecycle.sql";
+// Fixed date: Nov 15, 2025
+const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 05 — Manual Transaction Lifecycle", () => {
   beforeEach(() => {
-    cy.request("POST", "/api/testing/reset_db");
-    cy.request("POST", "/api/testing/seed_db", { fixture: FIXTURE });
+    cy.clock(FIXED_NOW);
+    cy.resetDatabase();
+    cy.seedDatabase(FIXTURE);
   });
 
   it("edits a pending outflow, toggles cleared, and keeps Ready-to-Assign steady", () => {
@@ -51,7 +54,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
     transactionPage.verifyTransactionRowAmount(0, "$62.00");
     transactionPage.verifyTransactionStatus(0, "cleared");
 
-    const monthStart = new Date().toISOString().slice(0, 7) + "-01";
+    const monthStart = "2025-11-01";
     cy.request(`/api/budget-categories?month=${monthStart}`).then(({ body }) => {
       const dining = body.find((category) => category.category_id === "dining_out");
       expect(dining?.available_minor).to.eq(13800);

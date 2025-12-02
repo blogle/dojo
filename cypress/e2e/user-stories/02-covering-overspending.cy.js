@@ -9,8 +9,8 @@ const FIXTURE = "tests/fixtures/e2e_covering_overspending.sql";
 
 describe("User Story 02 — Rolling with the Punches", () => {
   beforeEach(() => {
-    cy.request("POST", "/api/testing/reset_db");
-    cy.request("POST", "/api/testing/seed_db", { fixture: FIXTURE });
+    cy.resetDatabase();
+    cy.seedDatabase(FIXTURE);
   });
 
   it("covers Dining Out overspending by reallocating Groceries funds", () => {

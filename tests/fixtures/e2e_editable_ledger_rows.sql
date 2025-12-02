@@ -40,12 +40,12 @@ VALUES (
     '00000000-0000-0000-0000-0000000f0601',
     'house_checking',
     'opening_balance',
-    CURRENT_DATE,
+    '2025-11-15',
     500000,
     'Opening balance import',
     'cleared',
-    NOW(),
-    NOW(),
+    TIMESTAMP '2025-11-15 12:00:00',
+    TIMESTAMP '2025-11-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -54,12 +54,9 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 
 UPDATE accounts
 SET current_balance_minor = 500000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2025-11-15 12:00:00'
 WHERE account_id = 'house_checking';
 
-WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
-)
 INSERT INTO budget_category_monthly_state (
     category_id,
     month_start,
@@ -68,7 +65,7 @@ INSERT INTO budget_category_monthly_state (
     activity_minor,
     available_minor
 )
-SELECT 'utilities', month_start, 40000, 0, 0, 40000 FROM month_start
+VALUES ('utilities', '2025-11-01', 40000, 0, 0, 40000)
 ON CONFLICT (category_id, month_start) DO UPDATE
 SET allocated_minor = EXCLUDED.allocated_minor,
     inflow_minor = EXCLUDED.inflow_minor,

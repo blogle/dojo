@@ -8,8 +8,8 @@ const FIXTURE = "tests/fixtures/e2e_funded_credit_card_spending.sql";
 
 describe("User Story 03 — Funded Credit Card Spending", () => {
   beforeEach(() => {
-    cy.request("POST", "/api/testing/reset_db");
-    cy.request("POST", "/api/testing/seed_db", { fixture: FIXTURE });
+    cy.resetDatabase();
+    cy.seedDatabase(FIXTURE);
   });
 
   it("tracks category balances and credit liabilities when spending on card", () => {
