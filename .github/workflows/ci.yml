@@ -46,12 +46,17 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           archives=0
-          for dir in /tmp/dojo-run-tests-*; do
+          # Check both TMPDIR and /tmp to be safe, as the runner might use one
+          # but we want to catch where the script wrote.
+          # The script uses TMPDIR:-/tmp.
+          SEARCH_DIR="${TMPDIR:-/tmp}"
+          
+          for dir in "$SEARCH_DIR"/dojo-run-tests-*; do
             tar -czf "run-tests-logs-${archives}.tar.gz" -C "$(dirname "$dir")" "$(basename "$dir")"
             archives=$((archives+1))
           done
           if [ "$archives" -eq 0 ]; then
-            echo "no run-tests logs found" > run-tests-logs.txt
+            echo "no run-tests logs found in $SEARCH_DIR" > run-tests-logs.txt
           fi
       - name: Upload run-tests logs
         if: always()
