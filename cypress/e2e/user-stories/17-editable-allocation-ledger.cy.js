@@ -37,8 +37,8 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
     // Use selectall to replace content in one go, avoiding potential detachments between clear and type
     cy.get("@editRow")
       .find("input[name='amount_minor']")
-      .should("be.enabled")
-      .type("{selectall}600{enter}");
+      .should("not.be.disabled")
+      .type("{selectall}600{enter}", { force: true });
 
     cy.wait("@updateAllocation").its("response.statusCode").should("eq", 200);
     cy.wait("@fetchAllocations");

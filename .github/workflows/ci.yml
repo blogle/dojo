@@ -40,6 +40,28 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: Run tests
         run: nix develop . --command scripts/run-tests
+      - name: Package run-tests logs
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=0
+          for dir in /tmp/dojo-run-tests-*; do
+            tar -czf "run-tests-logs-${archives}.tar.gz" -C "$(dirname "$dir")" "$(basename "$dir")"
+            archives=$((archives+1))
+          done
+          if [ "$archives" -eq 0 ]; then
+            echo "no run-tests logs found" > run-tests-logs.txt
+          fi
+      - name: Upload run-tests logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-tests-logs
+          path: |
+            run-tests-logs-*.tar.gz
+            run-tests-logs.txt
+          if-no-files-found: ignore
 
   build-and-push:
     needs: [migrations-check, test]
