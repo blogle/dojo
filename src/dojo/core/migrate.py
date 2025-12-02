@@ -3,6 +3,8 @@
 import argparse
 import logging
 import re
+import shutil
+import time
 from collections.abc import Iterable, Sequence
 from importlib.resources import files
 from importlib.resources.abc import Traversable
@@ -185,20 +187,34 @@ def migrate(
     logger.info("Migrations complete for %s", path)
 
 
+def _backup_db(db_path: Path) -> None:
+    """Create a timestamped backup of the database file."""
+    if not db_path.exists():
+        logger.info("backup status=skipped reason=no-db-file path=%s", db_path)
+        return
+    backup = db_path.with_suffix(db_path.suffix + f".bak.{int(time.time())}")
+    shutil.copy2(db_path, backup)
+    logger.info("backup status=ok path=%s", backup)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Apply Dojo DuckDB migrations")
     parser.add_argument("--database", "-d", dest="database", default=None, help="Path to DuckDB file")
     parser.add_argument("--dry-run", action="store_true", help="Parse and log plan without executing")
     parser.add_argument("--target", dest="target", default=None, help="Apply up to and including filename")
     parser.add_argument("--log-plan", action="store_true", help="Log planned statements before execution")
+    parser.add_argument("--backup", action="store_true", help="Backup the database before migrating")
     return parser.parse_args()
 
 
 def main() -> None:
     """CLI entrypoint for `python -m dojo.core.migrate`."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     args = _parse_args()
     settings: Settings = get_settings()
     db_path = Path(args.database) if args.database else settings.db_path
+    if args.backup:
+        _backup_db(db_path)
     migrate(db_path, dry_run=args.dry_run, target=args.target, log_plan=args.log_plan)
 
 

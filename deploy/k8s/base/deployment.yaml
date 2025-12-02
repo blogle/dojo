@@ -20,17 +20,10 @@ spec:
         imagePullPolicy: IfNotPresent
         command:
         - python
-        - -c
-        - |
-            import pathlib, shutil, time
-            from dojo.core import migrate as m
-
-            db = pathlib.Path("/data/ledger.duckdb")
-            if db.exists():
-                backup = db.with_suffix(db.suffix + f".bak.{int(time.time())}")
-                shutil.copy2(db, backup)
-                print(f"backup path={backup}", flush=True)
-            m.migrate(db, log_plan=True)
+        - -m
+        - dojo.core.migrate
+        - --backup
+        - --log-plan
         env:
         - name: DOJO_DB_PATH
           value: /data/ledger.duckdb
