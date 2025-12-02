@@ -120,3 +120,4 @@ jobs:
             docker push "${IMAGE_REPO_LOWER}:${tag}"
             echo "step=push registry=${IMAGE_REPO_LOWER} tag=${tag} status=ok"
           done
+
