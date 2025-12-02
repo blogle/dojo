@@ -16,7 +16,10 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
   });
 
   it("edits a pending outflow, toggles cleared, and keeps Ready-to-Assign steady", () => {
+    cy.intercept("POST", "/api/transactions").as("mutateTransaction");
+    cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
     cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+    cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
     budgetPage.visit();
     cy.wait("@fetchBudgets");
@@ -24,10 +27,14 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
     budgetPage.rememberReadyToAssign();
 
     accountPage.visit();
+    cy.wait("@fetchAccounts");
     accountPage.verifyAccountBalance("House Checking", "$10,000.00");
 
     transactionPage.visit();
+    cy.wait("@fetchTransactions");
     transactionPage.createOutflowTransaction("House Checking", "Dining Out", "50");
+    cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchTransactions");
     transactionPage.verifyError("");
 
     transactionPage.elements.transactionTableRows().first().within(() => {
@@ -43,13 +50,17 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();
+    cy.wait("@fetchAccounts");
     accountPage.verifyAccountBalance("House Checking", "$9,950.00");
 
     transactionPage.visit();
+    cy.wait("@fetchTransactions");
     transactionPage.editTransaction(0);
     transactionPage.editOutflowAmount("62");
     transactionPage.toggleTransactionStatus();
     transactionPage.saveInlineEdit();
+    cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchTransactions");
 
     transactionPage.verifyTransactionRowAmount(0, "$62.00");
     transactionPage.verifyTransactionStatus(0, "cleared");
@@ -61,10 +72,12 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
     });
 
     cy.get("[data-route-link='budgets']").click(); // Navigating via UI for budgets page
+    cy.wait("@fetchBudgets");
     budgetPage.verifyAvailableAmount("Dining Out", "$138.00");
     budgetPage.expectReadyToAssignUnchanged();
 
     accountPage.visit();
+    cy.wait("@fetchAccounts");
     accountPage.verifyAccountBalance("House Checking", "$9,938.00");
   });
 });

@@ -19,7 +19,14 @@ describe("User Story 01 — Payday Assignment", () => {
   });
 
   it("records a paycheck and assigns it across envelopes", () => {
+    cy.intercept("POST", "/api/transactions").as("createTransaction");
+    cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
+    cy.intercept("POST", "/api/budget/allocations").as("createAllocation");
+    cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+    cy.intercept("GET", "/api/accounts").as("fetchAccounts");
+
     transactionPage.visit();
+    cy.wait("@fetchTransactions");
 
     transactionPage.elements.accountSelect().should("contain", "House Checking");
     SYSTEM_CATEGORY_LABELS.forEach((label) => {
@@ -27,21 +34,36 @@ describe("User Story 01 — Payday Assignment", () => {
     });
 
     transactionPage.createTransaction("inflow", "House Checking", "Available to Budget", "3000");
+    cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchTransactions");
     transactionPage.verifyError("");
 
     transactionPage.verifyTransactionCount(1);
     transactionPage.verifyTransactionRow(0, "House Checking", "Available to Budget", "$3,000.00");
 
     allocationPage.visit();
+    cy.wait("@fetchBudgets");
+    
     allocationPage.elements.categorySelect().should("contain", "Rent");
+    
     allocationPage.recordAllocation("Rent", "1500");
+    cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchBudgets"); // Allocations often trigger budget refresh
     allocationPage.verifyError("");
+    
     allocationPage.recordAllocation("Groceries", "500");
+    cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchBudgets");
     allocationPage.verifyError("");
+    
     allocationPage.recordAllocation("Savings", "1000");
+    cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
+    cy.wait("@fetchBudgets");
     allocationPage.verifyError("");
 
     budgetPage.visit();
+    cy.wait("@fetchBudgets");
+    
     budgetPage.verifyReadyToAssign("$0.00");
     budgetPage.verifyActivity("$0.00");
     budgetPage.verifyAvailable("$3,000.00");
