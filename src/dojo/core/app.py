@@ -8,6 +8,7 @@ ensuring explicit dependency management.
 
 from importlib import resources
 from pathlib import Path
+import logging
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +23,8 @@ from dojo.core.config import Settings, get_settings
 from dojo.core.db import get_connection
 from dojo.core.migrate import apply_migrations
 from dojo.core.routers import router as core_router
+
+logger = logging.getLogger(__name__)
 
 
 def _static_directory() -> Path:
@@ -80,8 +83,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """
     # Load settings, defaulting to environment/file if not provided.
     settings = settings or get_settings()
-    # Ensure the database schema is current before starting the application.
-    _apply_startup_migrations(settings)
+    # Ensure the database schema is current before starting the application when enabled.
+    if settings.run_startup_migrations:
+        _apply_startup_migrations(settings)
+    else:
+        logger.info("Skipping startup migrations (run_startup_migrations=false)")
 
     app = FastAPI(title="Dojo", version="0.1.0")
     # Store settings and API host/port in app state for easy access across the application.

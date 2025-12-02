@@ -22,7 +22,7 @@ Develop a shared, reusable frontend "Editable Ledger" UI component coupled with 
 The `transactions` table already supports SCD-2 columns (`concept_id`, `is_active`, `valid_from/to`), but the `budget_allocations` table (`0006_budget_allocations.sql`) does not. It needs to be brought up to parity to support non-destructive edits.
 
 ### Tasks
-*   **Task 1.1: Migration for Budget Allocations SCD-2** - **COMPLETED** (Verified via `0015_ensure_scd2_columns.sql`)
+*   **Task 1.1: Migration for Budget Allocations SCD-2** - **COMPLETED** (Verified via `0011_ensure_scd2_columns.sql`)
     *   **Description:** Create a new SQL migration file (e.g., `0011_allocation_scd2.sql`) to alter the `budget_allocations` table.
     *   **Requirements:**
         *   Add column `concept_id` (UUID, Not Null). Backfill existing rows by generating new UUIDs or using `allocation_id` if suitable.

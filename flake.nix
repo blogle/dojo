@@ -97,15 +97,17 @@
               export UV_PYTHON_DOWNLOADS=never
               export UV_CACHE_DIR="$PWD/.uv-cache"
               export LD_LIBRARY_PATH=${lib.makeLibraryPath [ stdenv.cc.cc.lib zlib ]}:$LD_LIBRARY_PATH
-              export CYPRESS_INSTALL_BINARY=0
-              export CYPRESS_RUN_BINARY=${pkgs.cypress}/bin/Cypress
-              export PATH="$PWD/scripts:$PATH"
+               export CYPRESS_INSTALL_BINARY=0
+               export CYPRESS_RUN_BINARY=${pkgs.cypress}/bin/Cypress
+               export PATH="$PWD/scripts:$PATH"
+               export DOJO_RUN_STARTUP_MIGRATIONS=true
 
-              if [ ! -f .venv/bin/activate ] || [ ''${DOJO_FORCE_UV_SYNC:-0} = 1 ]; then
-                mkdir -p .uv-cache
-                uv sync --extra dev
-              fi
-              . .venv/bin/activate
+               if [ ! -f .venv/bin/activate ] || [ ''${DOJO_FORCE_UV_SYNC:-0} = 1 ]; then
+                 mkdir -p .uv-cache
+                 uv sync --extra dev
+               fi
+               . .venv/bin/activate
+
             '';
           };
 

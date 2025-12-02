@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     )
     api_host: str = Field(default="0.0.0.0", description="Default host bound by API servers.")
     api_port: int = Field(default=8000, description="Default port bound by API servers.")
+    run_startup_migrations: bool = Field(
+        default=False,
+        description=(
+            "Whether the app applies migrations on startup; keep true for dev/test, false for prod when a preflight runs."
+        ),
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="dojo_",

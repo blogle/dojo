@@ -84,6 +84,19 @@ Rules:
    - Executes each inside a transaction.
    - Records success/failure in `schema_migrations`.
 
+6. Separate heavy DML from index/constraint creation:
+
+   - Do not place `CREATE INDEX`/`CREATE UNIQUE INDEX` in the same transaction as `INSERT`/`UPDATE`/`DELETE` backfills; DuckDB rejects indexes with outstanding updates.
+   - Prefer one concern per file: schema evolution, data backfill, then indexes in a follow-up file after prior changes have committed.
+   - Make statements deterministic (no time-based defaults or non-repeatable selects) so reruns under `schema_migrations` are safe.
+
+7. File ordering and execution:
+
+   - Filenames must be zero-padded and strictly sequential with no gaps (for example `0001_core.sql`, `0002_account_classes.sql`, ...). The runner validates numbering and fails fast on gaps or non-numeric prefixes.
+   - Use the runner CLI: `python -m dojo.core.migrate --database /path/to/db.duckdb [--target FILENAME] [--log-plan] [--dry-run]`. `--target` stops after a specific file for upgrade rehearsals; `--log-plan` prints per-file/per-statement execution.
+   - `scripts/run-migrations-check [--log-plan]` applies migrations to a temp DB and should be used in CI/local preflight. CI also rehearse-upgrades by applying migrations to a DB seeded to a prior target before running the full set.
+   - Production should run migrations out-of-band (init container or job) with `DOJO_RUN_STARTUP_MIGRATIONS=false`; dev/test may set `DOJO_RUN_STARTUP_MIGRATIONS=true` for convenience (see flake shellHook). Before production migrations, take a file copy backup (for example `cp /data/ledger.duckdb /data/ledger.duckdb.bak.$(date +%s)`). The deployment init container performs this backup automatically.
+
 
 ## 3. Seeds vs Fixtures vs Production Data
 

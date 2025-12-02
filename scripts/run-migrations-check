@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# NAME
+#     run-migrations-check - apply migrations against a temp DuckDB file with logging
+# SYNOPSIS
+#     scripts/run-migrations-check [--log-plan]
+# DESCRIPTION
+#     Creates a temporary DuckDB database, runs the migration runner, and cleans up.
+#     Use --log-plan to print planned statements before execution.
+
+set -euo pipefail
+
+readonly REPO_NAME="dojo"
+readonly SCRIPT_NAME="run-migrations-check"
+readonly TMP_DIR="${TMPDIR:-/tmp}"
+DB_PATH=$(mktemp "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-XXXXXX.duckdb")
+# Remove the empty placeholder so DuckDB can create the file cleanly.
+rm -f "${DB_PATH}"
+readonly DB_PATH
+LOG_PLAN=0
+
+usage() {
+    cat <<EOF
+NAME
+    ${SCRIPT_NAME} - apply migrations against a temp DuckDB file with logging
+SYNOPSIS
+    scripts/${SCRIPT_NAME} [--log-plan] [-h|--help]
+DESCRIPTION
+    Runs the migration runner on a temporary DuckDB file to validate that migrations
+    apply cleanly. On success the temp file is removed; on failure the path is printed
+    for inspection.
+EOF
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --log-plan)
+                LOG_PLAN=1
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+cleanup() {
+    if [[ -f "${DB_PATH}" ]]; then
+        rm -f "${DB_PATH}"
+    fi
+}
+
+run_check() {
+    local args=(python -m dojo.core.migrate --database "${DB_PATH}")
+    if [[ "${LOG_PLAN}" -eq 1 ]]; then
+        args+=(--log-plan)
+    fi
+    if "${args[@]}"; then
+        cleanup
+        echo "[OK] ${SCRIPT_NAME} (migrations applied cleanly)"
+    else
+        echo "[FAIL] ${SCRIPT_NAME} (see ${DB_PATH})"
+        exit 1
+    fi
+}
+
+parse_args "$@"
+run_check

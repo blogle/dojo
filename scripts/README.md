@@ -39,6 +39,18 @@ scripts/run-tests --skip-integration
 scripts/run-tests --skip-property --skip-integration
 ```
 
+### `scripts/run-migrations-check`
+
+- **Description**: Applies all migrations against a temporary DuckDB file and logs the plan (optional) so migration safety can be verified in CI or locally without touching real data. Cleans up the temp file on success and prints its path on failure.
+- **Underlying tools**: `python -m dojo.core.migrate --database <temp>.duckdb [--log-plan]`
+- **Options**:
+  - `--log-plan`: print the ordered migrations and statements before execution.
+  - `-h`/`--help`: show usage.
+- **Behavior**:
+  - Creates a temp DuckDB under `${TMPDIR:-/tmp}`.
+  - Runs the migration runner; removes the file on success.
+  - Emits `[OK] scripts/run-migrations-check (migrations applied cleanly)` on success or `[FAIL] ... (see <path>)` on failure.
+
 ### `scripts/release`
 
 - **Description**: Preflight guardrails (fetch tags, ensure on `master`, clean tree), bumps semantic version (`--bump patch|minor|major`), rolls `CHANGELOG.md` by moving the `[Unreleased]` section into a dated `vX.Y.Z` entry, optionally generates release notes via an LLM (`codex` by default, `gemini` as an alternative), updates `pyproject.toml`, creates an annotated git tag, and pushes branch + tag. Dry-run mode computes everything without touching the working tree.
