@@ -7,56 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.1.1] - 2025-12-01
+
 ### Added
-- Auditable ledger MVP: FastAPI monolith with DuckDB migrations, temporal transaction service, net worth API, and SPA wired to `/api/transactions` & `/api/net-worth/current`.
-- Unit + property tests covering transaction invariants and net worth aggregation.
-- Cypress-based e2e suite (config + docs) that drives the SPA transaction flow via `npx cypress run --e2e --browser <browser> [--headed]` from an activated dev shell.
-- Account and budget management APIs plus SPA pages to create, edit, and deactivate accounts and categories with new Cypress coverage.
-- Account classes/roles, SCD detail tables, and special categories plus a categorized-transfer API, Ready to Assign query/route, and tangibles valuation table that feed the net worth snapshot (ledger + positions + tangibles) along with unit tests for transfers, RTA, and net worth.
-- SPA updates that drive the Assets & Liabilities page from the backend, show net worth and Ready to Assign stats, group cards by account class with role icons, surface an account detail modal, and convert the Add Account modal into a real POST flow with sensible defaults.
-- Envelope-budgeting MVP: transactions form with mode/unit toggles, budgets section with allocation form + category modal, categorized transfer UX with toast feedback, backend category-state joins (with `month` query), README guidance, and new Cypress scenarios for the three flows.
-- Transaction status tracking: DuckDB now stores pending/cleared states, the `/api/transactions` payloads include `status`, and the SPA ledger renders the true reconciliation state instead of inferring from dates.
-- Dedicated allocations ledger: DuckDB now persists `budget_allocations` rows with from/to metadata, `/api/budget/allocations` exposes guard rails plus a month summary endpoint, and the SPA ships a standalone `#/allocations` page with summary chips, ledger table, and Cypress coverage.
-- Dev/demo data loader: `python -m dojo.core.seed` executes `sql/seeds/*.sql`, and tests now rely on purpose-built fixtures under `tests/fixtures/`.
-- Payday assignment Cypress spec with dedicated SQL fixture plus per-spec database reset to validate user-story-driven budgeting flows.
-- Funded credit card spending flow now mirrors budgeted purchases into the matching payment envelope, adds a tailored SQL fixture, and ships a Cypress spec that verifies category balances, Ready-to-Assign integrity, and credit liability updates end to end.
-- Credit accounts now auto-provision payment envelopes (grouped under "Credit Card Payments") and a migration backfills both the group and per-account envelopes so budgets consistently show the dedicated section at the top.
-- Rolling with the Punches Cypress spec + SQL fixture validate Dining Out overspending, Groceries-to-Dining reallocations via the allocations ledger, Ready-to-Assign stability, and the cash impact on House Checking.
-- Categorized investment transfer Cypress spec + fixture prove Future Home allocations drop correctly while Checking decreases, Brokerage increases, and Ready-to-Assign stays consistent when moving funds between on-budget accounts.
-- Manual transaction lifecycle Cypress spec + fixture walk a pending debit through edit → cleared while asserting category availability, Ready-to-Assign, and account balances stay in sync.
-- Deployment pipeline & infrastructure: Nix flake now builds a minimal, layered Docker image (`:edge`); Kubernetes manifests (Kustomize) provide `Recreate`-strategy deployment for data safety; and a GitHub Actions workflow automates CI checks and GHCR publishing on push to `master` or tags.
+- Auditable ledger MVP: FastAPI monolith with DuckDB migrations, temporal transaction service, net worth API, and SPA wired to `/api/transactions` and `/api/net-worth/current`.
+- Unit and property tests for transaction invariants and net worth aggregation plus a Cypress e2e suite driven via `npx cypress run --e2e --browser <browser> [--headed]`.
+- Account and budget management APIs with SPA create/edit/deactivate flows and Cypress coverage.
+- Account classes/roles, SCD detail tables, special categories, categorized-transfer API, Ready to Assign route, tangibles valuation table, and corresponding unit tests feeding the net worth snapshot.
+- SPA Assets & Liabilities experience with backend-driven stats, account-class grouping and icons, account detail modal, and an Add Account POST flow with defaults.
+- Envelope-budgeting MVP: transactions form with mode/unit toggles, allocation form and category modal, categorized transfer UX with toasts, backend category-state joins (`month` query), README guidance, and Cypress scenarios.
+- Transaction status tracking that persists pending/cleared states, returns `status` in `/api/transactions`, and renders reconciliation state in the ledger.
+- Dedicated allocations ledger persisted in DuckDB, `/api/budget/allocations` guard rails and month summary, and a `#/allocations` SPA page with summary chips, ledger table, and Cypress coverage.
+- Dev/demo data loader (`python -m dojo.core.seed`) for `sql/seeds/*.sql` plus test fixtures under `tests/fixtures/`.
+- End-to-end specs with fixtures for payday assignment, funded credit card spending, credit payment envelope backfill, Rolling with the Punches reallocations, categorized investment transfers, and manual transaction lifecycle; added monthly summary, account onboarding, and credit transaction correction workflows (Stories 14–16).
+- Deployment pipeline and infrastructure: Nix-built layered Docker image (`:edge`), Kustomize manifests with `Recreate` strategy, GitHub Actions CI/registry publish, and a `/healthz` endpoint for Kubernetes probes.
 
 ### Changed
-- Renamed the canonical test wrapper to `scripts/run-tests`, fixed its timing helper, and refreshed `scripts/README.md`/`AGENTS.md` so agents consistently call the renamed script instead of the shell `test` builtin.
-- Updated `docs/rules/sql.md` to recommend storing SQL files inside the application source (`src/dojo/sql/`) to align with the established practice of packaging data files within the Python namespace.
-- Rebuilt CI/release automation: new GitHub Actions workflows publish GHCR images on `master` using Nix builds, tag-based releases push versioned + SHA tags and create GitHub Releases from `CHANGELOG.md`, and a `scripts/release` helper enforces clean-release guardrails.
-- The release helper now invites `codex` or `gemini` to draft release notes (with a deterministic changelog/commit fallback) before rolling the `[Unreleased]` section.
-
-### Changed
-- Normalized budgeting schema limits, pagination guardrails, net worth rounding precision, and API host/port configuration behind named constants so the statics-over-dynamics rule holds for these knobs.
-- Documented the DAO-backed backend layering and componentized SPA by updating `README.md`, `docs/architecture/overview.md`, and `docs/rules/frontend.md`, including refreshed diagrams and guidance so contributors land on the current structure.
-- Reskinned frontend navigation into distinct Transactions, Accounts, and Budgets pages with header stats and consistent top bar layout.
-- Transaction editing now reverses the previous ledger effects (account balances, category month state, credit-payment reserves) before applying the updated amount so pending→cleared edits keep envelopes and Ready-to-Assign accurate.
-- Repositioned the dashboard stats into a single no-wrap card row, right-justified the navigation links, and removed the redundant pre-content copy so the ledger cards sit immediately below the hero metrics.
-- Rebuilt the Accounts view into an Assets & Liabilities workspace with grouped cards, navigation filters, stats, and a guided add-account modal for new holdings.
-- Updated architecture domain docs for Assets & Liabilities, Budgeting & Transactions, Net Worth, and Overview to formalize cash-only Ready to Assign, off-budget Accessible Assets, ledger-driven loan balances, and the unified net worth formula (ledger + positions + tangibles).
-- Simplified the SPA currency UX to dollars-only, exposed a month-to-date budgeted hero card backed by allocation totals, and added a budget-month summary chip so the ledger and Ready-to-Assign math stay reconciled at a glance.
-- Rebuilt the Transactions UI with an inflow/outflow toggle, inline editable rows (no modal hops), and moved categorized transfers into their own page so single-leg ledger work stays focused.
-- Transactions ledger rows now enter inline edit mode on click with separate inflow/outflow columns and the compact StatusToggle badge, removing the redundant actions column and the old “quick edit” buttons.
-- Removed the hard-coded house accounts/categories from `0001_core.sql`; README now documents optional seed scripts so migrations stay production-safe by default.
-- Promoted opening balance, available-to-budget, transfer, and balance-adjustment categories to first-class system envelopes so ledger posts stay valid, hidden from the budgets UI, and excluded from activity math while still contributing to Ready to Assign.
-
-### Deprecated
-
-### Removed
+- Renamed the canonical test wrapper to `scripts/run-tests`, fixed timing, added filtering, and enabled parallel suite execution; refreshed agent/docs guidance.
+- Updated SQL guidance to keep SQL within `src/dojo/sql/`; enforced sqlfluff compliance with dollar params and explicit joins; added broader Ruff checks, actionlint, and Rust 120-character limit.
+- Rebuilt CI/release automation with GitHub Actions for GHCR images and tag-based releases, aligned deploy image tagging, and hardened DuckDB migrations with preflight init and docs.
+- Normalized budgeting schema limits, pagination guardrails, net worth rounding, and API host/port constants to favor statics.
+- Documented DAO-backed layering, refreshed architecture/frontend docs and diagrams, and reskinned navigation into Transactions, Accounts, and Budgets pages with consistent headers.
+- Refined budgeting UX: dollars-only display, month-to-date budgeted hero card, budget-month summary chip, inflow/outflow toggle, inline editable ledger rows with status badges, and separate categorized transfer page.
+- Rebuilt Accounts view into an Assets & Liabilities workspace with grouped cards, navigation filters, stats, and guided add-account modal; repositioned dashboard stats into a compact card row.
+- Transaction editing now reverses prior ledger effects before reapplying changes to keep envelopes and Ready to Assign accurate; system envelopes (opening balance, available-to-budget, transfer, balance-adjustment) are first-class and hidden from budgets.
+- Removed hard-coded house accounts/categories from migrations; seeds documented as optional.
 
 ### Fixed
-- Account administration now seeds and backfills the per-class `*_account_details` tables so every account owns a detail row and the property suite no longer needs expected failures.
-- Categorized transfers flip the deltas for liability accounts so paying a loan or credit balance reduces the liability instead of increasing it.
-- Corrected the dashboard hero layout so the date, month-to-date spend, and net worth stay in a single card row and the page links pin to the top-right without stray pre-content text.
-- Wrapped transaction edits in the new `BudgetingDAO.transaction()` context manager, added a regression test that forces a failure mid-edit to prove rollback behavior, and documented that `accounts` and `budget_category_monthly_state` are mutable caches (not temporal tables) so in-place updates remain compliant.
-- Testing reset/seed endpoints now route fixture SQL through `TestingDAO` so layer boundaries stay intact and every DuckDB call uses the serialized connection helper.
-- Introduced `CoreDAO` plus Budgeting reference-data DAO helpers so the net-worth service and `/api/budget/reference-data` no longer execute inline SQL.
-- Eliminated the lingering `row[n]` magic-number accessors by wrapping DuckDB result sets in typed namespace helpers inside `BudgetingDAO` and the property/unit suites, so dataclasses and tests rely on named attributes per the statics-over-dynamics rule.
+- Account administration backfills per-class detail tables; categorized transfers now reduce liabilities correctly; ledger refreshes immediately after opening balance posts.
+- Transaction edits use `BudgetingDAO.transaction()` for rollback safety; TestingDAO mediates fixture SQL; DuckDB results wrapped in typed helpers to replace magic-number accessors.
+- Corrected dashboard hero layout and navigation positioning.
+- Fixed Ready-to-Assign races, complex allocation updates (including overspent reductions), and monthly state refresh on allocation edits; migration runner uses named parameters.
+- Ready-to-Assign and ledger stability validated via expanded e2e specs; targeted lint/test runner fixes keep py-sql checks and run-tests filters accurate.
 
-### Security
+### Breaking
+- None.
+
