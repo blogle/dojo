@@ -51,6 +51,24 @@ scripts/run-tests --skip-property --skip-integration
   - Runs the migration runner; removes the file on success.
   - Emits `[OK] scripts/run-migrations-check (migrations applied cleanly)` on success or `[FAIL] ... (see <path>)` on failure.
 
+### `scripts/extract-release-notes`
+
+- **Description**: Extracts the release notes for a specific version tag (e.g. `v0.1.1`) from `CHANGELOG.md`. Designed for use in CI/CD pipelines to populate GitHub Release bodies.
+- **Options**:
+  - `version`: The version tag to extract.
+  - `changelog_path` (optional): Path to the changelog file (defaults to `CHANGELOG.md`).
+  - `-h`/`--help`: show usage.
+- **Behavior**:
+  - Prints the extracted notes to stdout.
+  - Exits with error if the section is not found.
+
+#### Example usage
+
+```
+scripts/extract-release-notes v0.1.1
+scripts/extract-release-notes v0.1.1 custom_changelog.md
+```
+
 ### `scripts/release`
 
 - **Description**: Preflight guardrails (fetch tags, ensure on `master`, clean tree), bumps semantic version (`--bump patch|minor|major`), rolls `CHANGELOG.md` by moving the `[Unreleased]` section into a dated `vX.Y.Z` entry, optionally generates release notes via an LLM (`codex` by default, `gemini` as an alternative), updates `pyproject.toml`, creates an annotated git tag, and pushes branch + tag. Dry-run mode computes everything without touching the working tree.

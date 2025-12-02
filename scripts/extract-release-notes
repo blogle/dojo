@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""
+Extracts a specific version's release notes from a Keep a Changelog formatted file.
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+
+def extract_section(content: str, version: str) -> str:
+    # Escape the version for regex in case it contains dots/brackets
+    # We look for a line starting with "## [version]"
+    pattern = rf"^## \[ {re.escape(version)} \].*$"
+    match = re.search(pattern, content, flags=re.MULTILINE)
+    
+    if not match:
+        raise ValueError(f"Section for version '{version}' not found.")
+    
+    start_index = match.start()
+    # Find the start of the next section (## [...) or end of string
+    next_section = re.search(r"^## \[ ", content[match.end():], flags=re.MULTILINE)
+    
+    if next_section:
+        end_index = match.end() + next_section.start()
+    else:
+        end_index = len(content)
+        
+    return content[start_index:end_index].strip() + "\n"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Extract release notes for a specific version from CHANGELOG.md"
+    )
+    parser.add_argument("version", help="The version tag to extract (e.g. v1.0.0)")
+    parser.add_argument(
+        "changelog_path", 
+        nargs="?", 
+        default="CHANGELOG.md", 
+        help="Path to the changelog file (default: CHANGELOG.md)"
+    )
+
+    args = parser.parse_args()
+    changelog_path = Path(args.changelog_path)
+
+    if not changelog_path.exists():
+        sys.exit(f"Error: Changelog file not found at {changelog_path}")
+
+    try:
+        content = changelog_path.read_text(encoding="utf-8")
+        notes = extract_section(content, args.version)
+        print(notes)
+    except ValueError as e:
+        sys.exit(f"Error: {e}")
+    except Exception as e:
+        sys.exit(f"Unexpected error: {e}")
+
+
+if __name__ == "__main__":
+    main()
