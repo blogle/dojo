@@ -84,6 +84,7 @@ Do **not** stuff all rules into this file. When you start a task, decide which o
   - `docs/rules/fin_math.md` — Financial math conventions: simple vs log returns, annualization, volatility, portfolio math.
   - `docs/rules/engineering_guide.md` — DuckDB access, temporal tables, and transactional rules.
   - `docs/rules/frontend.md` — SPA structure, store usage, DOM + API patterns.
+  - `docs/rules/cypress.md` — Cypress E2E best practices for stability and maintainability.
   - `docs/rules/style_guide.md` — Visual/UX: minimalist earth tones, layout, typography.
 
 - **Language / Style (mostly enforced by lint/CI)**

@@ -14,20 +14,15 @@ All code and documentation contributions must adhere to the standards and princi
 - **[Python Style Guide](./docs/rules/python.md)**: Python best practices, naming, and style.
 - **[SQL Best Practices](./docs/rules/sql.md)**: Standards for writing and organizing SQL.
 - **[Financial Math Rulebook](./docs/rules/fin_math.md)**: Practices for financial calculations.
+- **[Cypress Best Practices](./docs/rules/cypress.md)**: Guidelines for writing stable and maintainable E2E tests.
 
 ### End-to-End Testing
 
-Our end-to-end (E2E) tests are critical for validating user workflows and preventing regressions. Please adhere to the following guidelines when contributing E2E tests:
-
--   **User-Story Driven**: Each test file in `cypress/e2e/user-stories/` corresponds to a canonical user story defined in `docs/plans/envelope-budget-e2e-mvp.md`.
--   **Atomic & Isolated**: Every test (`it` block) must be completely independent. The database is reset and seeded with a specific SQL fixture (from `tests/fixtures/`) in a `beforeEach()` hook to ensure a pristine and predictable state for each test.
--   **Page Objects**: Utilize Page Objects (located in `cypress/support/pages/`) to abstract UI interactions. Tests should describe *what* a user is doing, not *how* to interact with DOM elements.
--   **Resilient Selectors**: Prefer `data-testid` attributes for selecting UI elements over brittle CSS classes or DOM structure.
--   **Network Waiting**: Always wait for network responses when an action triggers a backend call using `cy.intercept().as('alias')` and `cy.wait('@alias')`.
+Our end-to-end (E2E) tests are critical for validating user workflows and preventing regressions. For detailed best practices on writing stable and maintainable E2E tests, including principles for atomicity, Page Objects, resilient selectors, and network waiting, please refer to the **[Cypress Best Practices Guide](./docs/rules/cypress.md)**.
 
 **Running E2E Tests**:
--   To run all E2E tests: `npx cypress run --e2e`
--   To open the Cypress test runner for interactive development: `npx cypress open --e2e --browser chrome --headed`
+-   To run all E2E tests: `run-tests --filter e2e`
+-   To open the Cypress test runner for interactive development: `npx cypress open --e2e --browser chrome`
 
 ## Pull Request Process
 
