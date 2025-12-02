@@ -124,8 +124,6 @@ def extract_unreleased(changelog: str) -> Tuple[int, int, str]:
     next_section = re.search(r'^## \[', changelog[start:], re.MULTILINE)
     end = start + next_section.start() if next_section else len(changelog)
     body = changelog[start:end]
-    if not body.strip():
-        raise SystemExit("step=changelog status=error reason=empty-unreleased")
     return start, end, body
 
 
