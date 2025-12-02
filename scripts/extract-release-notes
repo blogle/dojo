@@ -12,7 +12,7 @@ from pathlib import Path
 def extract_section(content: str, version: str) -> str:
     # Escape the version for regex in case it contains dots/brackets
     # We look for a line starting with "## [version]"
-    pattern = rf"^## \[ {re.escape(version)} \].*$"
+    pattern = rf"^## \[{re.escape(version)}\].*$"
     match = re.search(pattern, content, flags=re.MULTILINE)
     
     if not match:
@@ -20,7 +20,7 @@ def extract_section(content: str, version: str) -> str:
     
     start_index = match.start()
     # Find the start of the next section (## [...) or end of string
-    next_section = re.search(r"^## \[ ", content[match.end():], flags=re.MULTILINE)
+    next_section = re.search(r"^## \[", content[match.end():], flags=re.MULTILINE)
     
     if next_section:
         end_index = match.end() + next_section.start()
