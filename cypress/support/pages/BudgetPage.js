@@ -1,32 +1,38 @@
 class BudgetPage {
-	elements = {
-		readyToAssignValue: () => cy.get("#budgets-ready-value"),
-		activityValue: () => cy.get("#budgets-activity-value"),
-		availableValue: () => cy.get("#budgets-available-value"),
-		budgetsBody: () => cy.get("#budgets-body"),
+		elements = {
+			readyToAssignValue: () => cy.get("#budgets-ready-value"),
+			activityValue: () => cy.get("#budgets-activity-value"),
+			availableValue: () => cy.get("#budgets-available-value"),
+			budgetsBody: () => cy.get("#budgets-body"),
 
-		createGroupButton: () => cy.get("[data-open-group-modal]"),
-		groupNameInput: () => cy.getBySel("group-name-input"),
-		saveGroupButton: () => cy.getBySel("save-group-btn"),
+			reorderButton: () => cy.get("[data-budgets-reorder]"),
+			reorderSaveButton: () => cy.get("[data-budgets-reorder-save]"),
+			reorderCancelButton: () => cy.get("[data-budgets-reorder-cancel]"),
+			groupDragHandles: () => cy.get(".group-row__drag-handle"),
 
-		categoryGroupSelect: () => cy.getBySel("category-group-select"),
-		saveCategoryButton: () => cy.getBySel("save-category-btn"),
+			createGroupButton: () => cy.get("[data-open-group-modal]"),
+			groupNameInput: () => cy.getBySel("group-name-input"),
+			saveGroupButton: () => cy.getBySel("save-group-btn"),
 
-		addBudgetButton: () => cy.get("[data-open-category-modal]"),
-		categoryNameInput: () => cy.getBySel("category-name-input"),
-		goalTypeRecurringRadio: () => cy.getBySel("goal-type-recurring"),
-		goalTypeTargetDateRadio: () => cy.getBySel("goal-type-target-date"),
-		targetDateInput: () => cy.getBySel("target-date-input"),
-		targetAmountInput: () => cy.getBySel("target-amount-input"),
-		frequencySelect: () => cy.getBySel("frequency-select"),
-		recurringDateInput: () => cy.getBySel("recurring-date-input"),
-		recurringAmountInput: () => cy.getBySel("recurring-amount-input"),
+			categoryGroupSelect: () => cy.getBySel("category-group-select"),
+			saveCategoryButton: () => cy.getBySel("save-category-btn"),
 
-		budgetDetailModal: () => cy.get("#budget-detail-modal"),
-		budgetDetailQuickActions: () => cy.get("[data-quick-actions]"),
-		groupDetailModal: () => cy.get("#group-detail-modal"),
-		groupDetailQuickActions: () => cy.get("[data-group-quick-actions]"),
-	};
+			addBudgetButton: () => cy.get("[data-open-category-modal]"),
+			categoryNameInput: () => cy.getBySel("category-name-input"),
+			goalTypeRecurringRadio: () => cy.getBySel("goal-type-recurring"),
+			goalTypeTargetDateRadio: () => cy.getBySel("goal-type-target-date"),
+			targetDateInput: () => cy.getBySel("target-date-input"),
+			targetAmountInput: () => cy.getBySel("target-amount-input"),
+			frequencySelect: () => cy.getBySel("frequency-select"),
+			recurringDateInput: () => cy.getBySel("recurring-date-input"),
+			recurringAmountInput: () => cy.getBySel("recurring-amount-input"),
+
+			budgetDetailModal: () => cy.get("#budget-detail-modal"),
+			budgetDetailQuickActions: () => cy.get("[data-quick-actions]"),
+			groupDetailModal: () => cy.get("#group-detail-modal"),
+			groupDetailQuickActions: () => cy.get("[data-group-quick-actions]"),
+		};
+
 
 	visit() {
 		cy.visit("/#/budgets");
@@ -69,6 +75,60 @@ class BudgetPage {
 		return cy.contains('[data-testid="budget-group-row"]', name, {
 			timeout: 10000,
 		});
+	}
+
+	enterReorderMode() {
+		this.elements.reorderButton().click();
+		this.elements.reorderButton().should("be.disabled");
+		this.elements.reorderSaveButton().should("be.enabled");
+		this.elements.reorderCancelButton().should("be.enabled");
+		this.elements.groupDragHandles().should("exist");
+	}
+
+	dragGroup(sourceName, targetName) {
+		cy.window().then((win) => {
+			const dataTransfer = new win.DataTransfer();
+			this.groupRow(sourceName)
+				.trigger("dragstart", { dataTransfer, force: true })
+				.trigger("drag", { dataTransfer, force: true });
+			this.groupRow(targetName)
+				.trigger("dragover", { dataTransfer, force: true })
+				.trigger("drop", { dataTransfer, force: true });
+			this.groupRow(sourceName).trigger("dragend", { force: true });
+		});
+	}
+
+	saveReorder() {
+		this.elements.reorderSaveButton().click();
+	}
+
+	cancelReorder() {
+		this.elements.reorderCancelButton().click();
+	}
+
+	assertGroupOrder(names) {
+		const expectedIds = names.map((name) => this.getGroupIdFromName(name));
+		const ignoredIds = new Set(["credit_card_payments", "uncategorized"]);
+		cy.get('[data-testid="budget-group-row"]').should(($rows) => {
+			const ids = Array.from($rows)
+				.map((row) => row.dataset.groupId)
+				.filter((id) => !ignoredIds.has(id));
+			expect(ids.slice(0, expectedIds.length)).to.deep.equal(expectedIds);
+		});
+	}
+
+	assertGroupContainsCategories(groupName, categories) {
+		this.groupRow(groupName)
+			.nextUntil('[data-testid="budget-group-row"]')
+			.should("exist")
+			.then(($rows) => {
+				const labels = Array.from($rows).map((row) =>
+					row.querySelector('[data-testid="budget-col-name"]')?.innerText.trim(),
+				);
+				categories.forEach((category) => {
+					expect(labels).to.include(category);
+				});
+			});
 	}
 
 	verifyCategoryAmount(label, amount) {
