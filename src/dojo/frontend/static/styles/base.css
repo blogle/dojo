@@ -74,6 +74,14 @@ button {
 	color: var(--text);
 }
 
+.button--tertiary {
+	background: transparent;
+	color: var(--text);
+	border: none;
+	padding: 0.35rem 0.5rem;
+	box-shadow: none;
+}
+
 .button:hover:not(:disabled) {
 	background-color: var(--primary-hover);
 	color: var(--bg);
@@ -84,6 +92,14 @@ button {
 .button--secondary:hover:not(:disabled) {
 	background-color: var(--accent);
 	color: var(--text);
+}
+
+.button--tertiary:hover:not(:disabled) {
+	background: none;
+	color: var(--text);
+	text-decoration: underline;
+	box-shadow: none;
+	transform: none;
 }
 
 .button:disabled {

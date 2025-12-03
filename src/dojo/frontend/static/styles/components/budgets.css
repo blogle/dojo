@@ -101,3 +101,50 @@
 	flex-wrap: wrap;
 	gap: 0.5rem;
 }
+
+.budgets-page__reorder {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.budgets-page__reorder--inline {
+	justify-content: flex-end;
+	width: 100%;
+	margin: 0 0 0.75rem 0;
+}
+
+.budgets-page__reorder-editing {
+	display: none;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.budgets-page__reorder.is-editing [data-budgets-reorder] {
+	display: none;
+}
+
+.budgets-page__reorder.is-editing .budgets-page__reorder-editing {
+	display: flex;
+}
+
+.group-row.is-draggable {
+	cursor: grab;
+}
+
+.group-row.is-dragging {
+	opacity: 0.75;
+}
+
+.group-row__drag-handle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: 0.5rem;
+	color: var(--muted);
+}
+
+.group-row__drag-handle svg {
+	width: 1rem;
+	height: 1rem;
+}

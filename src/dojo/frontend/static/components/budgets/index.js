@@ -25,6 +25,16 @@ let refreshAccountsPage = async () => {};
 let refreshReferenceData = async () => {};
 let updateHeaderStats = () => {};
 
+const dragHandleIcon = `
+  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <path d="M8 1.5 10 3.5 9.2 4.3 8 3.1 6.8 4.3 6 3.5Z" />
+    <path d="M8 14.5 6 12.5 6.8 11.7 8 12.9 9.2 11.7 10 12.5Z" />
+    <path d="M4.25 6.25h7.5v1h-7.5zM4.25 8.75h7.5v1h-7.5zM4.25 11.25h7.5v1h-7.5z" />
+  </svg>
+`;
+
+let activeDragGroupId = null;
+
 const refreshReadyToAssign = (ready) => {
 	store.setState((prev) => ({ ...prev, readyToAssign: ready }));
 };
@@ -131,6 +141,174 @@ const firstOfNextMonthISO = () => {
 	return `${year}-${month}-${day}`;
 };
 
+const getNextGroupSortOrder = () => {
+	const state = store.getState();
+	const groups =
+		(state.budgets.reorderDraft && state.budgets.reorderDraft.length > 0
+			? state.budgets.reorderDraft
+			: state.budgets.groups) || [];
+	if (!groups.length) return 1;
+	const maxOrder = Math.max(
+		...groups.map((group) => (Number.isFinite(group.sort_order) ? group.sort_order : 0)),
+	);
+	return maxOrder + 1;
+};
+
+const reorderGroupsByIds = (groups = [], orderIds = []) => {
+	if (!orderIds || orderIds.length === 0) {
+		return [...groups];
+	}
+	const indexById = new Map(orderIds.map((id, index) => [id, index]));
+	return [...groups].sort((a, b) => {
+		const aIndex = indexById.has(a.group_id)
+			? indexById.get(a.group_id)
+			: orderIds.length + (a.sort_order ?? 0);
+		const bIndex = indexById.has(b.group_id)
+			? indexById.get(b.group_id)
+			: orderIds.length + (b.sort_order ?? 0);
+		if (aIndex === bIndex) {
+			return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+		}
+		return aIndex - bIndex;
+	});
+};
+
+const updateReorderControls = () => {
+	const reorderButton = document.querySelector(selectors.budgetsReorderButton);
+	const saveButton = document.querySelector(selectors.budgetsReorderSave);
+	const cancelButton = document.querySelector(selectors.budgetsReorderCancel);
+	const container = document.querySelector(".budgets-page__reorder");
+	const isReorderMode = store.getState().budgets.reorderMode;
+	if (container) {
+		container.classList.toggle("is-editing", isReorderMode);
+	}
+	if (reorderButton) {
+		reorderButton.disabled = isReorderMode;
+	}
+	if (saveButton) {
+		saveButton.disabled = !isReorderMode;
+	}
+	if (cancelButton) {
+		cancelButton.disabled = !isReorderMode;
+	}
+};
+
+const enterGroupReorderMode = () => {
+	const state = store.getState();
+	const orderIds =
+		(state.budgets.reorderDraft?.map((group) => group.group_id) ||
+			state.budgets.groups.map((group) => group.group_id)) ?? [];
+	const draft = reorderGroupsByIds(state.budgets.groups, orderIds);
+	store.setState((prev) => ({
+		...prev,
+		budgets: { ...prev.budgets, reorderMode: true, reorderDraft: draft },
+	}));
+	renderBudgetsPage();
+};
+
+const exitGroupReorderMode = () => {
+	store.setState((prev) => ({
+		...prev,
+		budgets: { ...prev.budgets, reorderMode: false, reorderDraft: [] },
+	}));
+	renderBudgetsPage();
+};
+
+const cancelGroupReorder = () => {
+	exitGroupReorderMode();
+	showToast("Reorder canceled");
+};
+
+const moveGroupInDraft = (sourceId, targetId) => {
+	const state = store.getState();
+	if (!state.budgets.reorderMode) return;
+	const draft =
+		(state.budgets.reorderDraft && state.budgets.reorderDraft.length > 0
+			? state.budgets.reorderDraft
+			: state.budgets.groups) || [];
+	const sourceIndex = draft.findIndex((group) => group.group_id === sourceId);
+	const targetIndex = draft.findIndex((group) => group.group_id === targetId);
+	if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+		return;
+	}
+	const updated = [...draft];
+	const [moved] = updated.splice(sourceIndex, 1);
+	updated.splice(targetIndex, 0, moved);
+	store.setState((prev) => ({
+		...prev,
+		budgets: { ...prev.budgets, reorderDraft: updated },
+	}));
+	renderBudgetsPage();
+};
+
+const handleGroupDragStart = (event) => {
+	const target = event.currentTarget;
+	activeDragGroupId = target?.dataset.groupId || null;
+	if (target) {
+		target.classList.add("is-dragging");
+	}
+	if (event.dataTransfer) {
+		event.dataTransfer.effectAllowed = "move";
+	}
+};
+
+const handleGroupDragOver = (event) => {
+	if (!store.getState().budgets.reorderMode) return;
+	event.preventDefault();
+	if (event.dataTransfer) {
+		event.dataTransfer.dropEffect = "move";
+	}
+};
+
+const handleGroupDrop = (event) => {
+	if (!store.getState().budgets.reorderMode) return;
+	event.preventDefault();
+	const targetId = event.currentTarget?.dataset.groupId;
+	if (!activeDragGroupId || !targetId || activeDragGroupId === targetId) {
+		return;
+	}
+	moveGroupInDraft(activeDragGroupId, targetId);
+	activeDragGroupId = null;
+};
+
+const handleGroupDragEnd = (event) => {
+	activeDragGroupId = null;
+	event.currentTarget?.classList.remove("is-dragging");
+};
+
+const persistGroupReorder = async () => {
+	const saveButton = document.querySelector(selectors.budgetsReorderSave);
+	const state = store.getState();
+	const draft =
+		(state.budgets.reorderDraft && state.budgets.reorderDraft.length > 0
+			? state.budgets.reorderDraft
+			: state.budgets.groups) || [];
+	if (!draft.length) {
+		exitGroupReorderMode();
+		return;
+	}
+	try {
+		setButtonBusy(saveButton, true);
+		const updates = draft.map((group, index) =>
+			api.budgets.updateGroup(group.group_id, {
+				name: group.name,
+				sort_order: index + 1,
+				is_active: group.is_active !== false,
+			}),
+		);
+		await Promise.all(updates);
+		exitGroupReorderMode();
+		await loadBudgetsData({ skipPendingCheck: true });
+		renderBudgetsPage();
+		showToast("Saved group order");
+	} catch (error) {
+		console.error(error);
+		alert(error.message || "Failed to save group order.");
+	} finally {
+		setButtonBusy(saveButton, false);
+	}
+};
+
 export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 	if (!skipPendingCheck) {
 		await waitForPendingAllocations();
@@ -173,13 +351,28 @@ export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 			0,
 		);
 		const monthDate = new Date(`${month}T00:00:00`);
+		const sortedGroups = (groups || []).sort((a, b) => a.sort_order - b.sort_order);
+		const previousState = store.getState();
+		const previousOrderIds =
+			previousState.budgets.reorderDraft?.map((group) => group.group_id) || [];
+		const isReorderMode = Boolean(previousState.budgets.reorderMode);
+		const reorderDraft = isReorderMode
+			? reorderGroupsByIds(
+					sortedGroups,
+					previousOrderIds.length > 0
+						? previousOrderIds
+						: sortedGroups.map((group) => group.group_id),
+				)
+			: [];
 		store.setState((prev) => ({
 			...prev,
 			budgets: {
 				...prev.budgets,
 				rawCategories: normalizedCategories,
 				categories: filtered,
-				groups: (groups || []).sort((a, b) => a.sort_order - b.sort_order),
+				groups: sortedGroups,
+				reorderMode: isReorderMode,
+				reorderDraft: isReorderMode ? reorderDraft : [],
 				collapsedGroups,
 				readyToAssignMinor: readyMinor,
 				activityMinor,
@@ -201,7 +394,10 @@ export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 	}
 };
 
-const renderGroupRows = (grouped, body) => {
+const renderGroupRows = (grouped, body, orderedGroups = []) => {
+	const state = store.getState();
+	const isReorderMode = state.budgets.reorderMode;
+
 	const renderGroup = (group) => {
 		if (
 			!group ||
@@ -209,16 +405,22 @@ const renderGroupRows = (grouped, body) => {
 		)
 			return;
 
-		const groupRow = document.createElement("tr");
 		const collapsed = isGroupCollapsed(group.group_id);
-		groupRow.className = "group-row";
-		groupRow.style.cursor = "pointer";
+		const isReorderable = isReorderMode && group.group_id !== "uncategorized";
+		const groupRow = document.createElement("tr");
+		groupRow.className = `group-row${isReorderable ? " is-draggable" : ""}`;
+		groupRow.style.cursor = isReorderable ? "grab" : "pointer";
 		groupRow.dataset.groupId = group.group_id;
 		groupRow.dataset.testid = "budget-group-row";
 		groupRow.dataset.collapsed = collapsed ? "true" : "false";
+		groupRow.draggable = isReorderable;
+		const dragHandle = isReorderable
+			? `<span class="group-row__drag-handle" aria-label="Drag to reorder ${group.name}">${dragHandleIcon}</span>`
+			: "";
 		groupRow.innerHTML = `
       <td colspan="4" class="group-cell">
         <div class="group-cell__content">
+          ${dragHandle}
           <span class="group-cell__label">${group.name}</span>
           <button
             type="button"
@@ -234,13 +436,20 @@ const renderGroupRows = (grouped, body) => {
     `;
 		body.appendChild(groupRow);
 
+		if (isReorderable) {
+			groupRow.addEventListener("dragstart", handleGroupDragStart);
+			groupRow.addEventListener("dragover", handleGroupDragOver);
+			groupRow.addEventListener("drop", handleGroupDrop);
+			groupRow.addEventListener("dragend", handleGroupDragEnd);
+		}
+
 		if (collapsed) {
 			return;
 		}
 
 		group.items.forEach((cat) => {
 			const row = document.createElement("tr");
-			row.style.cursor = "pointer";
+			row.style.cursor = isReorderMode ? "default" : "pointer";
 			row.dataset.categoryId = cat.category_id;
 			row.dataset.testid = "budget-category-row";
 
@@ -274,8 +483,7 @@ const renderGroupRows = (grouped, body) => {
 		});
 	};
 
-	const state = store.getState();
-	state.budgets.groups.forEach((g) => {
+	orderedGroups.forEach((g) => {
 		renderGroup(grouped[g.group_id]);
 	});
 	if (grouped.uncategorized.items.length > 0) {
@@ -306,8 +514,16 @@ export const renderBudgetsPage = () => {
 		return;
 	}
 
+	updateReorderControls();
+
+	const baseGroups = state.budgets.groups || [];
+	const orderedGroups =
+		state.budgets.reorderMode && state.budgets.reorderDraft?.length
+			? state.budgets.reorderDraft
+			: baseGroups;
+
 	const grouped = {};
-	state.budgets.groups.forEach((g) => {
+	baseGroups.forEach((g) => {
 		grouped[g.group_id] = { ...g, items: [] };
 	});
 	grouped.uncategorized = {
@@ -325,7 +541,7 @@ export const renderBudgetsPage = () => {
 	});
 
 	body.innerHTML = "";
-	renderGroupRows(grouped, body);
+	renderGroupRows(grouped, body, orderedGroups);
 
 	body.querySelectorAll("[data-toggle-group-id]").forEach((button) => {
 		button.addEventListener("click", (event) => {
@@ -335,43 +551,45 @@ export const renderBudgetsPage = () => {
 		});
 	});
 
-	body.querySelectorAll("tr[data-group-id]").forEach((row) => {
-		row.addEventListener("click", () => {
-			const gid = row.dataset.groupId;
-			if (gid === "uncategorized") {
-				openGroupDetailModal(grouped.uncategorized);
-			} else {
-				const group = grouped[gid];
-				if (group) openGroupDetailModal(group);
+	if (!state.budgets.reorderMode) {
+		body.querySelectorAll("tr[data-group-id]").forEach((row) => {
+			row.addEventListener("click", () => {
+				const gid = row.dataset.groupId;
+				if (gid === "uncategorized") {
+					openGroupDetailModal(grouped.uncategorized);
+				} else {
+					const group = grouped[gid];
+					if (group) openGroupDetailModal(group);
+				}
+			});
+			const editButton = row.querySelector("[data-edit-group-id]");
+			if (editButton) {
+				editButton.addEventListener("click", (event) => {
+					event.stopPropagation();
+					const gid = editButton.dataset.editGroupId;
+					const group = state.budgets.groups.find((g) => g.group_id === gid);
+					if (group) openGroupModal(group);
+				});
 			}
 		});
-		const editButton = row.querySelector("[data-edit-group-id]");
-		if (editButton) {
-			editButton.addEventListener("click", (event) => {
-				event.stopPropagation();
-				const gid = editButton.dataset.editGroupId;
-				const group = state.budgets.groups.find((g) => g.group_id === gid);
-				if (group) openGroupModal(group);
-			});
-		}
-	});
 
-	body.querySelectorAll("tr[data-category-id]").forEach((row) => {
-		row.addEventListener("click", () => {
-			const cid = row.dataset.categoryId;
-			const cat = state.budgets.categories.find((c) => c.category_id === cid);
-			if (cat) openBudgetDetailModal(cat);
-		});
-		const editButton = row.querySelector("[data-edit-category-id]");
-		if (editButton) {
-			editButton.addEventListener("click", (event) => {
-				event.stopPropagation();
-				const cid = editButton.dataset.editCategoryId;
+		body.querySelectorAll("tr[data-category-id]").forEach((row) => {
+			row.addEventListener("click", () => {
+				const cid = row.dataset.categoryId;
 				const cat = state.budgets.categories.find((c) => c.category_id === cid);
-				if (cat) openCategoryModal(cat);
+				if (cat) openBudgetDetailModal(cat);
 			});
-		}
-	});
+			const editButton = row.querySelector("[data-edit-category-id]");
+			if (editButton) {
+				editButton.addEventListener("click", (event) => {
+					event.stopPropagation();
+					const cid = editButton.dataset.editCategoryId;
+					const cat = state.budgets.categories.find((c) => c.category_id === cid);
+					if (cat) openCategoryModal(cat);
+				});
+			}
+		});
+	}
 };
 
 const handleQuickAllocation = async (
@@ -849,18 +1067,15 @@ const openGroupModal = (group = null) => {
 	setFormError(errorEl, "");
 
 	const nameInput = form.querySelector("input[name='name']");
-	const sortInput = form.querySelector("input[name='sort_order']");
 	const uncategorizedSelect = form.querySelector(selectors.groupUncategorizedSelect);
 	const uncategorizedHelper = form.querySelector(selectors.groupUncategorizedHelper);
 
 	if (group) {
 		title.textContent = "Edit Group";
 		nameInput.value = group.name;
-		sortInput.value = group.sort_order;
 	} else {
 		title.textContent = "Add Group";
 		nameInput.value = "";
-		sortInput.value = 0;
 	}
 
 	if (uncategorizedSelect) {
@@ -888,7 +1103,6 @@ const handleGroupFormSubmit = async (event) => {
 	const form = event.currentTarget;
 	const formData = new FormData(form);
 	const name = formData.get("name").trim();
-	const sortOrder = parseInt(formData.get("sort_order"), 10) || 0;
 	const errorEl = document.querySelector(selectors.groupError);
 	const submitButton = document.querySelector(selectors.groupSubmit);
 	const uncategorizedSelect = document.querySelector(
@@ -916,6 +1130,9 @@ const handleGroupFormSubmit = async (event) => {
 		const targetGroupId = isEditing
 			? pendingGroup.group_id
 			: slugifyCategoryName(name);
+		const sortOrder = isEditing
+			? pendingGroup.sort_order ?? 0
+			: getNextGroupSortOrder();
 
 		if (isEditing) {
 			await api.budgets.updateGroup(pendingGroup.group_id, {
@@ -1100,6 +1317,14 @@ export const initBudgets = ({
 
 	const openGroupButton = document.querySelector("[data-open-group-modal]");
 	openGroupButton?.addEventListener("click", () => openGroupModal());
+
+	const reorderButton = document.querySelector(selectors.budgetsReorderButton);
+	reorderButton?.addEventListener("click", () => enterGroupReorderMode());
+	const reorderSaveButton = document.querySelector(selectors.budgetsReorderSave);
+	reorderSaveButton?.addEventListener("click", () => persistGroupReorder());
+	const reorderCancelButton = document.querySelector(selectors.budgetsReorderCancel);
+	reorderCancelButton?.addEventListener("click", () => cancelGroupReorder());
+	updateReorderControls();
 
 	initBudgetDetailModal();
 	initGroupDetailModal();

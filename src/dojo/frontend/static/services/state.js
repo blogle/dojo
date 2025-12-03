@@ -17,6 +17,8 @@ export const createInitialState = () => ({
 		categories: [],
 		rawCategories: [],
 		groups: [],
+		reorderMode: false,
+		reorderDraft: [],
 		readyToAssignMinor: 0,
 		activityMinor: 0,
 		availableMinor: 0,

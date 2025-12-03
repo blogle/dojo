@@ -316,6 +316,13 @@
               <strong id="budgets-month-label">—</strong>
             </article>
           </div>
+          <div class="budgets-page__reorder budgets-page__reorder--inline">
+            <button type="button" class="button button--tertiary" data-budgets-reorder data-testid="reorder-groups-btn">Reorder</button>
+            <div class="budgets-page__reorder-editing" aria-live="polite">
+              <button type="button" class="button button--tertiary" data-budgets-reorder-save data-testid="save-group-order-btn">Save</button>
+              <button type="button" class="button button--tertiary" data-budgets-reorder-cancel>Cancel</button>
+            </div>
+          </div>
           <div class="ledger-card ledger-card--budgets">
             <table class="ledger-table ledger-table--budgets">
               <thead>
@@ -490,10 +497,6 @@
           <label>
             Group Name
             <input type="text" name="name" required data-testid="group-name-input" />
-          </label>
-          <label>
-            Sort Order
-            <input type="number" name="sort_order" value="0" required />
           </label>
           <label data-group-uncategorized-field>
             Assign uncategorized budgets
