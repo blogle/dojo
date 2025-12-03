@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Collapsible budget groups with stable table layout and bulk category assignment from the group modal.
+
+### Changed
+- Default recurring budget due dates to the start of the next month.
+- Documented Kubernetes consumption patterns and extracted release-note tooling into a reusable CLI.
+
+### Fixed
+- Hardened DuckDB migrations against DDL serialization races and centralized backup logic for Kubernetes deploys.
+- CI reliability: in-cluster watcher pattern, clearer image build paths, and more robust run-tests artifact collection.
+- Cypress stability: enforced Anti-Flake network rules, stabilized specs, and refreshed testing docs.
+
+### Breaking
+- None.
+
 ## [v0.1.1] - 2025-12-01
 
 ### Added
