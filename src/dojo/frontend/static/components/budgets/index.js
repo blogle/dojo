@@ -46,6 +46,15 @@ const toggleGroupCollapsed = (groupId) => {
 	renderBudgetsPage();
 };
 
+const firstOfNextMonthISO = () => {
+	const today = new Date();
+	const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+	const year = nextMonth.getFullYear();
+	const month = `${nextMonth.getMonth() + 1}`.padStart(2, "0");
+	const day = `${nextMonth.getDate()}`.padStart(2, "0");
+	return `${year}-${month}-${day}`;
+};
+
 export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 	if (!skipPendingCheck) {
 		await waitForPendingAllocations();
@@ -606,7 +615,7 @@ const openCategoryModal = (category = null) => {
 	form.querySelector("input[name='target_date_dt']").value = "";
 	form.querySelector("input[name='target_amount']").value = "";
 	form.querySelector("select[name='frequency']").value = "monthly";
-	form.querySelector("input[name='recurring_date_dt']").value = "";
+	form.querySelector("input[name='recurring_date_dt']").value = firstOfNextMonthISO();
 	form.querySelector("input[name='recurring_amount']").value = "";
 
 	if (category) {
