@@ -22,7 +22,7 @@
 	background: var(--surface);
 	color: var(--text);
 	font-family: var(--font-mono);
-	text-transform: uppercase;
+	text-transform: none;
 	padding: 0.5rem 0.75rem;
 }
 

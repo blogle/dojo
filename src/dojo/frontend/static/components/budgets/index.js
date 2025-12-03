@@ -535,7 +535,7 @@ export const renderBudgetsPage = () => {
 	state.budgets.categories.forEach((cat) => {
 		const gid = cat.group_id || "uncategorized";
 		if (!grouped[gid]) {
-			grouped[gid] = { group_id: gid, name: "Unknown Group", items: [] };
+			grouped[gid] = { group_id: gid, name: "Unknown group", items: [] };
 		}
 		grouped[gid].items.push(cat);
 	});
@@ -706,7 +706,7 @@ const openBudgetDetailModal = (category) => {
 			category.goal_amount_minor - category.available_minor,
 		);
 		if (needed > 0) {
-			createBtn("Fund Goal", needed, "Fund Goal");
+			createBtn("Fund goal", needed, "Fund goal");
 		} else {
 			const p = document.createElement("p");
 			p.className = "u-muted u-small-note";
@@ -722,15 +722,15 @@ const openBudgetDetailModal = (category) => {
 
 	if (category.last_month_allocated_minor > 0) {
 		createBtn(
-			"Budgeted Last Month",
+			"Budgeted last month",
 			category.last_month_allocated_minor,
-			"Budgeted Last Month",
+			"Budgeted last month",
 		);
 	}
 
 	const spentLastMonth = -1 * category.last_month_activity_minor;
 	if (spentLastMonth > 0) {
-		createBtn("Spent Last Month", spentLastMonth, "Spent Last Month");
+		createBtn("Spent last month", spentLastMonth, "Spent last month");
 	}
 
 	const editBtn = document.querySelector(selectors.budgetDetailEdit);
@@ -798,7 +798,7 @@ const openGroupDetailModal = (group) => {
 				fundAllocations.push({
 					category_id: cat.category_id,
 					amount_minor: needed,
-					memo: "Group quick allocation - Fund Goal",
+					memo: "Group quick allocation - Fund goal",
 				});
 			}
 		}
@@ -807,7 +807,7 @@ const openGroupDetailModal = (group) => {
 			budgetedAllocations.push({
 				category_id: cat.category_id,
 				amount_minor: cat.last_month_allocated_minor,
-				memo: "Group quick allocation - Budgeted Last Month",
+				memo: "Group quick allocation - Budgeted last month",
 			});
 		}
 
@@ -816,7 +816,7 @@ const openGroupDetailModal = (group) => {
 			spentAllocations.push({
 				category_id: cat.category_id,
 				amount_minor: spentLastMonth,
-				memo: "Group quick allocation - Spent Last Month",
+				memo: "Group quick allocation - Spent last month",
 			});
 		}
 	});
@@ -839,12 +839,12 @@ const openGroupDetailModal = (group) => {
 
 	let renderedAction = false;
 	renderedAction =
-		renderGroupAction("Fund Underfunded", fundAllocations) || renderedAction;
+		renderGroupAction("Fund underfunded", fundAllocations) || renderedAction;
 	renderedAction =
-		renderGroupAction("Budgeted Last Month", budgetedAllocations) ||
+		renderGroupAction("Budgeted last month", budgetedAllocations) ||
 		renderedAction;
 	renderedAction =
-		renderGroupAction("Spent Last Month", spentAllocations) || renderedAction;
+		renderGroupAction("Spent last month", spentAllocations) || renderedAction;
 
 	if (!renderedAction) {
 		const p = document.createElement("p");
@@ -1071,10 +1071,10 @@ const openGroupModal = (group = null) => {
 	const uncategorizedHelper = form.querySelector(selectors.groupUncategorizedHelper);
 
 	if (group) {
-		title.textContent = "Edit Group";
+		title.textContent = "Edit group";
 		nameInput.value = group.name;
 	} else {
-		title.textContent = "Add Group";
+		title.textContent = "Add group";
 		nameInput.value = "";
 	}
 

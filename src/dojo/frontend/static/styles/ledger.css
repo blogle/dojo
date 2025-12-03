@@ -20,7 +20,7 @@
 .ledger-table th {
 	font-family: var(--font-mono);
 	font-weight: 600;
-	text-transform: uppercase;
+	text-transform: none;
 }
 
 .ledger-table tbody tr:last-child td {

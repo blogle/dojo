@@ -122,7 +122,7 @@ button {
 	font-family: var(--font-mono);
 	font-size: 0.875rem;
 	color: var(--muted);
-	text-transform: uppercase;
+	text-transform: none;
 }
 
 .stat-card__value {
@@ -152,13 +152,13 @@ button {
 .summary-chip__label {
 	font-family: var(--font-mono);
 	font-size: 0.8rem;
-	text-transform: uppercase;
+	text-transform: none;
 	color: var(--muted);
 }
 
 .page-label {
 	font-family: var(--font-mono);
 	font-size: 1rem;
-	text-transform: uppercase;
+	text-transform: none;
 	letter-spacing: 0.1em;
 }
