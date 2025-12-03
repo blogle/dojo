@@ -38,17 +38,20 @@
 
       <main class="app-shell__content" id="page-container">
         <section class="route-page route-page--active transactions-page" id="transactions-page" data-route="transactions">
-          <header class="transactions-page__stats">
-            <article class="stat-card">
-              <span class="stat-card__label">Spent This Month</span>
-              <span id="month-spend" class="stat-card__value">$0.00</span>
-              <p class="u-muted u-small-note">Month-to-date spending from posted ledger activity.</p>
-            </article>
-            <article class="stat-card">
-              <span class="stat-card__label">Budgeted This Month</span>
-              <span id="month-budgeted" class="stat-card__value">$0.00</span>
-              <p class="u-muted u-small-note">Allocations applied to envelopes this month.</p>
-            </article>
+          <header class="transactions-page__header">
+            <p class="page-label">Transactions</p>
+            <div class="transactions-page__stats">
+              <article class="stat-card">
+                <span class="stat-card__label">Spent This Month</span>
+                <span id="month-spend" class="stat-card__value">$0.00</span>
+                <p class="u-muted u-small-note">Month-to-date spending from posted ledger activity.</p>
+              </article>
+              <article class="stat-card">
+                <span class="stat-card__label">Budgeted This Month</span>
+                <span id="month-budgeted" class="stat-card__value">$0.00</span>
+                <p class="u-muted u-small-note">Allocations applied to envelopes this month.</p>
+              </article>
+            </div>
           </header>
 
           <section class="form-panel transactions-page__form">
