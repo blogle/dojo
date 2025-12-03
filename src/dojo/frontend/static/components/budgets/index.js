@@ -29,6 +29,23 @@ const refreshReadyToAssign = (ready) => {
 	store.setState((prev) => ({ ...prev, readyToAssign: ready }));
 };
 
+const isGroupCollapsed = (groupId) => {
+	const collapsed = store.getState().budgets.collapsedGroups || {};
+	return Boolean(collapsed[groupId]);
+};
+
+const toggleGroupCollapsed = (groupId) => {
+	store.setState((prev) => {
+		const nextCollapsed = { ...(prev.budgets.collapsedGroups || {}) };
+		nextCollapsed[groupId] = !nextCollapsed[groupId];
+		return {
+			...prev,
+			budgets: { ...prev.budgets, collapsedGroups: nextCollapsed },
+		};
+	});
+	renderBudgetsPage();
+};
+
 export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 	if (!skipPendingCheck) {
 		await waitForPendingAllocations();
@@ -40,6 +57,16 @@ export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 			api.budgets.groups(),
 			api.readyToAssign.current(month),
 		]);
+		const collapsedGroups = {};
+		const existingCollapsed =
+			store.getState().budgets.collapsedGroups || Object.create(null);
+		const validGroupIds = new Set([
+			...(groups || []).map((group) => group.group_id),
+			"uncategorized",
+		]);
+		validGroupIds.forEach((gid) => {
+			collapsedGroups[gid] = existingCollapsed[gid] ?? false;
+		});
 		const normalizedCategories = (categories || []).map((category) => ({
 			...category,
 			available_minor: category.available_minor ?? 0,
@@ -68,6 +95,7 @@ export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 				rawCategories: normalizedCategories,
 				categories: filtered,
 				groups: (groups || []).sort((a, b) => a.sort_order - b.sort_order),
+				collapsedGroups,
 				readyToAssignMinor: readyMinor,
 				activityMinor,
 				availableMinor,
@@ -97,18 +125,33 @@ const renderGroupRows = (grouped, body) => {
 			return;
 
 		const groupRow = document.createElement("tr");
+		const collapsed = isGroupCollapsed(group.group_id);
 		groupRow.className = "group-row";
 		groupRow.style.cursor = "pointer";
 		groupRow.dataset.groupId = group.group_id;
 		groupRow.dataset.testid = "budget-group-row";
+		groupRow.dataset.collapsed = collapsed ? "true" : "false";
 		groupRow.innerHTML = `
       <td colspan="4" class="group-cell">
         <div class="group-cell__content">
-          <span>${group.name}</span>
+          <span class="group-cell__label">${group.name}</span>
+          <button
+            type="button"
+            class="group-toggle"
+            data-toggle-group-id="${group.group_id}"
+            aria-expanded="${!collapsed}"
+            aria-label="${collapsed ? "Expand" : "Collapse"} ${group.name} categories"
+          >
+            <span class="group-toggle__icon" aria-hidden="true">▾</span>
+          </button>
         </div>
       </td>
     `;
 		body.appendChild(groupRow);
+
+		if (collapsed) {
+			return;
+		}
 
 		group.items.forEach((cat) => {
 			const row = document.createElement("tr");
@@ -198,6 +241,14 @@ export const renderBudgetsPage = () => {
 
 	body.innerHTML = "";
 	renderGroupRows(grouped, body);
+
+	body.querySelectorAll("[data-toggle-group-id]").forEach((button) => {
+		button.addEventListener("click", (event) => {
+			event.stopPropagation();
+			const gid = button.dataset.toggleGroupId;
+			if (gid) toggleGroupCollapsed(gid);
+		});
+	});
 
 	body.querySelectorAll("tr[data-group-id]").forEach((row) => {
 		row.addEventListener("click", () => {

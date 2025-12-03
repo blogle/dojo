@@ -18,6 +18,20 @@
 	margin-bottom: 1.5rem;
 }
 
+.ledger-table--budgets {
+	table-layout: fixed;
+}
+
+.ledger-table--budgets th:first-child,
+.ledger-table--budgets td:first-child {
+	width: 46%;
+}
+
+.ledger-table--budgets th:nth-child(n + 2),
+.ledger-table--budgets td:nth-child(n + 2) {
+	width: 18%;
+}
+
 .group-row .group-cell {
 	background-color: var(--stone-50);
 	font-weight: 600;
@@ -27,6 +41,33 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	gap: 0.5rem;
+}
+
+.group-cell__label {
+	flex: 1;
+	font-weight: 600;
+}
+
+.group-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	border: none;
+	background: none;
+	cursor: pointer;
+	padding: 0.25rem;
+	color: inherit;
+}
+
+.group-toggle__icon {
+	display: inline-block;
+	transition: transform 0.2s ease;
+}
+
+.group-toggle[aria-expanded="false"] .group-toggle__icon {
+	transform: rotate(-90deg);
 }
 
 .category-row {

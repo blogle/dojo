@@ -23,6 +23,7 @@ export const createInitialState = () => ({
 		allocatedMinor: 0,
 		monthLabel: "",
 		monthStartISO: null,
+		collapsedGroups: {},
 	},
 	allocations: {
 		entries: [],
