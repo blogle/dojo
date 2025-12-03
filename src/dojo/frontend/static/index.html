@@ -494,6 +494,13 @@
             Sort Order
             <input type="number" name="sort_order" value="0" required />
           </label>
+          <label data-group-uncategorized-field>
+            Assign uncategorized budgets
+            <select multiple size="6" data-group-uncategorized data-testid="uncategorized-category-select">
+              <option value="" disabled>No uncategorized budgets</option>
+            </select>
+            <p class="form-panel__helper" data-group-uncategorized-helper>Select uncategorized budgets to move into this group.</p>
+          </label>
           <p class="form-panel__error" data-group-error aria-live="polite"></p>
           <div class="form-panel__actions">
             <button type="submit" class="button button--primary" data-group-submit data-testid="save-group-btn">Save group</button>

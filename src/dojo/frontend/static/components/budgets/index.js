@@ -46,6 +46,82 @@ const toggleGroupCollapsed = (groupId) => {
 	renderBudgetsPage();
 };
 
+const getUncategorizedBudgetCategories = () => {
+	const state = store.getState();
+	const categories = filterUserFacingCategories(state.budgets.rawCategories || []);
+	return categories
+		.filter((category) => !category.group_id)
+		.sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const getGroupBudgetCategories = (groupId) => {
+	if (!groupId) return [];
+	const state = store.getState();
+	const categories = filterUserFacingCategories(state.budgets.rawCategories || []);
+	return categories
+		.filter((category) => category.group_id === groupId)
+		.sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const buildCategoryUpdatePayload = (category, targetGroupId) => ({
+	name: category.name,
+	group_id: targetGroupId,
+	is_active: category.is_active !== false,
+	goal_type: category.goal_type || null,
+	goal_amount_minor: category.goal_amount_minor ?? null,
+	goal_target_date: category.goal_target_date || null,
+	goal_frequency: category.goal_frequency || null,
+});
+
+const formatCategoryOptionLabel = (label, isSelected) => `${isSelected ? "[x]" : "[ ]"} ${label}`;
+
+const refreshSelectOptionIndicators = (selectEl) => {
+	if (!selectEl) return;
+	Array.from(selectEl.options || []).forEach((option) => {
+		const baseLabel = option.dataset.baseLabel || option.textContent || "";
+		option.textContent = formatCategoryOptionLabel(
+			baseLabel.replace(/^\[(x| )\]\s+/, ""),
+			option.selected,
+		);
+	});
+};
+
+const populateGroupCategorySelect = (selectEl, helperEl, groupId) => {
+	if (!selectEl) {
+		return;
+	}
+	const uncategorized = getUncategorizedBudgetCategories();
+	const inGroup = getGroupBudgetCategories(groupId);
+	const combined = [...inGroup, ...uncategorized];
+	selectEl.innerHTML = "";
+	if (combined.length === 0) {
+		const option = document.createElement("option");
+		option.value = "";
+		option.textContent = "No uncategorized budgets";
+		option.disabled = true;
+		option.selected = true;
+		selectEl.appendChild(option);
+		selectEl.disabled = true;
+		if (helperEl) {
+			helperEl.textContent = "All budgets already belong to a group.";
+		}
+		return;
+	}
+	selectEl.disabled = false;
+	combined.forEach((category) => {
+		const option = document.createElement("option");
+		option.value = category.category_id;
+		option.selected = category.group_id === groupId;
+		option.dataset.baseLabel = category.name;
+		option.textContent = formatCategoryOptionLabel(category.name, option.selected);
+		selectEl.appendChild(option);
+	});
+	if (helperEl) {
+		helperEl.textContent =
+			"Toggle budgets to include them in this group. Untoggle to move back to Uncategorized.";
+	}
+};
+
 const firstOfNextMonthISO = () => {
 	const today = new Date();
 	const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
@@ -774,6 +850,8 @@ const openGroupModal = (group = null) => {
 
 	const nameInput = form.querySelector("input[name='name']");
 	const sortInput = form.querySelector("input[name='sort_order']");
+	const uncategorizedSelect = form.querySelector(selectors.groupUncategorizedSelect);
+	const uncategorizedHelper = form.querySelector(selectors.groupUncategorizedHelper);
 
 	if (group) {
 		title.textContent = "Edit Group";
@@ -783,6 +861,11 @@ const openGroupModal = (group = null) => {
 		title.textContent = "Add Group";
 		nameInput.value = "";
 		sortInput.value = 0;
+	}
+
+	if (uncategorizedSelect) {
+		populateGroupCategorySelect(uncategorizedSelect, uncategorizedHelper, group?.group_id || null);
+		refreshSelectOptionIndicators(uncategorizedSelect);
 	}
 
 	modal.classList.add("is-visible");
@@ -808,31 +891,107 @@ const handleGroupFormSubmit = async (event) => {
 	const sortOrder = parseInt(formData.get("sort_order"), 10) || 0;
 	const errorEl = document.querySelector(selectors.groupError);
 	const submitButton = document.querySelector(selectors.groupSubmit);
+	const uncategorizedSelect = document.querySelector(
+		selectors.groupUncategorizedSelect,
+	);
 
 	if (!name) {
 		setFormError(errorEl, "Name is required.");
 		return;
 	}
 
+	const selectedCategoryIds =
+		uncategorizedSelect && !uncategorizedSelect.disabled
+			? Array.from(uncategorizedSelect.selectedOptions || [])
+					.map((option) => option.value)
+					.filter(Boolean)
+			: [];
+
 	try {
 		setButtonBusy(submitButton, true);
 		setFormError(errorEl, "");
-		const isEditing = Boolean(store.getState().pendingGroupEdit);
+		const state = store.getState();
+		const pendingGroup = state.pendingGroupEdit;
+		const isEditing = Boolean(pendingGroup);
+		const targetGroupId = isEditing
+			? pendingGroup.group_id
+			: slugifyCategoryName(name);
 
 		if (isEditing) {
-			await api.budgets.updateGroup(
-				store.getState().pendingGroupEdit.group_id,
-				{ name, sort_order: sortOrder, is_active: true },
-			);
+			await api.budgets.updateGroup(pendingGroup.group_id, {
+				name,
+				sort_order: sortOrder,
+				is_active: true,
+			});
 		} else {
-			const groupId = slugifyCategoryName(name);
 			await api.budgets.createGroup({
-				group_id: groupId,
+				group_id: targetGroupId,
 				name,
 				sort_order: sortOrder,
 				is_active: true,
 			});
 		}
+
+		const categoriesById = new Map(
+			(state.budgets.rawCategories || []).map((category) => [
+				category.category_id,
+				category,
+			]),
+		);
+		const currentGroupCategoryIds = new Set(
+			(state.budgets.rawCategories || [])
+				.filter((category) => category.group_id === targetGroupId)
+				.map((category) => category.category_id),
+		);
+
+		const toAdd = selectedCategoryIds.filter(
+			(categoryId) => !currentGroupCategoryIds.has(categoryId),
+		);
+		const toRemove = Array.from(currentGroupCategoryIds).filter(
+			(categoryId) => !selectedCategoryIds.includes(categoryId),
+		);
+
+		const updates = [];
+		toAdd.forEach((categoryId) => {
+			const category = categoriesById.get(categoryId);
+			if (!category) {
+				updates.push(
+					Promise.reject(
+						new Error(`Category ${categoryId} is no longer available to assign.`),
+					),
+				);
+				return;
+			}
+			updates.push(
+				api.budgets.updateCategory(
+					categoryId,
+					buildCategoryUpdatePayload(category, targetGroupId),
+				),
+			);
+		});
+
+		toRemove.forEach((categoryId) => {
+			const category = categoriesById.get(categoryId);
+			if (!category) {
+				updates.push(
+					Promise.reject(
+						new Error(`Category ${categoryId} is no longer available to move.`),
+					),
+				);
+				return;
+			}
+			updates.push(
+				api.budgets.updateCategory(
+					categoryId,
+					buildCategoryUpdatePayload(category, null),
+				),
+			);
+		});
+
+		if (updates.length > 0) {
+			await Promise.all(updates);
+		}
+
 		closeGroupModal();
 		await loadBudgetsData();
 		renderBudgetsPage();
@@ -916,6 +1075,10 @@ const initGroupModal = () => {
 	closeButton?.addEventListener("click", () => closeGroupModal());
 	modal.addEventListener("click", (event) => {
 		if (event.target === modal) closeGroupModal();
+	});
+	const uncategorizedSelect = document.querySelector(selectors.groupUncategorizedSelect);
+	uncategorizedSelect?.addEventListener("change", () => {
+		refreshSelectOptionIndicators(uncategorizedSelect);
 	});
 };
 
