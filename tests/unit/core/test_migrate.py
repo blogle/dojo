@@ -1,4 +1,3 @@
-import pytest
 
 from dojo.core import migrate
 
@@ -7,12 +6,12 @@ class RecordingConn:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def execute(self, statement: str, params=None):  # noqa: ANN001
+    def execute(self, statement: str, params=None) -> None:  # noqa: ANN001
         self.calls.append(statement)
         return None
 
 
-def test_execute_statements_splits_dml_and_index_transactions():
+def test_execute_statements_splits_dml_and_index_transactions() -> None:
     conn = RecordingConn()
     statements = [
         "INSERT INTO t VALUES (1)",
@@ -37,7 +36,7 @@ def test_execute_statements_splits_dml_and_index_transactions():
     ]
 
 
-def test_execute_statements_dry_run_no_ops():
+def test_execute_statements_dry_run_no_ops() -> None:
     conn = RecordingConn()
     migrate._execute_statements(conn, "001_test.sql", ["CREATE TABLE t(x INT)"], dry_run=True)  # type: ignore[attr-defined]
     assert conn.calls == []

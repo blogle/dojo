@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           nix build .#docker
-          DERIVATION=$(nix path-info -S result | cut -d' ' -f1)
+          DERIVATION=$(nix path-info -S ./result | cut -d' ' -f1)
           echo "step=build status=ok derivation=${DERIVATION}"
 
       - name: Log in to GHCR

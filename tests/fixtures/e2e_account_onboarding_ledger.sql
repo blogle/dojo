@@ -3,8 +3,9 @@
 
 INSERT INTO budget_categories (category_id, name, is_active, is_system)
 VALUES
-    ('opening_balance', 'Opening Balance', TRUE, TRUE)
+('opening_balance', 'Opening Balance', TRUE, TRUE)
 ON CONFLICT (category_id) DO UPDATE
-    SET name = EXCLUDED.name,
-        is_active = EXCLUDED.is_active,
-        is_system = EXCLUDED.is_system;
+    SET
+        name = excluded.name,
+        is_active = excluded.is_active,
+        is_system = excluded.is_system;

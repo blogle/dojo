@@ -22,7 +22,7 @@ INSERT INTO budget_allocations (
     $amount_minor,
     $memo,
     TRUE,
-    CURRENT_TIMESTAMP,
-    CAST('9999-12-31 00:00:00' AS TIMESTAMP),
-    CURRENT_TIMESTAMP
+    current_timestamp,
+    cast('9999-12-31 00:00:00' AS TIMESTAMP),
+    current_timestamp
 );

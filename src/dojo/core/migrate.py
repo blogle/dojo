@@ -5,7 +5,7 @@ import logging
 import re
 import shutil
 import time
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Sequence
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -110,7 +110,7 @@ def _run_with_retry(action: Callable[[], None], *, context: str, attempts: int =
         try:
             action()
             return
-        except Exception as exc:  # noqa: BLE001 -- propagate non-transient errors after retries
+        except Exception as exc:
             if not _is_transient_error(exc) or attempt == attempts:
                 raise
             logger.warning("retrying file=%s attempt=%d/%d error=%s", context, attempt, attempts, exc)

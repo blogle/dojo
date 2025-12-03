@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     run_startup_migrations: bool = Field(
         default=False,
         description=(
-            "Whether the app applies migrations on startup; keep true for dev/test, false for prod when a preflight runs."
+            "Whether the app applies migrations on startup. "
+            "Keep true for dev/test, false for prod when a preflight runs."
         ),
     )
 

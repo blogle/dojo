@@ -1,17 +1,17 @@
 .toast-stack {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  z-index: 100;
+	position: fixed;
+	top: 1rem;
+	right: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	z-index: 100;
 }
 
 .toast {
-  background: var(--surface);
-  border: var(--border-thick);
-  padding: 0.75rem 1rem;
-  box-shadow: var(--shadow-hard);
-  font-family: var(--font-mono);
+	background: var(--surface);
+	border: var(--border-thick);
+	padding: 0.75rem 1rem;
+	box-shadow: var(--shadow-hard);
+	font-family: var(--font-mono);
 }

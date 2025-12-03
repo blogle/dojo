@@ -2,7 +2,9 @@
 -- Sets up an account with initial Ready-to-Assign and a Netflix category with historical allocations.
 
 -- Insert a test account with initial Ready-to-Assign ($200.00)
-INSERT INTO accounts (account_id, name, account_type, current_balance_minor, currency, is_active, account_class, account_role)
+INSERT INTO accounts (
+    account_id, name, account_type, current_balance_minor, currency, is_active, account_class, account_role
+)
 VALUES ('acc-1', 'Checking', 'asset', 20000, 'USD', TRUE, 'cash', 'on_budget');
 
 -- Insert Netflix budget category

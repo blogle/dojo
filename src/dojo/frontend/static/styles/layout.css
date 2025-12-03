@@ -1,77 +1,77 @@
 .app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+	max-width: 1400px;
+	margin: 0 auto;
+	padding: 0 2rem;
 }
 
 .app-header {
-  display: flex;
-  align-items: center;
-  padding: 1.5rem 0;
-  border-bottom: var(--border-thick);
+	display: flex;
+	align-items: center;
+	padding: 1.5rem 0;
+	border-bottom: var(--border-thick);
 }
 
 .app-header__logo {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 1.5rem;
+	font-family: var(--font-mono);
+	font-weight: 700;
+	font-size: 1.5rem;
 }
 
 .app-header__nav {
-  margin-left: auto;
-  display: flex;
-  gap: 1.5rem;
+	margin-left: auto;
+	display: flex;
+	gap: 1.5rem;
 }
 
 .app-header__link {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--muted);
-  transition: color 0.2s ease-in-out;
+	font-family: var(--font-mono);
+	font-size: 1rem;
+	font-weight: 500;
+	color: var(--muted);
+	transition: color 0.2s ease-in-out;
 }
 
 .app-header__link:hover,
 .app-header__link--active {
-  color: var(--text);
+	color: var(--text);
 }
 
 .app-shell__content {
-  flex-grow: 1;
-  padding: 2rem 0;
+	flex-grow: 1;
+	padding: 2rem 0;
 }
 
 .route-page {
-  display: none;
+	display: none;
 }
 
 .route-page--active {
-  display: block;
+	display: block;
 }
 
 .ledger-card {
-  width: 100%;
-  border: var(--border-thick);
-  background-color: var(--surface);
-  overflow-x: auto;
+	width: 100%;
+	border: var(--border-thick);
+	background-color: var(--surface);
+	overflow-x: auto;
 }
 
 @media (max-width: 768px) {
-  .app-shell {
-    padding: 0 1rem;
-  }
+	.app-shell {
+		padding: 0 1rem;
+	}
 
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
+	.app-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1rem;
+	}
 
-  .app-header__nav {
-    width: 100%;
-    justify-content: space-between;
-  }
+	.app-header__nav {
+		width: 100%;
+		justify-content: space-between;
+	}
 }

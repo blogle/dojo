@@ -6,9 +6,9 @@ database migration, service instantiation, and router registration,
 ensuring explicit dependency management.
 """
 
+import logging
 from importlib import resources
 from pathlib import Path
-import logging
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
