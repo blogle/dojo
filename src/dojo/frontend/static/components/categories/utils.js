@@ -11,51 +11,89 @@ export const filterUserFacingCategories = (categories = []) =>
 
 export const getCategoryOptions = ({ includeSystem = false } = {}) => {
 	const state = store.getState();
-	const merged = new Map();
-	const reference = Array.isArray(state.reference.categories)
+	const referenceCategories = Array.isArray(state.reference.categories)
 		? state.reference.categories
 		: [];
-	const budgeted = Array.isArray(state.budgets.rawCategories)
+	const budgetCategories = Array.isArray(state.budgets.rawCategories)
 		? state.budgets.rawCategories
 		: [];
-	reference.forEach((category) => {
-		if (!category || !category.category_id) {
-			return;
-		}
-		merged.set(category.category_id, category);
-	});
-	budgeted.forEach((category) => {
-		if (!category || !category.category_id) {
-			return;
-		}
-		const existing = merged.get(category.category_id) || {};
-		merged.set(category.category_id, { ...existing, ...category });
-	});
-	return Array.from(merged.values())
-		.filter((category) => {
-			if (!category) {
-				return false;
-			}
-			const isSystem = systemCategoryIds.has(category.category_id);
-			if (isSystem) {
-				return includeSystem;
-			}
-			return category.is_active !== false;
-		})
-		.map((category) => {
-			if (!category) {
-				return category;
-			}
-			if (systemCategoryIds.has(category.category_id)) {
-				const label =
-					SPECIAL_CATEGORY_LABELS[category.category_id] || category.name;
-				if (label && label !== category.name) {
-					return { ...category, name: label };
-				}
-			}
+	const groups = Array.isArray(state.budgets.groups) ? state.budgets.groups : [];
+	const groupIds = new Set(groups.map((group) => group.group_id));
+
+	const applyLabel = (category) => {
+		if (!category) {
 			return category;
-		})
+		}
+		if (systemCategoryIds.has(category.category_id)) {
+			const label =
+				SPECIAL_CATEGORY_LABELS[category.category_id] || category.name;
+			if (label && label !== category.name) {
+				return { ...category, name: label };
+			}
+		}
+		return category;
+	};
+
+	const systemCategories = includeSystem
+		? referenceCategories.filter((category) =>
+				category && systemCategoryIds.has(category.category_id),
+			)
+		: [];
+
+	const userSource = budgetCategories.length
+		? budgetCategories
+		: referenceCategories.filter(
+				(category) => category && !systemCategoryIds.has(category.category_id),
+			);
+
+	const userCategories = filterUserFacingCategories(userSource).filter(
+		(category) => category && !groupIds.has(category.category_id),
+	);
+
+	if (!budgetCategories.length) {
+		const orderedUsers = userCategories
+			.slice()
+			.sort((a, b) => a.name.localeCompare(b.name))
+			.map(applyLabel);
+		const orderedSystems = systemCategories
+			.map(applyLabel)
+			.sort((a, b) => a.name.localeCompare(b.name));
+		return includeSystem ? [...orderedSystems, ...orderedUsers] : orderedUsers;
+	}
+
+	const buckets = new Map();
+	const UNCATEGORIZED_KEY = "uncategorized";
+	userCategories.forEach((category) => {
+		const groupId = category.group_id || UNCATEGORIZED_KEY;
+		if (!buckets.has(groupId)) {
+			buckets.set(groupId, []);
+		}
+		buckets.get(groupId).push(category);
+	});
+
+	const orderedUsers = [];
+	groups.forEach((group) => {
+		const bucket = buckets.get(group.group_id) || [];
+		bucket.forEach((category) => orderedUsers.push(applyLabel(category)));
+		buckets.delete(group.group_id);
+	});
+
+	buckets.forEach((bucket, key) => {
+		if (key === UNCATEGORIZED_KEY) {
+			return;
+		}
+		bucket.forEach((category) => orderedUsers.push(applyLabel(category)));
+	});
+
+	(buckets.get(UNCATEGORIZED_KEY) || []).forEach((category) =>
+		orderedUsers.push(applyLabel(category)),
+	);
+
+	const orderedSystems = systemCategories
+		.map(applyLabel)
 		.sort((a, b) => a.name.localeCompare(b.name));
+
+	return includeSystem ? [...orderedSystems, ...orderedUsers] : orderedUsers;
 };
 
 export const findBudgetCategory = (

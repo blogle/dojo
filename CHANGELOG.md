@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented Kubernetes consumption patterns and extracted release-note tooling into a reusable CLI.
 
 ### Fixed
+- Allocation dropdowns now mirror budget table order, show system categories first, and hide group placeholders from selection.
 - Hardened DuckDB migrations against DDL serialization races and centralized backup logic for Kubernetes deploys.
 - CI reliability: in-cluster watcher pattern, clearer image build paths, and more robust run-tests artifact collection.
 - Cypress stability: enforced Anti-Flake network rules, stabilized specs, and refreshed testing docs.
