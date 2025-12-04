@@ -77,6 +77,11 @@ Phase 5: Testing strategy and tooling integration
 - Add Vitest unit tests for Vue components and utilities; keep Cypress for happy-path E2E. Update `scripts/run-tests` to invoke `npm run test:unit` before backend tests and to allow `--filter e2e:transactions` to run Cypress against Vite dev server.
 - In CI, add Node setup/cache; run `npm run lint` (if added) and `npm run test:unit` before `scripts/run-tests --filter e2e:...`. For production, build frontend (`npm run build`) and serve `dist/` via FastAPI.
 
+Phase 6: Time-travel testing middleware
+- Add a controllable clock dependency (e.g., `src/dojo/core/clock.py`) that reads `X-Test-Date` header and returns `date.fromisoformat`, defaulting to `date.today()`.
+- Inject `current_date`/`system_date` into services instead of calling `date.today()` directly, so backend logic is deterministic in tests.
+- In Cypress `beforeEach`, intercept all requests to set `x-test-date` and freeze the JS clock (e.g., to 2025-11-15) to align frontend/backend timelines.
+
 ## Concrete Steps
 
 Working directory: `/home/ogle/src/dojo`. Use repo scripts per `scripts/README.md`.

@@ -21,7 +21,18 @@
           <p class="u-muted u-small-note">Allocations applied to envelopes this month.</p>
         </article>
       </div>
+      <p v-if="isLoadingAllocations" class="u-muted" aria-live="polite">Loading budget data…</p>
     </header>
+
+    <div
+      v-if="referenceError || allocationsError"
+      class="form-panel__error"
+      data-testid="reference-error"
+      aria-live="polite"
+    >
+      <p v-if="referenceError">{{ referenceError }}</p>
+      <p v-if="allocationsError" data-testid="allocations-error">{{ allocationsError }}</p>
+    </div>
 
     <section class="form-panel transactions-page__form">
       <form
@@ -60,7 +71,13 @@
           </label>
           <label class="form-panel__field">
             <span>Account</span>
-            <select name="account_id" required data-transaction-account v-model="transactionForm.account_id">
+            <select
+              name="account_id"
+              required
+              data-transaction-account
+              v-model="transactionForm.account_id"
+              :disabled="isLoadingReference || !!referenceError"
+            >
               <option value="" disabled>Select account</option>
               <option
                 v-for="account in accounts"
@@ -73,7 +90,13 @@
           </label>
           <label class="form-panel__field">
             <span>Category</span>
-            <select name="category_id" required data-transaction-category v-model="transactionForm.category_id">
+            <select
+              name="category_id"
+              required
+              data-transaction-category
+              v-model="transactionForm.category_id"
+              :disabled="isLoadingReference || !!referenceError"
+            >
               <option value="" disabled>Select category</option>
               <option
                 v-for="category in categories"
@@ -102,7 +125,12 @@
           </label>
         </div>
         <div class="form-panel__actions">
-          <button type="submit" class="button button--primary" data-transaction-submit :disabled="isCreating">
+          <button
+            type="submit"
+            class="button button--primary"
+            data-transaction-submit
+            :disabled="isCreating || isLoadingReference || !!referenceError"
+          >
             {{ isCreating ? "Saving…" : "Save transaction" }}
           </button>
         </div>
@@ -124,7 +152,18 @@
           </tr>
         </thead>
         <tbody id="transactions-body">
-          <tr v-if="isLoadingTransactions">
+          <tr v-if="transactionsError">
+            <td
+              colspan="7"
+              class="form-panel__error"
+              data-testid="transactions-error"
+              aria-live="polite"
+              style="text-align: center"
+            >
+              {{ transactionsError }}
+            </td>
+          </tr>
+          <tr v-else-if="isLoadingTransactions">
             <td colspan="7" class="u-muted" style="text-align: center">Loading transactions…</td>
           </tr>
           <tr v-else-if="!transactions.length">
@@ -142,7 +181,12 @@
                   <input type="date" data-inline-date v-model="inlineForm.transaction_date" :disabled="inlineSubmitting" />
                 </td>
                 <td>
-                  <select data-inline-account v-model="inlineForm.account_id" :disabled="inlineSubmitting">
+                   <select
+                     data-inline-account
+                     v-model="inlineForm.account_id"
+                     :disabled="inlineSubmitting || isLoadingReference || !!referenceError"
+                   >
+
                     <option value="" disabled>Select account</option>
                     <option
                       v-for="account in accounts"
@@ -154,7 +198,12 @@
                   </select>
                 </td>
                 <td>
-                  <select data-inline-category v-model="inlineForm.category_id" :disabled="inlineSubmitting">
+                   <select
+                     data-inline-category
+                     v-model="inlineForm.category_id"
+                     :disabled="inlineSubmitting || isLoadingReference || !!referenceError"
+                   >
+
                     <option value="" disabled>Select category</option>
                     <option
                       v-for="category in categories"
@@ -292,6 +341,25 @@ const inlineForm = reactive({
 
 const statusIcons = statusToggleIcons;
 
+const isValidDateInput = (value) => {
+  if (!value) {
+    return false;
+  }
+  const parsed = Date.parse(`${value}T00:00:00`);
+  return Number.isFinite(parsed);
+};
+
+const toMinor = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return dollarsToMinor(parsed);
+};
+
 const referenceQuery = useQuery({
   queryKey: ['reference-data'],
   queryFn: () => api.reference.load(),
@@ -309,6 +377,17 @@ const allocationsQuery = useQuery({
   refetchOnWindowFocus: false,
 });
 
+const referenceError = computed(() => referenceQuery.error?.message || '');
+const transactionsError = computed(() => transactionsQuery.error?.message || '');
+const allocationsError = computed(() => allocationsQuery.error?.message || '');
+
+const isLoadingReference = computed(
+  () => referenceQuery.isPending.value || referenceQuery.isFetching.value,
+);
+const isLoadingAllocations = computed(
+  () => allocationsQuery.isPending.value || allocationsQuery.isFetching.value,
+);
+
 const createTransaction = useMutation({
   mutationFn: (payload) => api.transactions.create(payload),
   onSuccess: () => invalidateLedgerQueries(),
@@ -317,7 +396,32 @@ const createTransaction = useMutation({
 const updateTransaction = useMutation({
   mutationFn: ({ concept_id: conceptId, ...payload }) =>
     api.transactions.update(conceptId, payload),
-  onSuccess: () => invalidateLedgerQueries(),
+  onMutate: async (payload) => {
+    await queryClient.cancelQueries({ queryKey: ['transactions'] });
+    const previous = queryClient.getQueryData(['transactions']) ?? [];
+    const updated = previous.map((tx) =>
+      tx?.concept_id === payload.concept_id
+        ? {
+            ...tx,
+            ...payload,
+            amount_minor: payload.amount_minor,
+            transaction_date: payload.transaction_date,
+            account_id: payload.account_id,
+            category_id: payload.category_id,
+            memo: payload.memo,
+            status: payload.status,
+          }
+        : tx,
+    );
+    queryClient.setQueryData(['transactions'], updated);
+    return { previous };
+  },
+  onError: (_error, _payload, context) => {
+    if (context?.previous) {
+      queryClient.setQueryData(['transactions'], context.previous);
+    }
+  },
+  onSettled: () => invalidateLedgerQueries(),
 });
 
 const accounts = computed(() => referenceQuery.data?.accounts ?? []);
@@ -373,16 +477,25 @@ const formatAmountDisplay = (minor) => formatAmount(minor);
 
 const handleTransactionSubmit = async () => {
   formError.value = '';
-  const amountMinor = Math.abs(dollarsToMinor(transactionForm.amount));
+  const amountMinor = toMinor(transactionForm.amount);
+  if (!isValidDateInput(transactionForm.transaction_date)) {
+    formError.value = 'Enter a valid date (YYYY-MM-DD).';
+    return;
+  }
   if (!transactionForm.account_id || !transactionForm.category_id) {
     formError.value = 'Account and category are required.';
     return;
   }
-  if (amountMinor === 0) {
+  if (amountMinor === null) {
+    formError.value = 'Enter a valid amount.';
+    return;
+  }
+  const normalizedAmount = Math.abs(amountMinor);
+  if (normalizedAmount === 0) {
     formError.value = 'Amount must be non-zero.';
     return;
   }
-  const signedAmount = transactionForm.flow === 'outflow' ? -amountMinor : amountMinor;
+  const signedAmount = transactionForm.flow === 'outflow' ? -normalizedAmount : normalizedAmount;
   const payload = {
     transaction_date: transactionForm.transaction_date || todayISO(),
     account_id: transactionForm.account_id,
@@ -428,23 +541,33 @@ const handleRowClick = async (tx) => {
 };
 
 const validateInlinePayload = () => {
+  if (!isValidDateInput(inlineForm.transaction_date)) {
+    inlineError.value = 'Enter a valid date (YYYY-MM-DD).';
+    return null;
+  }
   if (!inlineForm.account_id || !inlineForm.category_id) {
     inlineError.value = 'Account and category are required.';
     return null;
   }
-  const inflowMinor = inlineForm.inflow ? Math.abs(dollarsToMinor(inlineForm.inflow)) : 0;
-  const outflowMinor = inlineForm.outflow ? Math.abs(dollarsToMinor(inlineForm.outflow)) : 0;
-  if (inflowMinor > 0 && outflowMinor > 0) {
+  const inflowMinor = toMinor(inlineForm.inflow);
+  const outflowMinor = toMinor(inlineForm.outflow);
+  const hasInflow = inflowMinor !== null && inflowMinor !== 0;
+  const hasOutflow = outflowMinor !== null && outflowMinor !== 0;
+
+  if (hasInflow && hasOutflow) {
     inlineError.value = 'Enter either an inflow or an outflow, not both.';
     return null;
   }
-  const picked = inflowMinor || outflowMinor;
-  if (picked === 0) {
+
+  const pickedMinor = hasInflow ? Math.abs(inflowMinor) : hasOutflow ? Math.abs(outflowMinor) : null;
+
+  if (!pickedMinor) {
     inlineError.value = 'Amount must be non-zero.';
     return null;
   }
-  const signedAmount = inflowMinor > 0 ? picked : -picked;
-  return { signedAmount, inflowMinor, outflowMinor };
+
+  const signedAmount = hasInflow ? pickedMinor : -pickedMinor;
+  return { signedAmount };
 };
 
 const saveInlineEdit = async (tx) => {
