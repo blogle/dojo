@@ -32,38 +32,73 @@ export const fetchJSON = async (url, options = {}) => {
 
 const defaultHeaders = { "Content-Type": "application/json" };
 
+const invalidateQueries = async (queryKeys = []) => {
+	const client = typeof window !== "undefined" ? window.dojoQueryClient : null;
+	if (!client?.invalidateQueries) {
+		return;
+	}
+	try {
+		await Promise.all(
+			queryKeys.map((queryKey) => client.invalidateQueries({ queryKey: [queryKey] })),
+		);
+	} catch (error) {
+		console.warn("queryClient invalidation failed", error);
+	}
+};
+
+const invalidateLedgerQueries = () =>
+	invalidateQueries([
+		"transactions",
+		"budget-allocations",
+		"ready-to-assign",
+		"accounts",
+		"budget-categories",
+	]);
+
 export const api = {
 	transactions: {
 		list: async (limit = 100) => fetchJSON(`/api/transactions?limit=${limit}`),
-		create: async (payload) =>
-			fetchJSON("/api/transactions", {
+		create: async (payload) => {
+			const result = await fetchJSON("/api/transactions", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
-		update: async (conceptId, payload) =>
-			fetchJSON(`/api/transactions/${conceptId}`, {
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+		update: async (conceptId, payload) => {
+			const result = await fetchJSON(`/api/transactions/${conceptId}`, {
 				method: "PUT",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
 	},
 	transfers: {
-		create: async (payload) =>
-			fetchJSON("/api/transfers", {
+		create: async (payload) => {
+			const result = await fetchJSON("/api/transfers", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
 	},
 	accounts: {
 		list: async () => fetchJSON("/api/accounts"),
-		create: async (payload) =>
-			fetchJSON("/api/accounts", {
+		create: async (payload) => {
+			const result = await fetchJSON("/api/accounts", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
 	},
 	netWorth: {
 		current: async () => fetchJSON("/api/net-worth/current"),
@@ -81,44 +116,64 @@ export const api = {
 		categories: async (month) =>
 			fetchJSON(`/api/budget-categories?month=${month}`),
 		groups: async () => fetchJSON("/api/budget-category-groups"),
-		createCategory: async (payload) =>
-			fetchJSON("/api/budget-categories", {
+		createCategory: async (payload) => {
+			const result = await fetchJSON("/api/budget-categories", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
-		updateCategory: async (categoryId, payload) =>
-			fetchJSON(`/api/budget-categories/${categoryId}`, {
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+		updateCategory: async (categoryId, payload) => {
+			const result = await fetchJSON(`/api/budget-categories/${categoryId}`, {
 				method: "PUT",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
-		createGroup: async (payload) =>
-			fetchJSON("/api/budget-category-groups", {
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+		createGroup: async (payload) => {
+			const result = await fetchJSON("/api/budget-category-groups", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
-		updateGroup: async (groupId, payload) =>
-			fetchJSON(`/api/budget-category-groups/${groupId}`, {
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+		updateGroup: async (groupId, payload) => {
+			const result = await fetchJSON(`/api/budget-category-groups/${groupId}`, {
 				method: "PUT",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
 		allocations: async (month) =>
-			fetchJSON(`/api/budget/allocations?month=${month}`),
-		createAllocation: async (payload) =>
-			fetchJSON("/api/budget/allocations", {
+			month
+				? fetchJSON(`/api/budget/allocations?month=${month}`)
+				: fetchJSON("/api/budget/allocations"),
+		createAllocation: async (payload) => {
+			const result = await fetchJSON("/api/budget/allocations", {
 				method: "POST",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
-		updateAllocation: async (conceptId, payload) =>
-			fetchJSON(`/api/budget/allocations/${conceptId}`, {
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+		updateAllocation: async (conceptId, payload) => {
+			const result = await fetchJSON(`/api/budget/allocations/${conceptId}`, {
 				method: "PUT",
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
-			}),
+			});
+			await invalidateLedgerQueries();
+			return result;
+		},
 	},
 };
 

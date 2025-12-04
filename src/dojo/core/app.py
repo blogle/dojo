@@ -134,12 +134,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ) -> None:  # pragma: no cover - simple guard
             raise HTTPException(status_code=404, detail="Testing routes disabled")
 
-    # Mount the static files directory to serve the frontend Single Page Application (SPA).
-    # All requests not matching API routes will be served by the SPA.
+    # Mount static assets, preferring the built Vite dist when available and falling back to legacy static files.
     static_dir = _static_directory()
+    dist_dir = static_dir / "dist"
+    spa_dir = dist_dir if dist_dir.exists() else static_dir
+
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(static_dir), html=False),
+        name="static",
+    )
+
     app.mount(
         "/",
-        StaticFiles(directory=str(static_dir), html=True),
+        StaticFiles(directory=str(spa_dir), html=True),
         name="spa",
     )
     return app

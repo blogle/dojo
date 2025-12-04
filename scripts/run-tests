@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # NAME
-#     run-tests - run the full test matrix (unit, property, integration, e2e)
+#     run-tests - run the full test matrix (frontend unit, unit, property, integration, e2e)
 # SYNOPSIS
-#     scripts/run-tests [--skip-property] [--skip-integration] [--skip-e2e]
+#     scripts/run-tests [--skip-frontend] [--skip-property] [--skip-integration] [--skip-e2e]
 # DESCRIPTION
-#     Runs pytest suites for unit, property, and integration code plus Cypress e2e while
+#     Runs Vitest frontend unit tests, pytest suites for unit/property/integration, and Cypress e2e while
 #     timing each suite, hiding verbose logs when everything passes, and spilling temp log
 #     paths if something fails.
 
@@ -16,6 +16,7 @@ readonly TMP_DIR="${TMPDIR:-/tmp}"
 RUN_DIR=$(mktemp -d "${TMP_DIR}/${REPO_NAME}-${SCRIPT_NAME}-XXXXXX")
 readonly RUN_DIR
 
+SKIP_FRONTEND=0
 SKIP_PROPERTY=0
 SKIP_INTEGRATION=0
 SKIP_E2E=0
@@ -26,13 +27,13 @@ FILTERED=0
 usage() {
     cat <<EOF
 NAME
-    ${SCRIPT_NAME} - run pytest suites and Cypress e2e with unified reporting
+    ${SCRIPT_NAME} - run frontend unit, pytest suites, and Cypress e2e with unified reporting
 SYNOPSIS
-    scripts/${SCRIPT_NAME} [--skip-property] [--skip-integration] [--skip-e2e] [--filter SUITE[:PATTERN]] [-h|--help]
+    scripts/${SCRIPT_NAME} [--skip-frontend] [--skip-property] [--skip-integration] [--skip-e2e] [--filter SUITE[:PATTERN]] [-h|--help]
 DESCRIPTION
-    Runs unit, property, integration, and e2e suites (Cypress with Chrome) and prints a
-    terse [OK]/[FAIL] summary per suite. Failures reference a temp log for the full output.
-    Use --filter to target a single suite (e.g., --filter unit:budgeting or --filter e2e:01-payday-assignment).
+    Runs frontend unit tests (Vitest), Python unit/property/integration suites, and e2e tests (Cypress with Chrome),
+    printing a terse [OK]/[FAIL] summary per suite. Failures reference a temp log for the full output.
+    Use --filter to target a single suite (e.g., --filter frontend or --filter e2e:01-payday-assignment).
 EOF
 }
 
@@ -42,6 +43,10 @@ parse_args() {
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --skip-frontend)
+                SKIP_FRONTEND=1
+                shift
                 ;;
             --skip-property)
                 SKIP_PROPERTY=1
@@ -90,7 +95,7 @@ add_filter() {
     fi
     suite="$(printf '%s' "$suite" | tr '[:upper:]' '[:lower:]')"
     case "$suite" in
-        unit|property|integration|e2e)
+        frontend|unit|property|integration|e2e)
             ;;
         *)
             echo "Invalid filter suite: $suite" >&2
@@ -185,6 +190,20 @@ run_suite() {
 parse_args "$@"
 
 pids=()
+if [[ "$SKIP_FRONTEND" -eq 1 ]]; then
+    echo "[SKIP] frontend tests (--skip-frontend)"
+elif should_run_suite frontend; then
+    frontend_cmd=(npm run test:unit --prefix src/dojo/frontend/vite)
+    frontend_pattern=$(suite_pattern frontend)
+    if [[ -n "$frontend_pattern" ]]; then
+        frontend_cmd+=(-- --testNamePattern "$frontend_pattern")
+    fi
+    run_suite "frontend unit tests" "${frontend_cmd[@]}" &
+    pids+=($!)
+else
+    echo "[SKIP] frontend tests (filtered)"
+fi
+
 if should_run_suite unit; then
     unit_cmd=(python -m pytest tests/unit)
     unit_pattern=$(suite_pattern unit)

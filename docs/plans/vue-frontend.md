@@ -10,6 +10,17 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 
 - [x] (2025-12-04 12:00Z) Drafted migration ExecPlan.
 - [x] (2025-12-04 12:45Z) Revised plan to adopt Vite + SFCs, add router/state bridges, and correct validation commands.
+- [x] (2025-12-04 19:47Z) Added Node 20 to dev shell and stubbed Nix build for frontend dist output.
+- [x] (2025-12-04 19:53Z) Scaffolded Vite project (Vue + TanStack Query) and set npmDepsHash for reproducible builds to `static/dist`.
+- [x] (2025-12-04 20:04Z) Added LegacyHost catch-all route (iframe to legacy app) and proxied `/static` for dev; Vite build still outputs to `static/dist`.
+- [x] (2025-12-04 21:15Z) Wired npm dev and e2e scripts to run backend + Vite together; added dedicated backend/frontend dev commands.
+- [x] (2025-12-04 21:30Z) FastAPI now serves built Vite `static/dist` when present and keeps legacy static as fallback.
+- [x] (2025-12-04 21:45Z) CI installs/caches Node, runs frontend npm ci/test/build, then backend tests with e2e skipped.
+- [x] (2025-12-04 22:30Z) Transactions Vue page now renders legacy layout, fetches reference + transactions via TanStack Query, supports creation and inline edits (status toggle, inflow/outflow) with preserved data-testids.
+- [x] (2025-12-04 22:50Z) Transactions header pulls budgeted-from-allocations data, and mutations now invalidate shared ledger queries (transactions/budget/allocation readiness).
+- [x] (2025-12-04 23:05Z) Added Vitest smoke tests for router/query client and wired scripts/run-tests to run the frontend suite.
+- [x] (2025-12-04 23:20Z) Added legacy→Vue query invalidation bridge and Vitest coverage to ensure legacy mutations refresh Vue caches.
+- [x] (2025-12-04 23:13Z) Fixed Vue inline edits to hit the update endpoint (PUT) instead of creating new transactions, added Vitest coverage for update invalidations, and verified `scripts/run-tests --skip-e2e`.
 
 ## Surprises & Discoveries
 

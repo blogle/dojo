@@ -85,7 +85,7 @@
               actionlint
               cypress
               duckdb
-              nodejs
+              nodejs_20
               mermaid-cli
               python312
               ruff
@@ -137,10 +137,23 @@
           pkgs = nixpkgs.legacyPackages.${system};
           pythonSet = pythonSets.${system};
           app-env = pythonSet.mkVirtualEnv "dojo-env" workspace.deps.default;
+          frontendDist = pkgs.buildNpmPackage {
+            pname = "dojo-frontend";
+            version = "0.0.0";
+            src = ./src/dojo/frontend/vite;
+            npmDepsHash = "sha256-+TocTOZG0/j+rZQa4Cx1cGbzjDEztc96V0zP933e9Yo=";
+            nodejs = pkgs.nodejs_20;
+            npmBuild = "npm run build";
+            installPhase = ''
+              mkdir -p $out/dist
+              cp -r dist/. $out/dist
+            '';
+          };
         in {
-        default = app-env;
-        
-        docker = pkgs.dockerTools.buildLayeredImage {
+          default = app-env;
+          frontend = frontendDist;
+          
+          docker = pkgs.dockerTools.buildLayeredImage {
           name = "dojo";
           tag = "latest";
           contents = [ 
