@@ -49,6 +49,7 @@ from dojo.budgeting.services import (
     BudgetCategoryAdminService,
     TransactionEntryService,
 )
+from dojo.core.clock import get_system_date
 from dojo.core.db import connection_dep
 
 # Initialize the API router with a tag for budgeting functionalities.
@@ -216,6 +217,7 @@ _CONNECTION_DEP = Depends(connection_dep)
 _TRANSACTION_SERVICE_DEP = Depends(transaction_service_dep)
 _ACCOUNT_ADMIN_SERVICE_DEP = Depends(account_admin_service_dep)
 _CATEGORY_ADMIN_SERVICE_DEP = Depends(category_admin_service_dep)
+_SYSTEM_DATE_DEP = Depends(get_system_date)
 
 
 @router.post(
@@ -226,6 +228,7 @@ _CATEGORY_ADMIN_SERVICE_DEP = Depends(category_admin_service_dep)
 def create_transaction(
     payload: NewTransactionRequest,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> TransactionResponse:
     """
@@ -257,7 +260,7 @@ def create_transaction(
     """
     try:
         # Attempt to create the transaction using the service.
-        return service.create(conn, payload)
+        return service.create(conn, payload, current_date=system_date)
     except BudgetingError as exc:
         # Catch specific budgeting errors and return a 400 Bad Request.
         raise HTTPException(
@@ -280,6 +283,7 @@ def update_transaction(
     concept_id: UUID,
     payload: TransactionUpdateRequest,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> TransactionResponse:
     """
@@ -307,7 +311,7 @@ def update_transaction(
         400 Bad Request for budgeting-related errors (e.g., invalid input, not found).
     """
     try:
-        return service.update_transaction(conn, concept_id, payload)
+        return service.update_transaction(conn, concept_id, payload, current_date=system_date)
     except BudgetingError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -405,6 +409,7 @@ def get_reference_data(
 def create_transfer(
     payload: CategorizedTransferRequest,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> CategorizedTransferResponse:
     """
@@ -434,7 +439,7 @@ def create_transfer(
     """
     try:
         # Attempt to perform the transfer using the service.
-        return service.transfer(conn, payload)
+        return service.transfer(conn, payload, current_date=system_date)
     except BudgetingError as exc:
         # Catch specific budgeting errors and return a 400 Bad Request.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -921,6 +926,7 @@ def deactivate_group(
 def ready_to_assign(
     month: date | None = _BUDGET_MONTH_QUERY,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> ReadyToAssignResponse:
     """
@@ -946,7 +952,7 @@ def ready_to_assign(
     """
     # Default to the first day of the current month if no month is specified.
     if month is None:
-        month = date.today().replace(day=1)
+        month = system_date.replace(day=1)
     # Retrieve the ready-to-assign amount from the service.
     ready_minor = service.ready_to_assign(conn, month)
     # Construct and return the response model, converting minor units to decimal.
@@ -965,6 +971,7 @@ def ready_to_assign(
 def allocate_budget(
     payload: BudgetAllocationRequest,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> CategoryState:
     """
@@ -1007,6 +1014,7 @@ def allocate_budget(
             from_category_id=payload.from_category_id,
             memo=payload.memo,
             allocation_date=payload.allocation_date,
+            current_date=system_date,
         )
     except (BudgetingError, InvalidTransactionError) as exc:
         # Handle budgeting and invalid transaction errors.
@@ -1058,6 +1066,7 @@ def list_allocations(
     month: date | None = _BUDGET_MONTH_QUERY,
     limit: int = _ALLOCATIONS_LIMIT_QUERY,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
 ) -> BudgetAllocationsResponse:
     """
@@ -1086,7 +1095,7 @@ def list_allocations(
         and a list of budget allocation entries.
     """
     # Determine the month start, defaulting to the current month's first day.
-    month_start = (month or date.today()).replace(day=1)
+    month_start = (month or system_date).replace(day=1)
     # Retrieve budget allocation entries from the service.
     entries = service.list_allocations(conn, month_start, limit)
     # Convert DAO records to Pydantic models for the response.

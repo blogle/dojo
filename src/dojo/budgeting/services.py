@@ -119,7 +119,13 @@ class TransactionEntryService:
     # Special category ID used for the transfer leg of categorized transfers.
     TRANSFER_CATEGORY_ID = "account_transfer"
 
-    def create(self, conn: duckdb.DuckDBPyConnection, cmd: NewTransactionRequest) -> TransactionResponse:
+    def create(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        cmd: NewTransactionRequest,
+        *,
+        current_date: date | None = None,
+    ) -> TransactionResponse:
         """
         Inserts a new transaction using the temporal ledger model.
 
@@ -149,8 +155,9 @@ class TransactionEntryService:
         UnknownCategoryError
             If the referenced category does not exist or is inactive.
         """
+        today = current_date or date.today()
         # Validate the incoming transaction payload.
-        self._validate_payload(cmd)
+        self._validate_payload(cmd, today=today)
         dao = BudgetingDAO(conn)
         # Generate a new concept_id if not provided, for grouping related transactions.
         concept_id = cmd.concept_id or uuid4()
@@ -231,6 +238,8 @@ class TransactionEntryService:
         conn: duckdb.DuckDBPyConnection,
         concept_id: UUID,
         cmd: TransactionUpdateRequest,
+        *,
+        current_date: date | None = None,
     ) -> TransactionResponse:
         """
         Updates an existing transaction using SCD-2 logic (correction flow).
@@ -295,12 +304,15 @@ class TransactionEntryService:
                 status=cast(Literal["pending", "cleared"], existing.status),
                 memo=memo,
             ),
+            current_date=current_date,
         )
 
     def transfer(
         self,
         conn: duckdb.DuckDBPyConnection,
         cmd: CategorizedTransferRequest,
+        *,
+        current_date: date | None = None,
     ) -> CategorizedTransferResponse:
         """
         Performs a categorized transfer with two ledger entries (legs).
@@ -332,8 +344,9 @@ class TransactionEntryService:
         UnknownCategoryError
             If the referenced category does not exist or is inactive.
         """
+        today = current_date or date.today()
         # Validate the incoming transfer payload.
-        self._validate_transfer_payload(cmd)
+        self._validate_transfer_payload(cmd, today=today)
         # Ensure source and destination accounts are different.
         if cmd.source_account_id == cmd.destination_account_id:
             raise InvalidTransactionError("Source and destination accounts must differ.")
@@ -460,6 +473,7 @@ class TransactionEntryService:
         from_category_id: str | None = None,
         memo: str | None = None,
         allocation_date: date | None = None,
+        current_date: date | None = None,
     ) -> CategoryState:
         """
         Allocates funds to a budgeting category (envelope).
@@ -503,10 +517,11 @@ class TransactionEntryService:
         self._validate_allocation_amount(amount_minor)
         # Determine and validate the destination category, ensuring it's not the same as source if specified.
         destination_category_id = self._require_allocation_destination(category_id, from_category_id)
+        today = current_date or date.today()
         # Determine the allocation date, defaulting to today.
-        allocation_day = allocation_date or date.today()
+        allocation_day = allocation_date or today
         # Coerce month_start to the first day of the month, defaulting to allocation_day's month if not provided.
-        month = self._coerce_month_start(month_start or allocation_day)
+        month = self._coerce_month_start(month_start or allocation_day, today=today)
         # Clean up memo if provided.
         memo_value = memo.strip() if memo else None
 
@@ -1098,24 +1113,14 @@ class TransactionEntryService:
             dao.adjust_category_allocation(from_category_id, month_start, -amount_minor, -amount_minor)
 
     @staticmethod
-    def _coerce_month_start(month_start: date | None) -> date:
+    def _coerce_month_start(month_start: date | None, *, today: date | None = None) -> date:
         """
-        Coerces a given date to the first day of its month, or the current month's first day.
-
-        Parameters
-        ----------
-        month_start : date | None
-            The date to coerce, or None to use today's date.
-
-        Returns
-        -------
-        date
-            A date object representing the first day of the relevant month.
+        Coerces a given date to the first day of its month, defaulting to `today` or the current date.
         """
-        reference = month_start or date.today()
+        reference = month_start or today or date.today()
         return reference.replace(day=1)
 
-    def _validate_payload(self, cmd: NewTransactionRequest) -> None:
+    def _validate_payload(self, cmd: NewTransactionRequest, *, today: date) -> None:
         """
         Validates the payload for a new transaction request.
 
@@ -1135,30 +1140,20 @@ class TransactionEntryService:
         if cmd.amount_minor == 0:
             raise InvalidTransactionError("amount_minor must be non-zero.")
         # Calculate the difference in days between the transaction date and today.
-        future_delta = (cmd.transaction_date - date.today()).days
+        future_delta = (cmd.transaction_date - today).days
+
         if future_delta > self.MAX_FUTURE_DAYS:
             raise InvalidTransactionError(
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
             )
 
-    def _validate_transfer_payload(self, cmd: CategorizedTransferRequest) -> None:
+    def _validate_transfer_payload(self, cmd: CategorizedTransferRequest, *, today: date) -> None:
         """
         Validates the payload for a categorized transfer request.
 
         Ensures the transfer date is not too far in the future.
-
-        Parameters
-        ----------
-        cmd : CategorizedTransferRequest
-            The incoming categorized transfer request payload.
-
-        Raises
-        ------
-        InvalidTransactionError
-            If the transaction date is too far in the future.
         """
-        # Calculate the difference in days between the transaction date and today.
-        future_delta = (cmd.transaction_date - date.today()).days
+        future_delta = (cmd.transaction_date - today).days
         if future_delta > self.MAX_FUTURE_DAYS:
             raise InvalidTransactionError(
                 f"transaction_date may not be more than {self.MAX_FUTURE_DAYS} days in the future."
@@ -1876,12 +1871,17 @@ class AccountAdminService:
 
 class BudgetCategoryAdminService:
     """
-    Manages administrative operations for budgeting categories and groups.
+    Provides administrative operations for budgeting categories and category groups.
 
     This service provides CRUD (Create, Read, Update, Delete/Deactivate)
     functionalities for budget categories and their organizational groups.
     It interacts with the `BudgetingDAO` to persist and retrieve budgeting data.
     """
+
+    @staticmethod
+    def _coerce_month_start(month_start: date | None, *, today: date | None = None) -> date:
+        reference = month_start or today or date.today()
+        return reference.replace(day=1)
 
     def list_categories(
         self,
@@ -2300,23 +2300,3 @@ class BudgetCategoryAdminService:
             last_month_activity_minor=record.last_month_activity_minor,
             last_month_available_minor=record.last_month_available_minor,
         )
-
-    @staticmethod
-    def _coerce_month_start(month_start: date | None) -> date:
-        """
-        Coerces a given date to the first day of its month, or the current month's first day.
-
-        Parameters
-        ----------
-        month_start : date | None
-            The date to coerce, or None to use today's date.
-
-        Returns
-        -------
-        date
-            A date object representing the first day of the relevant month.
-        """
-        if month_start is None:
-            today = date.today()
-            return today.replace(day=1)
-        return month_start.replace(day=1)
