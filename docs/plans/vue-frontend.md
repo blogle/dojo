@@ -20,7 +20,10 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 - [x] (2025-12-04 22:50Z) Transactions header pulls budgeted-from-allocations data, and mutations now invalidate shared ledger queries (transactions/budget/allocation readiness).
 - [x] (2025-12-04 23:05Z) Added Vitest smoke tests for router/query client and wired scripts/run-tests to run the frontend suite.
 - [x] (2025-12-04 23:20Z) Added legacy→Vue query invalidation bridge and Vitest coverage to ensure legacy mutations refresh Vue caches.
+- [x] (2025-12-04 23:25Z) Hardened Vue transactions UX (inline validation, optimistic row updates, loading/error surfacing) and kept tests green.
 - [x] (2025-12-04 23:13Z) Fixed Vue inline edits to hit the update endpoint (PUT) instead of creating new transactions, added Vitest coverage for update invalidations, and verified `scripts/run-tests --skip-e2e`.
+- [x] (2025-12-05 00:00Z) Added controllable system clock (X-Test-Date) wired through budgeting routers/services to replace `date.today()` in request flows.
+- [x] (2025-12-05 00:03Z) Cypress now injects X-Test-Date and freezes the JS clock before each test to keep frontend/backend time in lockstep.
 
 ## Surprises & Discoveries
 
