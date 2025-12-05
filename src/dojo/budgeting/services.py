@@ -291,6 +291,7 @@ class TransactionEntryService:
 
         existing_memo = getattr(existing, "memo", None)
         memo = cmd.memo if cmd.memo is not None else existing_memo
+        status = cmd.status if cmd.status is not None else cast(Literal["pending", "cleared"], existing.status)
         # Reuse the creation flow to ensure balances, category activity, and payment reserves
         # are reversed and reapplied consistently.
         return self.create(
@@ -301,7 +302,7 @@ class TransactionEntryService:
                 account_id=cmd.account_id,
                 category_id=cmd.category_id,
                 amount_minor=cmd.amount_minor,
-                status=cast(Literal["pending", "cleared"], existing.status),
+                status=status,
                 memo=memo,
             ),
             current_date=current_date,

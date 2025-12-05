@@ -63,7 +63,7 @@ class TransactionPage {
 	}
 
 	editTransaction(rowIndex) {
-		this.elements.transactionTableRows().eq(rowIndex).click();
+		this.elements.transactionTableRows().eq(rowIndex).find('[data-testid="transaction-col-account"]').click();
 	}
 
 	setInlineDate(dateString) {
@@ -94,7 +94,7 @@ class TransactionPage {
 	}
 
 	toggleTransactionStatus() {
-		cy.get("[data-inline-status-toggle]").click();
+		cy.get("[data-inline-status-toggle]").click({ force: true });
 	}
 
 	saveInlineEdit() {

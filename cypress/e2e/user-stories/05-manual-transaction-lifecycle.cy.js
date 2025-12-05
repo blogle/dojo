@@ -20,7 +20,8 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 	});
 
 	it("edits a pending outflow, toggles cleared, and keeps Ready-to-Assign steady", () => {
-		cy.intercept("POST", "/api/transactions").as("mutateTransaction");
+		cy.intercept("POST", "/api/transactions").as("createTransaction");
+        cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
@@ -45,7 +46,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 			"Dining Out",
 			"50",
 		);
-		cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
 		cy.wait("@fetchTransactions");
 		transactionPage.verifyError("");
 
@@ -69,12 +70,22 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		accountPage.verifyAccountBalance("House Checking", "$9,950.00");
 
 		transactionPage.visit();
+        // Clean up legacy artifacts (if any) when returning from legacy routes
+        cy.reload();
 		cy.wait("@fetchTransactions");
 		transactionPage.editTransaction(0);
 		transactionPage.editOutflowAmount("62");
 		transactionPage.toggleTransactionStatus();
+        
+        // Verify UI updated before saving
+        cy.get("[data-inline-status-toggle]").should("have.attr", "data-state", "cleared");
+
 		transactionPage.saveInlineEdit();
-		cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@updateTransaction").then((interception) => {
+            // Verify payload
+            expect(interception.request.body.status).to.eq('cleared');
+            expect(interception.response.statusCode).to.eq(200);
+        });
 		cy.wait("@fetchTransactions");
 
 		transactionPage.verifyTransactionRowAmount(0, "$62.00");

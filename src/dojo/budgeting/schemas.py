@@ -64,6 +64,7 @@ class TransactionUpdateRequest(BaseModel):
     category_id: str
     amount_minor: int
     memo: str | None = None
+    status: Literal["pending", "cleared"] | None = None
 
 
 
