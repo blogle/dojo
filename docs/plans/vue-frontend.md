@@ -24,6 +24,14 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 - [x] (2025-12-04 23:13Z) Fixed Vue inline edits to hit the update endpoint (PUT) instead of creating new transactions, added Vitest coverage for update invalidations, and verified `scripts/run-tests --skip-e2e`.
 - [x] (2025-12-05 00:00Z) Added controllable system clock (X-Test-Date) wired through budgeting routers/services to replace `date.today()` in request flows.
 - [x] (2025-12-05 00:03Z) Cypress now injects X-Test-Date and freezes the JS clock before each test to keep frontend/backend time in lockstep.
+- [x] (2025-12-05 03:26Z) Cypress time-travel hook now reads `Cypress.env("TEST_DATE")` or defaults to today, avoiding hardcoded dates; next step is rerunning e2e to validate Ready-to-Assign/assertions.
+- [x] (2025-12-05 04:30Z) Adjusted Cypress clock/header hook to respect per-spec dates, standardized quick allocation labels, kept Uncategorized visible, and the full `scripts/run-tests --filter e2e` suite now passes.
+- [x] (2025-12-05 06:00Z) Phase 4: Moved layout/nav to `App.vue`. Implemented `LegacyHost` bridge using iframe for unmigrated routes.
+- [x] (2025-12-05 06:00Z) Phase 4: Hid legacy header in `LegacyHost` via `?embed=true` query param and CSS class.
+- [x] (2025-12-05 06:00Z) Phase 5: Updated legacy Cypress Page Objects (`BudgetPage`, `AccountPage`, `AllocationPage`) to support iframe access (`getLegacyBody`).
+- [x] (2025-12-05 06:00Z) Phase 6: Implemented `Date` mocking bridge for iframe using `localStorage` to sync test time across Vue app and legacy iframe.
+- [x] (2025-12-05 07:00Z) Fixed `TransactionsPage.vue` runtime errors (missing `.value` access on TanStack Query refs) which caused the page to fail rendering. Validated that `TransactionsPage` now renders and makes API calls.
+- [ ] (IN PROGRESS) Debugging `TransactionsPage` E2E test (`05-manual-transaction-lifecycle`) failure at the inline edit step (`tr.is-editing` not found). The page loads and creates transactions, but the row click handler seems to not trigger editing mode.
 
 ## Surprises & Discoveries
 
@@ -32,6 +40,9 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 - Transactions component (`components/transactions/index.js`) clears and rebuilds `<tbody>` via `innerHTML`, adds ad-hoc key listeners, and manages inline edit state in a global store; this is a primary flake source.
 - State store (`services/state.js`) is a bespoke clone-based store without derivations; most state can be supplanted by TanStack Query cache + component-local state.
 - No-build ESM would force magic-string templates, CDN/vendor drift, and browser-only testing; Vite restores SFC ergonomics, deterministic deps, and fast unit tests (Vitest).
+- Cypress tests running against the Vue app with `LegacyHost` iframe require significant updates to Page Objects to pierce the iframe.
+- `cy.clock()` only affects the top window; legacy app in iframe needs a separate mechanism (localStorage bridge) to receive the test date.
+- `cy.visit` does not reload the page on hash change, which can cause issues when transitioning between `LegacyHost` (iframe) and Vue routes in tests. `cy.reload()` is a workaround.
 
 ## Decision Log
 

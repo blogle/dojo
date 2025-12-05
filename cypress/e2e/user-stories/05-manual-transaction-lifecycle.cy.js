@@ -10,6 +10,10 @@ const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 05 — Manual Transaction Lifecycle", () => {
 	beforeEach(() => {
+		const isoDate = new Date(FIXED_NOW).toISOString();
+		cy.on("window:before:load", (win) => {
+			win.localStorage.setItem("DOJO_TEST_DATE", isoDate);
+		});
 		cy.clock(FIXED_NOW);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
@@ -31,7 +35,11 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		accountPage.verifyAccountBalance("House Checking", "$10,000.00");
 
 		transactionPage.visit();
+		// Force reload to ensure clean state when switching from LegacyHost (iframe) to Vue Page
+		cy.reload();
+		cy.wait(1000); // Wait for Vue to hydrate
 		cy.wait("@fetchTransactions");
+
 		transactionPage.createOutflowTransaction(
 			"House Checking",
 			"Dining Out",

@@ -23,6 +23,29 @@ import { initRouter } from "./components/router/index.js";
 import { loadReferenceData } from "./components/reference/index.js";
 
 const bootstrap = async () => {
+	const params = new URLSearchParams(window.location.search);
+	if (params.get("embed") === "true") {
+		document.body.classList.add("is-embedded");
+	}
+
+	const testDate = localStorage.getItem("DOJO_TEST_DATE");
+	if (testDate) {
+		const fixed = new Date(testDate).getTime();
+		const OriginalDate = Date;
+		// eslint-disable-next-line no-global-assign
+		window.Date = class extends OriginalDate {
+			constructor(...args) {
+				if (args.length === 0) {
+					return new OriginalDate(fixed);
+				}
+				return new OriginalDate(...args);
+			}
+			static now() {
+				return fixed;
+			}
+		};
+	}
+
 	initAccounts({
 		onReferenceRefresh: loadReferenceData,
 		onBudgetsRefresh: loadBudgetsData,

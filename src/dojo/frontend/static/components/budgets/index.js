@@ -399,11 +399,8 @@ const renderGroupRows = (grouped, body, orderedGroups = []) => {
 	const isReorderMode = state.budgets.reorderMode;
 
 	const renderGroup = (group) => {
-		if (
-			!group ||
-			(group.group_id === "uncategorized" && group.items.length === 0)
-		)
-			return;
+		if (!group) return;
+		if (group.group_id !== "uncategorized" && group.items.length === 0) return;
 
 		const collapsed = isGroupCollapsed(group.group_id);
 		const isReorderable = isReorderMode && group.group_id !== "uncategorized";
@@ -486,9 +483,7 @@ const renderGroupRows = (grouped, body, orderedGroups = []) => {
 	orderedGroups.forEach((g) => {
 		renderGroup(grouped[g.group_id]);
 	});
-	if (grouped.uncategorized.items.length > 0) {
-		renderGroup(grouped.uncategorized);
-	}
+	renderGroup(grouped.uncategorized);
 };
 
 export const renderBudgetsPage = () => {
@@ -706,7 +701,7 @@ const openBudgetDetailModal = (category) => {
 			category.goal_amount_minor - category.available_minor,
 		);
 		if (needed > 0) {
-			createBtn("Fund goal", needed, "Fund goal");
+			createBtn("Fund Goal", needed, "Fund Goal");
 		} else {
 			const p = document.createElement("p");
 			p.className = "u-muted u-small-note";
@@ -722,15 +717,15 @@ const openBudgetDetailModal = (category) => {
 
 	if (category.last_month_allocated_minor > 0) {
 		createBtn(
-			"Budgeted last month",
+			"Budgeted Last Month",
 			category.last_month_allocated_minor,
-			"Budgeted last month",
+			"Budgeted Last Month",
 		);
 	}
 
 	const spentLastMonth = -1 * category.last_month_activity_minor;
 	if (spentLastMonth > 0) {
-		createBtn("Spent last month", spentLastMonth, "Spent last month");
+		createBtn("Spent Last Month", spentLastMonth, "Spent Last Month");
 	}
 
 	const editBtn = document.querySelector(selectors.budgetDetailEdit);
@@ -839,12 +834,12 @@ const openGroupDetailModal = (group) => {
 
 	let renderedAction = false;
 	renderedAction =
-		renderGroupAction("Fund underfunded", fundAllocations) || renderedAction;
+		renderGroupAction("Fund Underfunded", fundAllocations) || renderedAction;
 	renderedAction =
-		renderGroupAction("Budgeted last month", budgetedAllocations) ||
+		renderGroupAction("Budgeted Last Month", budgetedAllocations) ||
 		renderedAction;
 	renderedAction =
-		renderGroupAction("Spent last month", spentAllocations) || renderedAction;
+		renderGroupAction("Spent Last Month", spentAllocations) || renderedAction;
 
 	if (!renderedAction) {
 		const p = document.createElement("p");

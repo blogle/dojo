@@ -3,12 +3,15 @@ import "./commands";
 
 // Freeze frontend time and align backend clock via X-Test-Date.
 beforeEach(() => {
-  const now = new Date(2025, 10, 15);
-  const isoDate = now.toISOString().split("T")[0];
+  const testDate = Cypress.env("TEST_DATE");
 
   cy.intercept("**", (req) => {
-    req.headers["x-test-date"] = isoDate;
+    const headerIsoDate = Cypress.env("TEST_DATE") || new Date(Date.now()).toISOString().split("T")[0];
+    req.headers["x-test-date"] = headerIsoDate;
   });
 
-  cy.clock(now.getTime(), ["Date"]);
+  if (testDate) {
+    const now = new Date(`${testDate}T00:00:00Z`);
+    cy.clock(now.getTime(), ["Date"]);
+  }
 });

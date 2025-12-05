@@ -9,5 +9,8 @@ artifacts/
 data/*.duckdb
 src/dojo.egg-info/
 cypress/downloads
+cypress/screenshots
+src/dojo/frontend/static/dist
 node_modules/
 npm-debug.log*
+*.log

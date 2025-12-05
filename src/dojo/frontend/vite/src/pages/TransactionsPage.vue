@@ -377,9 +377,9 @@ const allocationsQuery = useQuery({
   refetchOnWindowFocus: false,
 });
 
-const referenceError = computed(() => referenceQuery.error?.message || '');
-const transactionsError = computed(() => transactionsQuery.error?.message || '');
-const allocationsError = computed(() => allocationsQuery.error?.message || '');
+const referenceError = computed(() => referenceQuery.error.value?.message || '');
+const transactionsError = computed(() => transactionsQuery.error.value?.message || '');
+const allocationsError = computed(() => allocationsQuery.error.value?.message || '');
 
 const isLoadingReference = computed(
   () => referenceQuery.isPending.value || referenceQuery.isFetching.value,
@@ -424,10 +424,10 @@ const updateTransaction = useMutation({
   onSettled: () => invalidateLedgerQueries(),
 });
 
-const accounts = computed(() => referenceQuery.data?.accounts ?? []);
-const categories = computed(() => referenceQuery.data?.categories ?? []);
+const accounts = computed(() => referenceQuery.data.value?.accounts ?? []);
+const categories = computed(() => referenceQuery.data.value?.categories ?? []);
 const transactions = computed(() => {
-  const data = transactionsQuery.data ?? [];
+  const data = transactionsQuery.data.value ?? [];
   return [...data].sort((a, b) => {
     const aDate = a?.transaction_date ? new Date(`${a.transaction_date}T00:00:00`) : 0;
     const bDate = b?.transaction_date ? new Date(`${b.transaction_date}T00:00:00`) : 0;
@@ -451,7 +451,7 @@ const monthSpendMinor = computed(() => {
 
 const monthSpend = computed(() => formatAmount(monthSpendMinor.value));
 const monthBudgetedMinor = computed(() => {
-  const allocations = allocationsQuery.data?.allocations ?? [];
+  const allocations = allocationsQuery.data.value?.allocations ?? [];
   return allocations.reduce((total, entry) => {
     if (!entry?.from_category_id) {
       return total + (entry.amount_minor || 0);

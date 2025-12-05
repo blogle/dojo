@@ -27,7 +27,7 @@ const legacyHash = computed(() => {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 });
 
-const legacySrc = computed(() => `/static/index.html#${legacyHash.value}`);
+const legacySrc = computed(() => `/static/index.html?embed=true#${legacyHash.value}`);
 </script>
 
 <style scoped>

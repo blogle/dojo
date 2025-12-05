@@ -2,8 +2,8 @@ class TransactionPage {
 	elements = {
 		accountSelect: () => cy.get("[data-transaction-account]"),
 		categorySelect: () => cy.get("[data-transaction-category]"),
-		inflowRadio: () => cy.get("[data-transaction-flow][value='inflow']"),
-		outflowRadio: () => cy.get("[data-transaction-flow][value='outflow']"),
+		inflowRadio: () => cy.get('input[value="inflow"]'),
+		outflowRadio: () => cy.get('input[value="outflow"]'),
 		amountInput: () => cy.get("#transaction-form input[name='amount']"),
 		submitButton: () => cy.get("[data-transaction-submit]"),
 		errorDisplay: () => cy.get("[data-testid='transaction-error']"),
