@@ -1,10 +1,6 @@
 <template>
-  <section class="route-page route-page--active legacy-host" data-testid="legacy-host">
-    <header class="legacy-host__header">
-      <p class="page-label">Legacy route</p>
-      <p class="u-muted">This path is still served by the existing app.</p>
-    </header>
-    <div class="legacy-host__frame">
+  <section class="route-page route-page--active app-bridge" data-testid="app-bridge">
+    <div class="app-bridge__frame">
       <iframe
         title="Dojo legacy app"
         loading="lazy"
@@ -31,29 +27,23 @@ const legacySrc = computed(() => `/static/index.html?embed=true#${legacyHash.val
 </script>
 
 <style scoped>
-.legacy-host {
+.app-bridge {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1.5rem;
+  padding: 0; /* Reduced padding as there is no header now, or keep it if layout needs it */
+  height: 100%; /* Ensure it takes full height */
 }
 
-.legacy-host__header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.legacy-host__frame {
+.app-bridge__frame {
   flex: 1;
   min-height: 70vh;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 8px;
+  border: none; /* Remove border if we want it seamless */
   overflow: hidden;
   background: #fff;
 }
 
-.legacy-host__frame iframe {
+.app-bridge__frame iframe {
   width: 100%;
   height: 100%;
   border: none;
