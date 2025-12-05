@@ -39,6 +39,24 @@ scripts/run-tests --skip-integration
 scripts/run-tests --skip-property --skip-integration
 ```
 
+### `scripts/search-logs`
+
+- **Description**: Surfaces temp log files produced by `scripts/run-tests` or `scripts/lint` so you can inspect or ripgrep them by suite/tool (e.g., e2e, unit, ruff). Pass the temp directory name (basename only, e.g., `dojo-run-tests-abcd`) as the first argument or via `-n/--name`; it expands under `${TMPDIR:-/tmp}`.
+- **Options**:
+  - Positional `NAME` or `-n`/`--name NAME` (required): temp directory name under `${TMPDIR:-/tmp}`
+  - Suite selectors: `--frontend`, `--unit`, `--property`, `--integration`, `--e2e`, `--tests`, or `--test SUITE`
+  - Linter selectors: `--lint`, `--ruff`, `--sqlfluff`, `--biome`, `--actionlint`, `--py-sql`
+  - `--pattern PATTERN`: search with ripgrep instead of printing full logs
+  - `--list`: show the `.log` files in the directory (with counts/bytes)
+  - `--all`: include every `.log` file (default if no selectors are passed)
+- **Example usage**:
+
+```
+scripts/search-logs -n dojo-run-tests-abcd --test e2e
+scripts/search-logs -n dojo-lint-abcd --lint --pattern error
+scripts/search-logs dojo-run-tests-abcd --tests --list
+```
+
 ### `scripts/run-migrations-check`
 
 - **Description**: Applies all migrations against a temporary DuckDB file and logs the plan (optional) so migration safety can be verified in CI or locally without touching real data. Cleans up the temp file on success and prints its path on failure.

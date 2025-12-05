@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# NAME
+#     search-logs - find and inspect linter/test logs by suite
+# SYNOPSIS
+#     scripts/search-logs NAME|--name NAME [selectors] [--pattern PATTERN] [--list] [-h|--help]
+# DESCRIPTION
+#     Targets log files emitted by scripts/run-tests and scripts/lint. Pass suite flags like
+#     --e2e or --unit to fetch specific test logs, or --lint/--ruff/etc. to focus on linters.
+#     Without --pattern the script prints the selected logs with headers; with --pattern it uses
+#     ripgrep to search within them. NAME is the temp directory basename (e.g., dojo-run-tests-abc123)
+#     and is expanded under ${TMPDIR:-/tmp}.
+
+set -euo pipefail
+shopt -s nullglob
+
+readonly SCRIPT_NAME="search-logs"
+
+LOG_DIR=""
+LOG_NAME=""
+PATTERN=""
+LIST_ONLY=0
+
+LOG_BASE="${TMPDIR:-/tmp}"
+
+declare -a SELECTORS=()
+declare -a FILES=()
+declare -A SEEN_FILES=()
+
+usage() {
+    cat <<EOF
+NAME
+    ${SCRIPT_NAME} - locate and search linter/test logs from temp run directories
+SYNOPSIS
+    scripts/${SCRIPT_NAME} NAME|--name NAME [--e2e|--unit|--property|--integration|--frontend|--tests|--test SUITE] [--lint|--ruff|--sqlfluff|--biome|--actionlint|--py-sql] [--all] [--pattern PATTERN] [--list] [-h|--help]
+DESCRIPTION
+    Pulls the relevant .log files created by scripts/run-tests or scripts/lint. Pass the temp directory
+    name (e.g., dojo-run-tests-abc123) via positional NAME or --name/-n; the script expands it under
+    ${TMPDIR:-/tmp}. Suite flags like --e2e or --test e2e target the Cypress run; --lint scopes to
+    linters. With --pattern, ripgrep searches the selected files; otherwise the script prints each file
+    with a header.
+EOF
+}
+
+die() {
+    echo "$1" >&2
+    exit 1
+}
+
+add_selector() {
+    local sel
+    sel=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    SELECTORS+=("$sel")
+}
+
+add_files() {
+    if [[ -z "$LOG_DIR" ]]; then
+        die "log directory is required before selecting files"
+    fi
+    for pattern in "$@"; do
+        for file in "${LOG_DIR}/${pattern}"; do
+            if [[ -f "$file" && -z "${SEEN_FILES[$file]+x}" ]]; then
+                FILES+=("$file")
+                SEEN_FILES["$file"]=1
+            fi
+        done
+    done
+}
+
+resolve_selector() {
+    case "$1" in
+        e2e)
+            add_files "e2e-tests-cypress.log"
+            ;;
+        integration)
+            add_files "integration-tests.log"
+            ;;
+        property)
+            add_files "property-tests.log"
+            ;;
+        unit)
+            add_files "unit-tests.log"
+            ;;
+        frontend)
+            add_files "frontend-unit-tests.log"
+            ;;
+        tests)
+            add_files \
+                "frontend-unit-tests.log" \
+                "unit-tests.log" \
+                "property-tests.log" \
+                "integration-tests.log" \
+                "e2e-tests-cypress.log"
+            ;;
+        lint)
+            add_files \
+                "ruff.log" \
+                "sqlfluff.log" \
+                "biome.log" \
+                "actionlint.log" \
+                "py-sql-check.log"
+            ;;
+        ruff)
+            add_files "ruff.log"
+            ;;
+        sqlfluff)
+            add_files "sqlfluff.log"
+            ;;
+        biome)
+            add_files "biome.log"
+            ;;
+        actionlint)
+            add_files "actionlint.log"
+            ;;
+        py-sql|py-sql-check)
+            add_files "py-sql-check.log"
+            ;;
+        all)
+            add_files "*.log"
+            ;;
+        *)
+            die "Unknown selector: $1"
+            ;;
+    esac
+}
+
+list_available() {
+    local found=0
+    for file in "${LOG_DIR}"/*.log; do
+        if [[ -f "$file" ]]; then
+            found=1
+            local lines bytes
+            lines=$(wc -l <"$file" | tr -d '[:space:]')
+            bytes=$(stat -c%s "$file")
+            printf "%s (lines: %s, bytes: %s)\n" "$(basename "$file")" "$lines" "$bytes"
+        fi
+    done
+    if [[ "$found" -eq 0 ]]; then
+        echo "No .log files found in ${LOG_DIR}" >&2
+    fi
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -n|--name)
+                shift
+                [[ $# -gt 0 ]] || die "--name requires a directory name"
+                LOG_NAME="$1"
+                shift
+                ;;
+            --pattern)
+                shift
+                [[ $# -gt 0 ]] || die "--pattern requires an argument"
+                PATTERN="$1"
+                shift
+                ;;
+            --pattern=*)
+                PATTERN="${1#*=}"
+                shift
+                ;;
+            --list)
+                LIST_ONLY=1
+                shift
+                ;;
+            --test)
+                shift
+                [[ $# -gt 0 ]] || die "--test requires a suite (e.g., e2e)"
+                add_selector "$1"
+                shift
+                ;;
+            --test=*)
+                add_selector "${1#*=}"
+                shift
+                ;;
+            --e2e|--integration|--property|--unit|--frontend|--tests|--lint|--ruff|--sqlfluff|--biome|--actionlint|--py-sql|--py-sql-check|--all)
+                add_selector "${1#--}"
+                shift
+                ;;
+            --*)
+                die "Unknown option: $1"
+                ;;
+            *)
+                if [[ -z "$LOG_NAME" ]]; then
+                    LOG_NAME="$1"
+                    shift
+                else
+                    die "Unexpected argument: $1"
+                fi
+                ;;
+        esac
+    done
+}
+
+print_headers_and_files() {
+    for file in "${FILES[@]}"; do
+        echo "===== ${file} ====="
+        cat "$file"
+        echo
+    done
+}
+
+main() {
+    parse_args "$@"
+
+    [[ -n "$LOG_NAME" ]] || die "log directory name (positional or --name) is required"
+    [[ "$LOG_NAME" != */* ]] || die "provide a directory name (no slashes)"
+    LOG_DIR="${LOG_BASE%/}/$LOG_NAME"
+
+    [[ -d "$LOG_DIR" ]] || die "Log directory not found: $LOG_DIR"
+
+    if [[ ${#SELECTORS[@]} -eq 0 ]]; then
+        add_selector "all"
+    fi
+
+    for selector in "${SELECTORS[@]}"; do
+        resolve_selector "$selector"
+    done
+
+    if [[ ${#FILES[@]} -eq 0 ]]; then
+        echo "No matching log files found for selectors: ${SELECTORS[*]:-all}" >&2
+        list_available
+        exit 1
+    fi
+
+    if [[ "$LIST_ONLY" -eq 1 && -z "$PATTERN" ]]; then
+        list_available
+        exit 0
+    fi
+
+    if [[ "$LIST_ONLY" -eq 1 ]]; then
+        list_available
+        echo
+    fi
+
+    if [[ -n "$PATTERN" ]]; then
+        if ! command -v rg >/dev/null 2>&1; then
+            die "ripgrep (rg) is required for --pattern searches"
+        fi
+        rg --no-heading --line-number "$PATTERN" "${FILES[@]}"
+        exit 0
+    fi
+
+    print_headers_and_files
+}
+
+main "$@"
