@@ -38,6 +38,7 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 - [x] (2025-12-05 08:15Z) Cleaned up visible migration artifacts ("VUE TRANSACTIONS PAGE", "Legacy route" headers) to ensure a seamless user experience as requested.
 - [x] (2025-12-06 09:00Z) Implemented Vue versions of `AccountsPage`, `BudgetPage`, `AllocationsPage`, and `TransfersPage`.
 - [x] (2025-12-06 09:15Z) Updated router to serve new pages and verified build success.
+- [x] (2025-12-06 09:30Z) Verified `npm run build` succeeds and `scripts/run-tests --skip-e2e` passes. Migration of all pages is complete.
 
 ## Surprises & Discoveries
 
@@ -67,7 +68,11 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 
 ## Outcomes & Retrospective
 
-To be filled as milestones land: what shipped, remaining gaps, and lessons about Vue + TanStack + Vite in this codebase.
+- **Migration Complete:** All five core pages (Transactions, Transfers, Allocations, Accounts, Budgets) are now Vue 3 SFCs using TanStack Query.
+- **Build & Tests:** The Vite build is reproducible via `npm run build` and integrated into the CI pipeline. Unit tests run via Vitest. Backend tests pass.
+- **Legacy Fallback:** `LegacyHost` remains as a catch-all route, ensuring that any unmigrated paths (if they existed) would still function, though all known routes are migrated.
+- **Performance:** DOM updates are now fine-grained (Vue Reactivity) rather than destructive `innerHTML` replacements, eliminating "detached element" flakes in theory.
+- **Next Steps:** The E2E suite needs to be fully validated against the Vue app. The "iframe bridge" in Page Objects can likely be simplified now that the app renders directly in the main window.
 
 ## Context and Orientation
 
