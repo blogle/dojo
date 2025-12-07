@@ -1,59 +1,47 @@
-const getLegacyBody = () => {
-	return cy.get("body").then(($body) => {
-		if ($body.find('iframe[title="Dojo legacy app"]').length) {
-			return cy
-				.get('iframe[title="Dojo legacy app"]')
-				.its("0.contentDocument.body")
-				.should("not.be.empty")
-				.then(cy.wrap);
-		}
-		return cy.get("body");
-	});
-};
-
 class BudgetPage {
 	elements = {
-		readyToAssignValue: () => getLegacyBody().find("#budgets-ready-value"),
-		activityValue: () => getLegacyBody().find("#budgets-activity-value"),
-		availableValue: () => getLegacyBody().find("#budgets-available-value"),
-		budgetsBody: () => getLegacyBody().find("#budgets-body"),
+		readyToAssignValue: () => cy.get("#budgets-ready-value"),
+		activityValue: () => cy.get("#budgets-activity-value"),
+		availableValue: () => cy.get("#budgets-available-value"),
+		budgetsBody: () => cy.get("#budgets-body"),
 
-		reorderButton: () => getLegacyBody().find("[data-budgets-reorder]"),
-		reorderSaveButton: () => getLegacyBody().find("[data-budgets-reorder-save]"),
+		reorderButton: () => cy.get("[data-budgets-reorder]"),
+		reorderSaveButton: () => cy.get("[data-budgets-reorder-save]"),
 		reorderCancelButton: () =>
-			getLegacyBody().find("[data-budgets-reorder-cancel]"),
-		groupDragHandles: () => getLegacyBody().find(".group-row__drag-handle"),
+			cy.get("[data-budgets-reorder-cancel]"),
+		groupDragHandles: () => cy.get(".group-row__drag-handle"),
 
-		createGroupButton: () => getLegacyBody().find("[data-open-group-modal]"),
-		groupNameInput: () => getLegacyBody().find("[data-testid='group-name-input']"),
-		saveGroupButton: () => getLegacyBody().find("[data-testid='save-group-btn']"),
+		createGroupButton: () => cy.get("[data-testid='create-group-btn']"),
+		groupNameInput: () => cy.get("[data-testid='group-name-input']"),
+		saveGroupButton: () => cy.get("[data-testid='save-group-btn']"),
 
 		categoryGroupSelect: () =>
-			getLegacyBody().find("[data-testid='category-group-select']"),
+			cy.get("[data-testid='category-group-select']"),
 		saveCategoryButton: () =>
-			getLegacyBody().find("[data-testid='save-category-btn']"),
+			cy.get("[data-testid='save-category-btn']"),
 
-		addBudgetButton: () => getLegacyBody().find("[data-open-category-modal]"),
+		addBudgetButton: () => cy.get("[data-testid='add-budget-button']"),
 		categoryNameInput: () =>
-			getLegacyBody().find("[data-testid='category-name-input']"),
+			cy.get("[data-testid='category-name-input']"),
 		goalTypeRecurringRadio: () =>
-			getLegacyBody().find("[data-testid='goal-type-recurring']"),
+			cy.get("[data-testid='goal-type-recurring']"),
 		goalTypeTargetDateRadio: () =>
-			getLegacyBody().find("[data-testid='goal-type-target-date']"),
-		targetDateInput: () => getLegacyBody().find("[data-testid='target-date-input']"),
+			cy.get("[data-testid='goal-type-target-date']"),
+		targetDateInput: () => cy.get("[data-testid='target-date-input']"),
 		targetAmountInput: () =>
-			getLegacyBody().find("[data-testid='target-amount-input']"),
-		frequencySelect: () => getLegacyBody().find("[data-testid='frequency-select']"),
+			cy.get("[data-testid='target-amount-input']"),
+		frequencySelect: () => cy.get("[data-testid='frequency-select']"),
 		recurringDateInput: () =>
-			getLegacyBody().find("[data-testid='recurring-date-input']"),
+			cy.get("[data-testid='recurring-date-input']"),
 		recurringAmountInput: () =>
-			getLegacyBody().find("[data-testid='recurring-amount-input']"),
+			cy.get("[data-testid='recurring-amount-input']"),
 
-		budgetDetailModal: () => getLegacyBody().find("#budget-detail-modal"),
-		budgetDetailQuickActions: () => getLegacyBody().find("[data-quick-actions]"),
-		groupDetailModal: () => getLegacyBody().find("#group-detail-modal"),
+		budgetDetailModal: () => cy.get("#budget-detail-modal"),
+		budgetDetailQuickActions: () =>
+			cy.get("#budget-detail-modal .quick-allocations__actions"),
+		groupDetailModal: () => cy.get("#group-detail-modal"),
 		groupDetailQuickActions: () =>
-			getLegacyBody().find("[data-group-quick-actions]"),
+			cy.get("#group-detail-modal .quick-allocations__actions"),
 	};
 
 	visit() {
@@ -88,7 +76,7 @@ class BudgetPage {
 	}
 
 	categoryRow(name) {
-		return getLegacyBody().contains(
+		return cy.contains(
 			'[data-testid="budget-category-row"]',
 			name,
 			{
@@ -98,7 +86,7 @@ class BudgetPage {
 	}
 
 	groupRow(name) {
-		return getLegacyBody().contains('[data-testid="budget-group-row"]', name, {
+		return cy.contains('[data-testid="budget-group-row"]', name, {
 			timeout: 10000,
 		});
 	}
@@ -135,8 +123,7 @@ class BudgetPage {
 	assertGroupOrder(names) {
 		const expectedIds = names.map((name) => this.getGroupIdFromName(name));
 		const ignoredIds = new Set(["credit_card_payments", "uncategorized"]);
-		getLegacyBody()
-			.find('[data-testid="budget-group-row"]')
+		cy.get('[data-testid="budget-group-row"]')
 			.should(($rows) => {
 				const ids = Array.from($rows)
 					.map((row) => row.dataset.groupId)
@@ -185,31 +172,36 @@ class BudgetPage {
 	}
 
 	assignCategoryToGroup(categoryName, groupName) {
-		this.categoryRow(categoryName).scrollIntoView().click();
-		getLegacyBody().find("#budget-detail-modal").should("be.visible");
+		this.categoryRow(categoryName).scrollIntoView().click({ force: true });
+		cy.get("#budget-detail-modal").should("be.visible");
 		this.clickBudgetDetailEditButton();
-		getLegacyBody().find("#category-modal.is-visible").should("exist");
+		cy.get("#category-modal.is-visible").should("exist");
 		const groupSelect = this.elements.categoryGroupSelect();
 		groupSelect.should("contain", groupName).select(groupName);
 		this.elements.saveCategoryButton().click();
-		getLegacyBody()
-			.find("#category-modal")
-			.should("have.attr", "aria-hidden", "true");
+		cy.get("#category-modal").should("not.exist");
 	}
 
 	verifyGroupContainsCategories(groupName, categories) {
 		categories.forEach((category) => {
-			getLegacyBody()
-				.contains('[data-testid="budget-category-row"]', category)
+			cy.contains('[data-testid="budget-category-row"]', category)
 				.should("be.visible");
 		});
 	}
 
 	verifyCategoryNotInUncategorized(categoryName) {
-		this.groupRow("Uncategorized").within(() => {
-			cy.contains('[data-testid="budget-category-row"]', categoryName).should(
-				"not.exist",
-			);
+		cy.get("body").then(($body) => {
+			const hasUncategorized =
+				$body.find('[data-testid="budget-group-row"]:contains("Uncategorized")')
+					.length > 0;
+			if (hasUncategorized) {
+				this.groupRow("Uncategorized").within(() => {
+					cy.contains(
+						'[data-testid="budget-category-row"]',
+						categoryName,
+					).should("not.exist");
+				});
+			}
 		});
 	}
 
@@ -260,11 +252,12 @@ class BudgetPage {
 	}
 
 	clickBudgetDetailEditButton() {
-		getLegacyBody()
-			.find("#budget-detail-modal button[data-detail-edit]", { timeout: 10000 })
+		cy.get("#budget-detail-modal")
+			.contains("button", "Edit settings")
+			.scrollIntoView()
 			.should("be.visible")
 			.and("be.enabled")
-			.click();
+			.click({ force: true });
 	}
 
 	openGroupDetailModal(groupName) {
@@ -287,7 +280,7 @@ class BudgetPage {
 	}
 
 	verifyToast(message) {
-		getLegacyBody().find("#toast-stack").should("contain", message);
+		cy.get("#toast-stack").should("contain", message);
 	}
 
 	getGroupIdFromName(groupName) {

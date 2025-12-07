@@ -1,25 +1,16 @@
-const getLegacyBody = () => {
-	return cy.get("body").then(($body) => {
-		if ($body.find('iframe[title="Dojo legacy app"]').length) {
-			return cy
-				.get('iframe[title="Dojo legacy app"]')
-				.its("0.contentDocument.body")
-				.should("not.be.empty")
-				.then(cy.wrap);
-		}
-		return cy.get("body");
-	});
-};
-
 class AllocationPage {
 	elements = {
-		allocationForm: () => getLegacyBody().find("[data-testid='allocation-form']"),
-		categorySelect: () => getLegacyBody().find("[data-allocation-to]"),
-		fromCategorySelect: () => getLegacyBody().find("[data-allocation-from]"),
-		amountInput: () => getLegacyBody().find("input[name='amount']"),
-		memoInput: () => getLegacyBody().find("input[name='memo']"),
-		submitButton: () => getLegacyBody().find("[data-allocation-submit]"),
-		errorDisplay: () => getLegacyBody().find("[data-testid='allocation-error']"),
+		allocationForm: () => cy.get("[data-testid='allocation-form']"),
+		categorySelect: () => cy.get("[data-allocation-to]"),
+		fromCategorySelect: () => cy.get("[data-allocation-from]"),
+		dateInput: () => cy.get("[data-allocation-date]"),
+		amountInput: () => cy.get("input[name='amount']"),
+		memoInput: () => cy.get("input[name='memo']"),
+		submitButton: () => cy.get("[data-allocation-submit]"),
+		errorDisplay: () => cy.get("[data-testid='allocation-error']"),
+		inflowValue: () => cy.get("#allocations-inflow-value"),
+		readyValue: () => cy.get("#allocations-ready-value"),
+		tableRows: () => cy.get("#allocations-body tr"),
 	};
 
 	visit() {
@@ -27,20 +18,6 @@ class AllocationPage {
 	}
 
 	categoryTransfer(fromCategory, toCategory, amountDollars, memo) {
-		this.elements.allocationForm().within(() => {
-			// Note: .within() scopes subsequent commands to the subject.
-			// However, `this.elements.fromCategorySelect()` calls `getLegacyBody()` which starts a NEW chain from `cy.get('body')` or `cy.get('iframe')`.
-			// This breaks the .within() scoping if used incorrectly.
-			// BUT: `fromCategorySelect` returns a chainable that resolves to the element.
-			// If we use it inside .within(), Cypress might complain if we chain off `cy` root.
-			// Actually, `getLegacyBody` uses `cy.get`.
-			// To be safe, we should avoid `this.elements` inside `.within()` if they restart the chain.
-			// Or just don't use `.within()`.
-
-			// Correcting logic: remove .within() and use elements directly.
-		});
-		
-		// Refactoring methods to not use .within() to avoid chain-breaking issues with getLegacyBody helper.
 		this.elements.fromCategorySelect().select(fromCategory);
 		this.elements.categorySelect().select(toCategory);
 		const memoField = this.elements.memoInput();
@@ -60,6 +37,69 @@ class AllocationPage {
 
 	verifyError(errorMessage) {
 		this.elements.errorDisplay().should("have.text", errorMessage);
+	}
+
+	verifyFormError(errorMessage) {
+		this.verifyError(errorMessage);
+	}
+
+	verifyMonthInflow(amount) {
+		this.elements.inflowValue().should("contain", amount);
+	}
+
+	verifyReadyToAssign(amount) {
+		this.elements.readyValue().should("contain", amount);
+	}
+
+	getReadyToAssign() {
+		return this.elements.readyValue().invoke("text").then((text) => {
+			return parseFloat(text.replace(/[^0-9.-]+/g, ""));
+		});
+	}
+
+	createAllocation(date, amount, from, to, memo) {
+		this.elements.dateInput().type(date);
+		if (from) {
+			this.elements.fromCategorySelect().select(from);
+		} else {
+			this.elements.fromCategorySelect().select(""); // Ready to Assign
+		}
+		this.elements.categorySelect().select(to);
+		this.elements.amountInput().clear().type(amount);
+		if (memo) {
+			this.elements.memoInput().clear().type(memo);
+		}
+		this.elements.submitButton().click();
+	}
+
+	verifyAllocationRow(index, date, amount, from, to, memo) {
+		this.elements.tableRows().eq(index).within(() => {
+			cy.contains("td", date);
+			cy.contains("td.amount-cell", amount);
+			if (from) cy.contains("td", from);
+			if (to) cy.contains("td", to);
+			if (memo) cy.contains("td", memo);
+		});
+	}
+
+	editAllocation(index) {
+		this.elements.tableRows().eq(index).click();
+	}
+
+	setInlineAmount(amount) {
+		cy.get("tr.is-editing .amount-cell input").clear().type(amount);
+	}
+
+	setInlineToCategory(category) {
+		cy.get("tr.is-editing select").select(category);
+	}
+
+	setInlineMemo(memo) {
+		cy.get("tr.is-editing input[type='text']").clear().type(memo);
+	}
+
+	saveInlineEdit() {
+		cy.get("tr.is-editing input[type='text']").type("{enter}");
 	}
 }
 

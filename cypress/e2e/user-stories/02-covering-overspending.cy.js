@@ -18,6 +18,7 @@ describe("User Story 02 — Rolling with the Punches", () => {
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("POST", "/api/budget/allocations").as("createAllocation");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+		cy.intercept("GET", "/api/budget/allocations*").as("fetchAllocations");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
 		budgetPage.visit();
@@ -57,10 +58,10 @@ describe("User Story 02 — Rolling with the Punches", () => {
 		accountPage.verifyAccountBalance("House Checking", "$880.00");
 
 		allocationPage.visit();
-		cy.wait("@fetchBudgets");
+		cy.wait("@fetchAllocations");
 		allocationPage.categoryTransfer("Groceries", "Dining Out", "20");
 		cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
-		cy.wait("@fetchBudgets");
+		cy.wait("@fetchAllocations");
 		allocationPage.verifyError("");
 
 		budgetPage.visit();

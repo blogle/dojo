@@ -21,7 +21,11 @@ class TransferPage {
 	}
 
 	verifyError(errorMessage) {
-		this.elements.errorDisplay().should("have.text", errorMessage);
+		if (!errorMessage) {
+			cy.get("[data-testid='transfer-error']").should("not.exist");
+		} else {
+			this.elements.errorDisplay().should("have.text", errorMessage);
+		}
 	}
 }
 

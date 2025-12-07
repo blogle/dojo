@@ -21,7 +21,8 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		// Visit the allocations page and wait for initial data to load
 		cy.visit("/#/allocations");
 		cy.wait("@fetchAllocations");
-		cy.wait("@fetchRTA");
+		// cy.wait("@fetchRTA"); // Flaky, replacing with UI check
+        cy.get("#allocations-ready-value").should("not.contain", "—");
 
 		// Optional: capture the initial RTA value, so we can assert it changed
 		cy.get("#allocations-ready-value")
@@ -46,7 +47,7 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		const newAmountMinor = "600"; // 600_00 in minor units → $600.00, tweak as needed
 
 		cy.get("@editRow").within(() => {
-			cy.get("input[name='amount_minor']")
+			cy.get("input[type='number']")
 				.should("be.visible")
 				.and("not.be.disabled")
 				// Single .type to reduce detach risk; {selectall} keeps UX behavior.

@@ -5,22 +5,6 @@ const SUFFICIENT_FIXTURE =
 const INSUFFICIENT_FIXTURE =
 	"tests/fixtures/e2e_quick_allocate_budget_insufficient.sql";
 
-const openBudgetModal = (categoryName) => {
-	cy.contains("#budgets-body tr[data-category-id]", categoryName)
-		.scrollIntoView()
-		.click({ force: true });
-	cy.get("#budget-detail-modal")
-		.should("have.class", "is-visible")
-		.and("have.attr", "aria-hidden", "false");
-};
-
-const clickQuickAllocateButton = (label) => {
-	cy.get("[data-quick-actions]")
-		.contains("button", label)
-		.scrollIntoView()
-		.click({ force: true });
-};
-
 describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
 	context("Successful Allocation", () => {
 		beforeEach(() => {
@@ -44,8 +28,8 @@ describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
 			budgetPage.verifyReadyToAssign("$200.00");
 			budgetPage.verifyAvailableAmount(categoryName, "$0.00");
 
-			openBudgetModal(categoryName);
-			clickQuickAllocateButton(quickAllocateLabel);
+			budgetPage.openBudgetDetailModal(categoryName);
+			budgetPage.clickQuickAllocateButton(quickAllocateLabel);
 			cy.wait("@allocateBudget").its("response.statusCode").should("eq", 201);
 			cy.wait("@fetchBudgets");
 			cy.wait("@fetchReady");
@@ -85,8 +69,8 @@ describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
 
 			cy.window().then((win) => cy.stub(win, "alert").as("alertStub"));
 
-			openBudgetModal(categoryName);
-			clickQuickAllocateButton(quickAllocateLabel);
+			budgetPage.openBudgetDetailModal(categoryName);
+			budgetPage.clickQuickAllocateButton(quickAllocateLabel);
 
 			cy.get("@alertStub").should(
 				"have.been.calledWith",

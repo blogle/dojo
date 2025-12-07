@@ -13,6 +13,7 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchReady");
 		cy.intercept("GET", "/api/accounts*").as("fetchAccounts");
+		cy.intercept("GET", "/api/net-worth/current").as("fetchNetWorth");
 		cy.intercept("POST", "/api/transfers").as("createTransfer");
 	});
 
@@ -25,12 +26,13 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 
 		accountPage.visit();
 		cy.wait("@fetchAccounts");
+		cy.wait("@fetchNetWorth");
 		accountPage.verifyAccountBalance("House Checking", "$10,000.00");
 		accountPage.verifyAccountBalance("Brokerage", "$2,000.00");
-		cy.get("#net-worth").invoke("text").as("initialNetWorth");
-		cy.get("#ready-to-assign").invoke("text").as("initialReadyToAssign");
-		cy.get("#assets-total").invoke("text").as("initialAssets");
-		cy.get("#liabilities-total").invoke("text").as("initialLiabilities");
+		cy.get("#net-worth").should("contain", "$").invoke("text").as("initialNetWorth");
+		cy.get("#ready-to-assign").should("contain", "$").invoke("text").as("initialReadyToAssign");
+		cy.get("#assets-total").should("contain", "$").invoke("text").as("initialAssets");
+		cy.get("#liabilities-total").should("contain", "$").invoke("text").as("initialLiabilities");
 
 		transferPage.visit();
 		transferPage.createTransfer(
@@ -57,6 +59,7 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 
 		accountPage.visit();
 		cy.wait("@fetchAccounts");
+		cy.wait("@fetchNetWorth");
 		accountPage.verifyAccountBalance("House Checking", "$9,600.00");
 		accountPage.verifyAccountBalance("Brokerage", "$2,400.00");
 

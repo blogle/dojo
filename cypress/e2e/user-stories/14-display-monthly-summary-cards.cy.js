@@ -25,6 +25,7 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchReady");
+		cy.intercept("GET", "/api/budget/allocations*").as("fetchAllocations");
 		cy.intercept("POST", "/api/transactions").as("persistTransaction");
 		cy.intercept("POST", "/api/budget/allocations").as("createAllocation");
 	});
@@ -76,6 +77,7 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 		budgetPage.verifyActivity("$200.00");
 
 		allocationPage.visit();
+		cy.wait("@fetchAllocations");
 		allocationPage.categoryTransfer(
 			"Ready to Assign",
 			"Rent",
