@@ -166,3 +166,45 @@ ON CONFLICT (category_id, month_start) DO UPDATE
         inflow_minor = excluded.inflow_minor,
         activity_minor = excluded.activity_minor,
         available_minor = excluded.available_minor;
+
+INSERT INTO budget_allocations (
+    allocation_id,
+    concept_id,
+    allocation_date,
+    month_start,
+    from_category_id,
+    to_category_id,
+    amount_minor,
+    memo,
+    is_active,
+    valid_from,
+    recorded_at
+)
+VALUES
+(
+    '00000000-0000-0000-0000-0000000f1403',
+    '00000000-0000-0000-0000-0000000f1403',
+    DATE '2024-01-01',
+    DATE '2024-01-01',
+    NULL,
+    'groceries',
+    20000,
+    'Initial budget',
+    TRUE,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+),
+(
+    '00000000-0000-0000-0000-0000000f1404',
+    '00000000-0000-0000-0000-0000000f1404',
+    DATE '2024-01-01',
+    DATE '2024-01-01',
+    NULL,
+    'rent',
+    25000,
+    'Initial budget',
+    TRUE,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+

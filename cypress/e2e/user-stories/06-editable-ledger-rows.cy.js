@@ -13,19 +13,31 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		cy.clock(FIXED_NOW);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
+		// Ensure backend is ready (checking Nov 2025 state)
+		cy.ensureBackendState(
+			"/api/budget-categories?month=2025-11-01",
+			(categories) => {
+				const utilities = categories.find((c) => c.name === "Utilities");
+				return utilities && utilities.available_minor === 40000;
+			},
+		);
 	});
 
 	it("edits an erroneous utility payment down to 30.00 while keeping Ready-to-Assign stable", () => {
-		cy.intercept("POST", "/api/transactions").as("mutateTransaction");
+		cy.intercept("POST", "/api/transactions").as("createTransaction");
+		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchRTA");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
 		const correctedDate = "2025-11-14";
 
 		budgetPage.visit();
-		cy.wait("@fetchBudgets");
+		cy.wait(["@fetchBudgets", "@fetchRTA"]);
 		budgetPage.verifyAvailableAmount("Utilities", "$400.00");
+        // Ensure RTA is loaded (fixture: $5000 checking - $400 allocated = $4600)
+        budgetPage.verifyReadyToAssign("$4,600.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();
@@ -39,14 +51,14 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 			"Utilities",
 			"300",
 		);
-		cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
 		cy.wait("@fetchTransactions");
 		transactionPage.verifyError("");
 		transactionPage.verifyTransactionRowAmount(0, "$300.00");
 		transactionPage.verifyTransactionStatus(0, "pending");
 
 		budgetPage.visit();
-		cy.wait("@fetchBudgets");
+		cy.wait(["@fetchBudgets", "@fetchRTA"]);
 		budgetPage.verifyAvailableAmount("Utilities", "$100.00");
 		budgetPage.expectReadyToAssignUnchanged();
 
@@ -64,7 +76,7 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		transactionPage.toggleTransactionStatus();
 		transactionPage.saveInlineEdit();
 
-		cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@updateTransaction").its("response.statusCode").should("eq", 200);
 		cy.wait("@fetchTransactions");
 
 		transactionPage.verifyTransactionRowByMemo("Corrected utility payment", {
@@ -74,7 +86,7 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		});
 
 		budgetPage.visit();
-		cy.wait("@fetchBudgets");
+		cy.wait(["@fetchBudgets", "@fetchRTA"]);
 		budgetPage.verifyAvailableAmount("Utilities", "$370.00");
 		budgetPage.expectReadyToAssignUnchanged();
 

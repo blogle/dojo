@@ -17,6 +17,14 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		cy.clock(FIXED_NOW);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
+		// Ensure backend is ready (checking Nov 2025 state)
+		cy.ensureBackendState(
+			"/api/budget-categories?month=2025-11-01",
+			(categories) => {
+				const dining = categories.find((c) => c.name === "Dining Out");
+				return dining && dining.available_minor === 20000;
+			},
+		);
 	});
 
 	it("edits a pending outflow, toggles cleared, and keeps Ready-to-Assign steady", () => {
@@ -24,11 +32,15 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
         cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchRTA");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");
+		cy.wait("@fetchRTA");
 		budgetPage.verifyAvailableAmount("Dining Out", "$200.00");
+        // Ensure RTA is loaded (fixture: $10,000 checking - $200 allocated = $9,800)
+        budgetPage.verifyReadyToAssign("$9,800.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();

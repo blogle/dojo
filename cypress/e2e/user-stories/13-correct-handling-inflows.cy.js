@@ -15,6 +15,11 @@ describe("User Story 13 — Correct Handling of Inflows in Ledger", () => {
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchReady");
 		cy.intercept("GET", "/api/accounts*").as("fetchAccounts");
 		cy.intercept("POST", "/api/transactions").as("createTransaction");
+		// Ensure backend is ready (Checking Account should have $1,000.00)
+		cy.ensureBackendState("/api/accounts", (accounts) => {
+			const checking = accounts.find((a) => a.name === "House Checking");
+			return checking && checking.current_balance_minor === 100000;
+		});
 	});
 
 	it("renders a refund as a positive inflow and keeps summaries in sync", () => {
@@ -27,6 +32,8 @@ describe("User Story 13 — Correct Handling of Inflows in Ledger", () => {
 		cy.wait("@fetchBudgets");
 		cy.wait("@fetchReady");
 		budgetPage.verifyActivity("$0.00");
+        // Ensure RTA is loaded (fixture: $1,000 checking - 0 allocated = $1,000)
+        budgetPage.verifyReadyToAssign("$1,000.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();

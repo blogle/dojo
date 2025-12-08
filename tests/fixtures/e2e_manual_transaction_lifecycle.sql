@@ -16,7 +16,8 @@ ON CONFLICT (account_id) DO UPDATE
         account_role = excluded.account_role;
 
 INSERT INTO budget_categories (category_id, name, is_active, is_system)
-VALUES ('dining_out', 'Dining Out', TRUE, FALSE)
+VALUES ('dining_out', 'Dining Out', TRUE, FALSE),
+       ('groceries', 'Groceries', TRUE, FALSE)
 ON CONFLICT (category_id) DO UPDATE
     SET
         name = excluded.name,

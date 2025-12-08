@@ -63,7 +63,7 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		// These waits specifically ensure that by the time we check the DOM,
 		// we’ve seen at least one post-update fetch for both.
 		cy.wait("@fetchAllocations");
-		cy.wait("@fetchRTA");
+		// cy.wait("@fetchRTA"); // Not fetched on this page, derived from allocations
 
 		// --- Step 4: verify RTA and row amount in the DOM ---
 

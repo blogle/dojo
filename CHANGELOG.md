@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Python integration test suite (`tests/integration`) for verifying core API logic independently of the frontend.
 - Collapsible budget groups with stable table layout and bulk category assignment from the group modal.
 
 ### Changed
+- Validated and updated Cypress E2E tests to reflect the completed Vue frontend migration.
 - Default recurring budget due dates to the start of the next month.
 - Documented Kubernetes consumption patterns and extracted release-note tooling into a reusable CLI.
 

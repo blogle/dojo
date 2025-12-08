@@ -11,6 +11,11 @@ describe("User Story 02 — Rolling with the Punches", () => {
 	beforeEach(() => {
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
+		// Ensure backend is ready before starting the test
+		cy.ensureBackendState("/api/budget-categories", (categories) => {
+			const dining = categories.find((c) => c.name === "Dining Out");
+			return dining && dining.available_minor === 10000;
+		});
 	});
 
 	it("covers Dining Out overspending by reallocating Groceries funds", () => {
@@ -18,13 +23,20 @@ describe("User Story 02 — Rolling with the Punches", () => {
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("POST", "/api/budget/allocations").as("createAllocation");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
+		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchRTA");
 		cy.intercept("GET", "/api/budget/allocations*").as("fetchAllocations");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");
+		cy.wait("@fetchRTA");
+		cy.get('[data-testid="budget-col-available"]').each(($el) => {
+			cy.log(`Available Amount: ${$el.text()}`);
+		});
 		budgetPage.verifyAvailableAmount("Dining Out", "$100.00");
 		budgetPage.verifyAvailableAmount("Groceries", "$500.00");
+        // Ensure RTA is loaded (fixture: $1000 checking - $600 allocated = $400)
+        budgetPage.verifyReadyToAssign("$400.00");
 		budgetPage.rememberReadyToAssign();
 
 		transactionPage.visit();
@@ -49,6 +61,9 @@ describe("User Story 02 — Rolling with the Punches", () => {
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");
+		cy.get('[data-testid="budget-col-available"]').each(($el) => {
+			cy.log(`Available Amount After Transaction: ${$el.text()}`);
+		});
 		budgetPage.verifyAvailableAmount("Dining Out", "-$20.00");
 		budgetPage.verifyAvailableAmount("Groceries", "$500.00");
 		budgetPage.expectReadyToAssignUnchanged();
@@ -66,6 +81,9 @@ describe("User Story 02 — Rolling with the Punches", () => {
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");
+		cy.get('[data-testid="budget-col-available"]').each(($el) => {
+			cy.log(`Available Amount After Allocation: ${$el.text()}`);
+		});
 		budgetPage.verifyAvailableAmount("Dining Out", "$0.00");
 		budgetPage.verifyAvailableAmount("Groceries", "$480.00");
 		budgetPage.expectReadyToAssignUnchanged();

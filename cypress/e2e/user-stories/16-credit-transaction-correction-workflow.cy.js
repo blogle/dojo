@@ -13,6 +13,7 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
 		cy.seedDatabase(FIXTURE);
 		cy.clock(FIXED_NOW);
 		cy.intercept("POST", "/api/transactions").as("mutateTransaction");
+		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
@@ -109,7 +110,7 @@ describe("User Story 16 — Credit Transaction Correction Workflow", () => {
 		transactionPage.editTransaction(0);
 		transactionPage.selectInlineAccount(mastercardAccount);
 		transactionPage.saveInlineEdit();
-		cy.wait("@mutateTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@updateTransaction").its("response.statusCode").should("eq", 200);
 		cy.wait("@fetchTransactions");
 
 		// Verify budgets after correction

@@ -27,6 +27,7 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchReady");
 		cy.intercept("GET", "/api/budget/allocations*").as("fetchAllocations");
 		cy.intercept("POST", "/api/transactions").as("persistTransaction");
+		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("POST", "/api/budget/allocations").as("createAllocation");
 	});
 
@@ -60,7 +61,7 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 		transactionPage.setInlineOutflow("200");
 		cy.get("[data-inline-outflow]").should("have.value", "200");
 		transactionPage.saveInlineEdit();
-		cy.wait("@persistTransaction").its("response.statusCode").should("eq", 201);
+		cy.wait("@updateTransaction").its("response.statusCode").should("eq", 200);
 		cy.wait("@fetchTransactions");
 
 		cy.get("#transactions-body tr").should("have.length", 2); // Ensure no duplicate created
