@@ -103,3 +103,50 @@
 	opacity: 0.5;
 	pointer-events: none;
 }
+
+.action-button {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	color: var(--danger);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: opacity 0.2s;
+	width: 24px;
+	height: 24px;
+	margin-left: 0.5rem;
+}
+
+.action-button:hover {
+	opacity: 0.8;
+}
+
+.action-button svg {
+	width: 20px;
+	height: 20px;
+	stroke: currentColor;
+	stroke-width: 2;
+	fill: none;
+}
+
+.is-deleting td {
+	transition:
+		padding 0.5s ease,
+		height 0.5s ease,
+		opacity 0.5s ease;
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	height: 0 !important;
+	line-height: 0;
+	opacity: 0;
+	overflow: hidden;
+	border: none;
+}
+
+.cell-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}

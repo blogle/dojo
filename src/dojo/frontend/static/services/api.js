@@ -76,6 +76,12 @@ export const api = {
 			await invalidateLedgerQueries();
 			return result;
 		},
+		delete: async (conceptId) => {
+			await fetchJSON(`/api/transactions/${conceptId}`, {
+				method: "DELETE",
+			});
+			await invalidateLedgerQueries();
+		},
 	},
 	transfers: {
 		create: async (payload) => {

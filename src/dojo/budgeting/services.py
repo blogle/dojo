@@ -308,6 +308,36 @@ class TransactionEntryService:
             current_date=current_date,
         )
 
+    def delete_transaction(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        concept_id: UUID,
+    ) -> None:
+        """
+        Deletes (deactivates) a transaction using SCD-2 logic.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            The DuckDB connection object.
+        concept_id : UUID
+            The concept ID of the transaction to delete.
+        """
+        dao = BudgetingDAO(conn)
+        # Check if transaction exists
+        existing = dao.get_active_transaction(concept_id)
+        if not existing:
+            raise InvalidTransactionError("Transaction not found or not active.")
+
+        # Start a database transaction
+        with dao.transaction():
+            # Reverse effects (balances, category activity, etc.)
+            self._reverse_transaction_effects(dao, existing)
+
+            # Close the active transaction
+            recorded_at = datetime.now(UTC)
+            dao.close_active_transaction(concept_id, recorded_at)
+
     def transfer(
         self,
         conn: duckdb.DuckDBPyConnection,

@@ -82,8 +82,7 @@ def test_create_transaction_updates_account_and_category(
     assert response.account.current_balance_minor == 500000 - 12345
     # Assert category available funds reflect the transaction. (Initial 0 - 12345)
     # Note: For spending, available_minor decreases, activity_minor increases (positive value for outflow).
-    # The initial available for groceries is 0, then allocated + activity_minor.
-    # The base_budgeting.sql sets groceries to 0, so the available will be 0 - 12345.
+    # The initial available for groceries is 0, so the available will be 0 - 12345.
     assert response.category.available_minor == -12345
     # Verify that exactly one transaction version exists for this concept.
     count_row = _fetch_namespace(
@@ -827,4 +826,65 @@ def test_ready_to_assign_with_activity(in_memory_db: duckdb.DuckDBPyConnection) 
     # This means the test effectively asserts that `ready_to_assign` equals the
     # initial total cash balance of on-budget accounts before the spending occurred.
     expected = expected_cash + (-amount)
-    assert ready == expected
+    assert ready == expected_cash + (-amount)
+
+
+def test_delete_transaction_reverses_effects_and_deactivates(
+    in_memory_db: duckdb.DuckDBPyConnection,
+) -> None:
+    """
+    Verifies that deleting a transaction correctly reverses its financial effects
+    (account balance, category activity) and marks it as inactive.
+    """
+    service = TransactionEntryService()
+    month_start = date.today().replace(day=1)
+
+    # Create a transaction
+    cmd = NewTransactionRequest(
+        transaction_date=date.today(),
+        account_id="house_checking",
+        category_id="groceries",
+        amount_minor=-10000,
+        memo="To be deleted",
+    )
+    tx = service.create(in_memory_db, cmd)
+
+    # Verify baseline state
+    # Account: 500000 - 10000 = 490000
+    acc = in_memory_db.execute(
+        "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_checking'"
+    ).fetchone()
+    assert acc[0] == 490000
+
+    # Category: available decreased by 10000
+    cat = in_memory_db.execute(
+        "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = 'groceries' AND month_start = ?",
+        [month_start],
+    ).fetchone()
+    assert cat[0] == -10000
+
+    # Delete the transaction
+    service.delete_transaction(in_memory_db, tx.concept_id)
+
+    # Verify transaction is inactive
+    rows = in_memory_db.execute(
+        "SELECT is_active FROM transactions WHERE concept_id = ?",
+        [str(tx.concept_id)],
+    ).fetchall()
+    # Should be at least one row, all inactive
+    assert len(rows) > 0
+    assert all(row[0] is False for row in rows)
+
+    # Verify effects reversed
+    # Account back to 500000
+    acc_after = in_memory_db.execute(
+        "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_checking'"
+    ).fetchone()
+    assert acc_after[0] == 500000
+
+    # Category available back to 0
+    cat_after = in_memory_db.execute(
+        "SELECT available_minor FROM budget_category_monthly_state WHERE category_id = 'groceries' AND month_start = ?",
+        [month_start],
+    ).fetchone()
+    assert cat_after[0] == 0

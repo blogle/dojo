@@ -173,7 +173,7 @@
             <tr
               v-for="tx in transactions"
               :key="tx.transaction_version_id"
-              :class="{ 'is-editing': isEditing(tx), 'is-saving': isSavingInline(tx) }"
+              :class="{ 'is-editing': isEditing(tx), 'is-saving': isSavingInline(tx), 'is-deleting': deletingIds.has(tx.transaction_version_id) }"
               @click="handleRowClick(tx)"
             >
               <template v-if="isEditing(tx)">
@@ -251,17 +251,30 @@
                   />
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    class="status-toggle-badge"
-                    data-inline-status-toggle
-                    :data-state="inlineForm.status"
-                    role="switch"
-                    :aria-checked="inlineForm.status === 'cleared' ? 'true' : 'false'"
-                    :disabled="inlineSubmitting"
-                    @click.stop="toggleInlineStatus"
-                    v-html="statusIcons"
-                  ></button>
+                  <div class="cell-actions">
+                    <button
+                      type="button"
+                      class="status-toggle-badge"
+                      data-inline-status-toggle
+                      :data-state="inlineForm.status"
+                      role="switch"
+                      :aria-checked="inlineForm.status === 'cleared' ? 'true' : 'false'"
+                      :disabled="inlineSubmitting"
+                      @click.stop="toggleInlineStatus"
+                      v-html="statusIcons"
+                    ></button>
+                    <button
+                      type="button"
+                      class="action-button"
+                      title="Delete transaction"
+                      @click.stop="handleDelete(tx)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </template>
               <template v-else>
@@ -514,6 +527,32 @@ const handleTransactionSubmit = async () => {
 
 const isEditing = (tx) => editingId.value === tx.transaction_version_id;
 const isSavingInline = (tx) => updateTransaction.isPending.value && isEditing(tx);
+
+const deletingIds = reactive(new Set());
+
+const handleDelete = async (tx) => {
+  if (!tx?.concept_id) return;
+  // Determine if we should confirm. For now, let's just do it as requested (click -> animate -> gone).
+  // Ideally, "click a red trash can" is explicit enough, but a confirm is safer. 
+  // The prompt implies a direct action: "When clicked, we mark the row as inactive..."
+  // I'll skip confirm for now to match the "fluid" feel, or maybe add it if it feels too dangerous.
+  // "click a row to make it editable... click a red trash can" -> fairly deliberate.
+  
+  deletingIds.add(tx.transaction_version_id);
+  
+  // Start animation immediately
+  try {
+    // Wait for animation duration (match CSS transition)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await api.transactions.delete(tx.concept_id);
+    editingId.value = null; // Exit edit mode
+  } catch (error) {
+    console.error(error);
+    deletingIds.delete(tx.transaction_version_id);
+    // Ideally show a toast here, but for now we'll just log it and revert the state
+    alert(error.message || 'Failed to delete transaction.');
+  }
+};
 
 const populateInlineForm = (tx) => {
   inlineForm.transaction_date = tx.transaction_date || todayISO();
