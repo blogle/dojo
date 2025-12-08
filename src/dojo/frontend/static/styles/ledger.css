@@ -58,7 +58,7 @@
 	cursor: pointer;
 }
 
-.status-toggle-badge.is-cleared {
+.status-toggle-badge[data-state="cleared"] {
 	background-color: var(--primary);
 	border-color: var(--primary-hover);
 	color: var(--bg);
@@ -89,8 +89,8 @@
 	stroke-linejoin: round;
 }
 
-.status-toggle-badge.is-cleared .status-icon--check,
-.status-toggle-badge.is-pending .status-icon--pending {
+.status-toggle-badge[data-state="cleared"] .status-icon--check,
+.status-toggle-badge[data-state="pending"] .status-icon--pending {
 	opacity: 1;
 	transform: scale(1);
 }
