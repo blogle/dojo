@@ -105,22 +105,26 @@
 }
 
 .action-button {
-	background: none;
-	border: none;
+	background-color: var(--stone-50); /* Match status-toggle-badge */
+	border: 2px solid var(--accent); /* Match status-toggle-badge */
+	border-radius: 0.4rem; /* Match status-toggle-badge */
 	cursor: pointer;
 	padding: 0;
 	color: var(--danger);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	transition: opacity 0.2s;
+	transition: opacity 0.2s, background-color 0.2s ease, border-color 0.2s ease;
 	width: 24px;
 	height: 24px;
 	margin-left: 0.5rem;
 }
 
 .action-button:hover {
-	opacity: 0.8;
+	opacity: 1; /* Reset opacity from previous hover */
+	background-color: var(--danger); /* Red background on hover */
+	border-color: var(--danger); /* Red border on hover */
+	color: var(--bg); /* White icon on hover */
 }
 
 .action-button svg {
