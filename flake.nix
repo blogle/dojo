@@ -51,11 +51,34 @@
         root = "$REPO_ROOT";
       };
 
+      mkFrontend = pkgs: pkgs.buildNpmPackage {
+        pname = "dojo-frontend";
+        version = "0.0.0";
+        src = ./src/dojo/frontend/vite;
+        npmDepsHash = "sha256-+TocTOZG0/j+rZQa4Cx1cGbzjDEztc96V0zP933e9Yo=";
+        nodejs = pkgs.nodejs_20;
+        npmBuild = "npm run build";
+        installPhase = ''
+          mkdir -p $out/dist
+          cp -r dist/. $out/dist
+        '';
+      };
+
       pythonSets = forAllSystems (
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           python = pkgs.python312;
+          frontend = mkFrontend pkgs;
+          
+          frontendOverlay = final: prev: {
+            dojo = prev.dojo.overrideAttrs (old: {
+              preBuild = (old.preBuild or "") + ''
+                mkdir -p src/dojo/frontend/static/dist
+                cp -r ${frontend}/dist/. src/dojo/frontend/static/dist/
+              '';
+            });
+          };
         in
         (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
@@ -65,6 +88,7 @@
               pyproject-build-systems.overlays.wheel
               overlay
               dependencyOverlay
+              frontendOverlay
             ]
           )
       );
@@ -137,18 +161,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           pythonSet = pythonSets.${system};
           app-env = pythonSet.mkVirtualEnv "dojo-env" workspace.deps.default;
-          frontendDist = pkgs.buildNpmPackage {
-            pname = "dojo-frontend";
-            version = "0.0.0";
-            src = ./src/dojo/frontend/vite;
-            npmDepsHash = "sha256-+TocTOZG0/j+rZQa4Cx1cGbzjDEztc96V0zP933e9Yo=";
-            nodejs = pkgs.nodejs_20;
-            npmBuild = "npm run build";
-            installPhase = ''
-              mkdir -p $out/dist
-              cp -r dist/. $out/dist
-            '';
-          };
+          frontendDist = mkFrontend pkgs;
         in {
           default = app-env;
           frontend = frontendDist;
