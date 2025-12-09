@@ -111,6 +111,7 @@
               duckdb
               nodejs_20
               mermaid-cli
+              prefetch-npm-deps
               python312
               ruff
               sqlfluff

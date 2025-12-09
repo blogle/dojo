@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This script updates the npmDepsHash in flake.nix based on the current package-lock.json
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+LOCK_FILE="$REPO_ROOT/src/dojo/frontend/vite/package-lock.json"
+FLAKE_FILE="$REPO_ROOT/flake.nix"
+
+if [ ! -f "$LOCK_FILE" ]; then
+  echo "Error: $LOCK_FILE not found."
+  exit 1
+fi
+
+echo "Calculating new npmDepsHash..."
+NEW_HASH=$(prefetch-npm-deps "$LOCK_FILE")
+
+echo "Updating flake.nix with hash: $NEW_HASH"
+
+# Use sed to replace the existing hash line
+# Matches: npmDepsHash = "sha256-..."
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s|npmDepsHash = \"sha256-.*\"|npmDepsHash = \"$NEW_HASH\"|" "$FLAKE_FILE"
+else
+  sed -i "s|npmDepsHash = \"sha256-.*\"|npmDepsHash = \"$NEW_HASH\"|" "$FLAKE_FILE"
+fi
+
+echo "Done. Verify flake.nix changes with 'git diff'."
