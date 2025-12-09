@@ -1,5 +1,5 @@
-import { minorToDollars } from "./format.js";
 import { populateSelect } from "./dom.js";
+import { minorToDollars } from "./format.js";
 
 export const renderMoneyInput = (valueMinor, name) => {
 	const dollars = valueMinor ? minorToDollars(Math.abs(valueMinor)) : "";
@@ -44,13 +44,14 @@ export const makeRowEditable = (row, data, config) => {
 				});
 			}
 		} else if (col.type === "date") {
-			            td.innerHTML = renderDateInput(data[col.key], col.name);
-			            const input = td.querySelector("input");
-			            if (col.attrs) {
-			                Object.entries(col.attrs).forEach(([k, v]) => {
-			                    input.setAttribute(k, v);
-			                });
-			            }		} else if (col.type === "select") {
+			td.innerHTML = renderDateInput(data[col.key], col.name);
+			const input = td.querySelector("input");
+			if (col.attrs) {
+				Object.entries(col.attrs).forEach(([k, v]) => {
+					input.setAttribute(k, v);
+				});
+			}
+		} else if (col.type === "select") {
 			const select = document.createElement("select");
 			select.name = col.name;
 			select.classList.add("table-input");

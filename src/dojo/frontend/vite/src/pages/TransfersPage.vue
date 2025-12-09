@@ -55,82 +55,87 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { api } from '../../../static/services/api.js';
-import { todayISO, dollarsToMinor } from '../../../static/services/format.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, reactive, ref } from "vue";
+import { api } from "../../../static/services/api.js";
+import { dollarsToMinor, todayISO } from "../../../static/services/format.js";
 
 const queryClient = useQueryClient();
 
 const referenceQuery = useQuery({
-    queryKey: ['reference-data'],
-    queryFn: api.reference.load
+	queryKey: ["reference-data"],
+	queryFn: api.reference.load,
 });
 
 const accounts = computed(() => referenceQuery.data.value?.accounts ?? []);
 const categories = computed(() => referenceQuery.data.value?.categories ?? []);
 
 const form = reactive({
-    transaction_date: todayISO(),
-    source_account_id: '',
-    destination_account_id: '',
-    category_id: '',
-    memo: '',
-    amount: ''
+	transaction_date: todayISO(),
+	source_account_id: "",
+	destination_account_id: "",
+	category_id: "",
+	memo: "",
+	amount: "",
 });
 
-const formError = ref('');
+const formError = ref("");
 
 const createTransferMutation = useMutation({
-    mutationFn: api.transfers.create,
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
-        queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
-    }
+	mutationFn: api.transfers.create,
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["transactions"] });
+		queryClient.invalidateQueries({ queryKey: ["accounts"] });
+		queryClient.invalidateQueries({ queryKey: ["budget-categories"] });
+		queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
+	},
 });
 
 const isSubmitting = computed(() => createTransferMutation.isPending.value);
 
 const sourceError = computed(() => {
-    if (form.source_account_id && form.destination_account_id && form.source_account_id === form.destination_account_id) {
-        return "Source and destination must differ.";
-    }
-    return "";
+	if (
+		form.source_account_id &&
+		form.destination_account_id &&
+		form.source_account_id === form.destination_account_id
+	) {
+		return "Source and destination must differ.";
+	}
+	return "";
 });
 
 const destinationError = computed(() => sourceError.value); // Same error for both
 
 const isValid = computed(() => {
-    return form.source_account_id && 
-           form.destination_account_id && 
-           form.category_id && 
-           form.amount && 
-           form.source_account_id !== form.destination_account_id &&
-           Number(form.amount) > 0;
+	return (
+		form.source_account_id &&
+		form.destination_account_id &&
+		form.category_id &&
+		form.amount &&
+		form.source_account_id !== form.destination_account_id &&
+		Number(form.amount) > 0
+	);
 });
 
 const submitTransfer = async () => {
-    if (!isValid.value) return;
-    formError.value = '';
-    
-    try {
-        await createTransferMutation.mutateAsync({
-            source_account_id: form.source_account_id,
-            destination_account_id: form.destination_account_id,
-            category_id: form.category_id,
-            transaction_date: form.transaction_date,
-            memo: form.memo || null,
-            amount_minor: Math.abs(dollarsToMinor(form.amount))
-        });
-        // Reset form but keep date?
-        form.amount = '';
-        form.memo = '';
-        alert("Transfer posted successfully");
-    } catch (e) {
-        formError.value = e.message || "Transfer failed";
-    }
-};
+	if (!isValid.value) return;
+	formError.value = "";
 
+	try {
+		await createTransferMutation.mutateAsync({
+			source_account_id: form.source_account_id,
+			destination_account_id: form.destination_account_id,
+			category_id: form.category_id,
+			transaction_date: form.transaction_date,
+			memo: form.memo || null,
+			amount_minor: Math.abs(dollarsToMinor(form.amount)),
+		});
+		// Reset form but keep date?
+		form.amount = "";
+		form.memo = "";
+		alert("Transfer posted successfully");
+	} catch (e) {
+		formError.value = e.message || "Transfer failed";
+	}
+};
 </script>

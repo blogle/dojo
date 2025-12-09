@@ -12,18 +12,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 
 const route = useRoute();
 
 const legacyHash = computed(() => {
-  const raw = route.fullPath.startsWith('/') ? route.fullPath.slice(1) : route.fullPath;
-  const normalized = raw === '' ? 'transactions' : raw;
-  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+	const raw = route.fullPath.startsWith("/")
+		? route.fullPath.slice(1)
+		: route.fullPath;
+	const normalized = raw === "" ? "transactions" : raw;
+	return normalized.startsWith("/") ? normalized : `/${normalized}`;
 });
 
-const legacySrc = computed(() => `/static/index.html?embed=true#${legacyHash.value}`);
+const legacySrc = computed(
+	() => `/static/index.html?embed=true#${legacyHash.value}`,
+);
 </script>
 
 <style scoped>

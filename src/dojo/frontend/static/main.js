@@ -4,12 +4,6 @@ import {
 	updateAccountStats,
 } from "./components/accounts/index.js";
 import {
-	initTransactions,
-	refreshTransactions,
-	updateHeaderStats,
-} from "./components/transactions/index.js";
-import { initTransfers } from "./components/transfers/index.js";
-import {
 	initAllocations,
 	loadAllocationsData,
 	renderAllocationsPage,
@@ -19,8 +13,14 @@ import {
 	loadBudgetsData,
 	renderBudgetsPage,
 } from "./components/budgets/index.js";
-import { initRouter } from "./components/router/index.js";
 import { loadReferenceData } from "./components/reference/index.js";
+import { initRouter } from "./components/router/index.js";
+import {
+	initTransactions,
+	refreshTransactions,
+	updateHeaderStats,
+} from "./components/transactions/index.js";
+import { initTransfers } from "./components/transfers/index.js";
 
 const bootstrap = async () => {
 	const params = new URLSearchParams(window.location.search);

@@ -825,7 +825,6 @@ def test_ready_to_assign_with_activity(in_memory_db: duckdb.DuckDBPyConnection) 
     # 1,740,000 + (-(-10,000)) = 1,740,000 + 10,000 = 1,750,000.
     # This means the test effectively asserts that `ready_to_assign` equals the
     # initial total cash balance of on-budget accounts before the spending occurred.
-    expected = expected_cash + (-amount)
     assert ready == expected_cash + (-amount)
 
 

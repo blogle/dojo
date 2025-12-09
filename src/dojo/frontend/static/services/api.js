@@ -39,7 +39,9 @@ const invalidateQueries = async (queryKeys = []) => {
 	}
 	try {
 		await Promise.all(
-			queryKeys.map((queryKey) => client.invalidateQueries({ queryKey: [queryKey] })),
+			queryKeys.map((queryKey) =>
+				client.invalidateQueries({ queryKey: [queryKey] }),
+			),
 		);
 	} catch (error) {
 		console.warn("queryClient invalidation failed", error);

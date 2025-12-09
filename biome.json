@@ -1,0 +1,51 @@
+{
+  "files": {
+    "ignoreUnknown": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/dist/**"],
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["src/dojo/frontend/static/main.js"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noConstructorReturn": "off",
+            "noUnreachableSuper": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -187,182 +187,210 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { api, postOpeningBalanceTransaction } from '../../../static/services/api.js';
-import { formatAmount } from '../../../static/services/format.js';
-import { accountGroupDefinitions, accountTypeMapping } from '../../../static/constants.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, reactive, ref } from "vue";
+import {
+	accountGroupDefinitions,
+	accountTypeMapping,
+} from "../../../static/constants.js";
+import {
+	api,
+	postOpeningBalanceTransaction,
+} from "../../../static/services/api.js";
+import { formatAmount } from "../../../static/services/format.js";
 
 const queryClient = useQueryClient();
-const filter = ref('all');
+const filter = ref("all");
 const isModalOpen = ref(false);
-const modalView = ref('add'); // 'add' | 'detail'
+const modalView = ref("add"); // 'add' | 'detail'
 const selectedAccount = ref(null);
 
 const addForm = reactive({
-  type: 'checking',
-  name: '',
-  balance: '',
-  notes: '',
+	type: "checking",
+	name: "",
+	balance: "",
+	notes: "",
 });
 
 // Queries
 const accountsQuery = useQuery({
-  queryKey: ['accounts'],
-  queryFn: api.accounts.list,
+	queryKey: ["accounts"],
+	queryFn: api.accounts.list,
 });
 
 const netWorthQuery = useQuery({
-  queryKey: ['netWorth'],
-  queryFn: api.netWorth.current,
+	queryKey: ["netWorth"],
+	queryFn: api.netWorth.current,
 });
 
 const readyToAssignQuery = useQuery({
-  queryKey: ['readyToAssign'],
-  queryFn: () => api.readyToAssign.current(),
+	queryKey: ["readyToAssign"],
+	queryFn: () => api.readyToAssign.current(),
 });
 
-const isLoading = computed(() => accountsQuery.isPending.value || accountsQuery.isFetching.value);
+const isLoading = computed(
+	() => accountsQuery.isPending.value || accountsQuery.isFetching.value,
+);
 
 // Stats
 const assetsTotal = computed(() => {
-  const val = netWorthQuery.data.value?.assets_minor;
-  return val !== undefined ? formatAmount(val) : '—';
+	const val = netWorthQuery.data.value?.assets_minor;
+	return val !== undefined ? formatAmount(val) : "—";
 });
 
 const liabilitiesTotal = computed(() => {
-  const val = netWorthQuery.data.value?.liabilities_minor;
-  return val !== undefined ? formatAmount(-val) : '—'; // Liabilities are usually positive in NW object but displayed as negative or positive depending on context. Legacy code: -state.netWorth.liabilities_minor
+	const val = netWorthQuery.data.value?.liabilities_minor;
+	return val !== undefined ? formatAmount(-val) : "—"; // Liabilities are usually positive in NW object but displayed as negative or positive depending on context. Legacy code: -state.netWorth.liabilities_minor
 });
 
 const netWorthTotal = computed(() => {
-  const val = netWorthQuery.data.value?.net_worth_minor;
-  return val !== undefined ? formatAmount(val) : '—';
+	const val = netWorthQuery.data.value?.net_worth_minor;
+	return val !== undefined ? formatAmount(val) : "—";
 });
 
 const readyToAssignTotal = computed(() => {
-  const val = readyToAssignQuery.data.value?.ready_to_assign_minor;
-  return val !== undefined ? formatAmount(val) : '—';
+	const val = readyToAssignQuery.data.value?.ready_to_assign_minor;
+	return val !== undefined ? formatAmount(val) : "—";
 });
 
 // Accounts Grouping
-const accounts = computed(() => (accountsQuery.data.value || []).filter(acct => acct.is_active));
+const accounts = computed(() =>
+	(accountsQuery.data.value || []).filter((acct) => acct.is_active),
+);
 
 const filteredGroups = computed(() => {
-  const groups = accountGroupDefinitions.map(group => ({
-    ...group,
-    accounts: accounts.value.filter(account => account.account_class === group.id),
-  }));
+	const groups = accountGroupDefinitions.map((group) => ({
+		...group,
+		accounts: accounts.value.filter(
+			(account) => account.account_class === group.id,
+		),
+	}));
 
-  const scope = filter.value === 'all'
-    ? groups
-    : groups.filter(group =>
-        filter.value === 'assets'
-          ? group.type === 'asset'
-          : group.type === 'liability'
-      );
+	const scope =
+		filter.value === "all"
+			? groups
+			: groups.filter((group) =>
+					filter.value === "assets"
+						? group.type === "asset"
+						: group.type === "liability",
+				);
 
-  return scope.filter(group => group.accounts.length > 0);
+	return scope.filter((group) => group.accounts.length > 0);
 });
 
 // Formatting
-const formatRoleLabel = (role) => (role === "on_budget" ? "On-budget" : "Tracking");
+const formatRoleLabel = (role) =>
+	role === "on_budget" ? "On-budget" : "Tracking";
 
 const formatAccountBalance = (account) => {
-  const amount = account.account_type === "liability"
-    ? -account.current_balance_minor
-    : account.current_balance_minor;
-  return formatAmount(amount);
+	const amount =
+		account.account_type === "liability"
+			? -account.current_balance_minor
+			: account.current_balance_minor;
+	return formatAmount(amount);
 };
 
 // Modal Logic
-const modalTitleLabel = computed(() => modalView.value === 'add' ? 'Add account' : 'Account detail');
-const modalTitle = computed(() => modalView.value === 'add' ? 'Follow the guided steps' : selectedAccount.value?.name);
-const modalSubtitle = computed(() => modalView.value === 'add' ? 'Create a new asset or liability' : `ID • ${selectedAccount.value?.account_id}`);
+const modalTitleLabel = computed(() =>
+	modalView.value === "add" ? "Add account" : "Account detail",
+);
+const modalTitle = computed(() =>
+	modalView.value === "add"
+		? "Follow the guided steps"
+		: selectedAccount.value?.name,
+);
+const modalSubtitle = computed(() =>
+	modalView.value === "add"
+		? "Create a new asset or liability"
+		: `ID • ${selectedAccount.value?.account_id}`,
+);
 const addTypeHint = computed(() => {
-  const mapping = accountTypeMapping[addForm.type];
-  return mapping
-    ? `${mapping.account_class.replace(/_/g, " ")} · ${mapping.account_role === "on_budget" ? "On-budget" : "Tracking"}`
-    : "";
+	const mapping = accountTypeMapping[addForm.type];
+	return mapping
+		? `${mapping.account_class.replace(/_/g, " ")} · ${mapping.account_role === "on_budget" ? "On-budget" : "Tracking"}`
+		: "";
 });
 
 const openAddModal = () => {
-  modalView.value = 'add';
-  selectedAccount.value = null;
-  addForm.type = 'checking';
-  addForm.name = '';
-  addForm.balance = '';
-  addForm.notes = '';
-  isModalOpen.value = true;
+	modalView.value = "add";
+	selectedAccount.value = null;
+	addForm.type = "checking";
+	addForm.name = "";
+	addForm.balance = "";
+	addForm.notes = "";
+	isModalOpen.value = true;
 };
 
 const openDetailModal = (account) => {
-  modalView.value = 'detail';
-  selectedAccount.value = account;
-  isModalOpen.value = true;
+	modalView.value = "detail";
+	selectedAccount.value = account;
+	isModalOpen.value = true;
 };
 
 const closeModal = () => {
-  isModalOpen.value = false;
+	isModalOpen.value = false;
 };
 
 // Create Account Logic
 const slugify = (value) => {
-  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  const trimmed = normalized.replace(/^_+|_+$/g, "");
-  return `${trimmed || "account"}_${Date.now().toString(36)}`;
+	const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+	const trimmed = normalized.replace(/^_+|_+$/g, "");
+	return `${trimmed || "account"}_${Date.now().toString(36)}`;
 };
 
 const createAccountMutation = useMutation({
-  mutationFn: async (payload) => {
-    const createdAccount = await api.accounts.create(payload.accountData);
-    if (payload.balanceMinor !== 0) {
-      await postOpeningBalanceTransaction(createdAccount, payload.balanceMinor);
-    }
-    return createdAccount;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    queryClient.invalidateQueries({ queryKey: ['netWorth'] });
-    queryClient.invalidateQueries({ queryKey: ['readyToAssign'] });
-    queryClient.invalidateQueries({ queryKey: ['reference-data'] });
-    // Legacy support: also invalidate via window.dojoQueryClient if needed, but the api wrapper does that.
-    closeModal();
-  },
+	mutationFn: async (payload) => {
+		const createdAccount = await api.accounts.create(payload.accountData);
+		if (payload.balanceMinor !== 0) {
+			await postOpeningBalanceTransaction(createdAccount, payload.balanceMinor);
+		}
+		return createdAccount;
+	},
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["accounts"] });
+		queryClient.invalidateQueries({ queryKey: ["netWorth"] });
+		queryClient.invalidateQueries({ queryKey: ["readyToAssign"] });
+		queryClient.invalidateQueries({ queryKey: ["reference-data"] });
+		// Legacy support: also invalidate via window.dojoQueryClient if needed, but the api wrapper does that.
+		closeModal();
+	},
 });
 
 const isCreating = computed(() => createAccountMutation.isPending.value);
 
 const handleAddAccount = async () => {
-  if (!addForm.name) {
-    alert("Please provide an account name.");
-    return;
-  }
-  const mapping = accountTypeMapping[addForm.type];
-  if (!mapping) {
-    alert("Please choose a valid account type.");
-    return;
-  }
+	if (!addForm.name) {
+		alert("Please provide an account name.");
+		return;
+	}
+	const mapping = accountTypeMapping[addForm.type];
+	if (!mapping) {
+		alert("Please choose a valid account type.");
+		return;
+	}
 
-  const parsedBalance = Number.parseFloat(addForm.balance) || 0;
-  const balanceMinor = Math.round(parsedBalance * 100);
-  const accountId = slugify(addForm.name);
+	const parsedBalance = Number.parseFloat(addForm.balance) || 0;
+	const balanceMinor = Math.round(parsedBalance * 100);
+	const accountId = slugify(addForm.name);
 
-  const payload = {
-    account_id: accountId,
-    name: addForm.name,
-    account_type: mapping.account_type,
-    account_class: mapping.account_class,
-    account_role: mapping.account_role,
-    current_balance_minor: 0,
-    currency: "USD",
-  };
+	const payload = {
+		account_id: accountId,
+		name: addForm.name,
+		account_type: mapping.account_type,
+		account_class: mapping.account_class,
+		account_role: mapping.account_role,
+		current_balance_minor: 0,
+		currency: "USD",
+	};
 
-  try {
-    await createAccountMutation.mutateAsync({ accountData: payload, balanceMinor });
-  } catch (error) {
-    console.error(error);
-    alert(error.message || "Failed to create account.");
-  }
+	try {
+		await createAccountMutation.mutateAsync({
+			accountData: payload,
+			balanceMinor,
+		});
+	} catch (error) {
+		console.error(error);
+		alert(error.message || "Failed to create account.");
+	}
 };
 </script>

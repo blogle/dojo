@@ -1,5 +1,5 @@
-import { store } from "../../store.js";
 import { SPECIAL_CATEGORY_LABELS, systemCategoryIds } from "../../constants.js";
+import { store } from "../../store.js";
 
 export const filterUserFacingCategories = (categories = []) =>
 	categories.filter(
@@ -17,7 +17,9 @@ export const getCategoryOptions = ({ includeSystem = false } = {}) => {
 	const budgetCategories = Array.isArray(state.budgets.rawCategories)
 		? state.budgets.rawCategories
 		: [];
-	const groups = Array.isArray(state.budgets.groups) ? state.budgets.groups : [];
+	const groups = Array.isArray(state.budgets.groups)
+		? state.budgets.groups
+		: [];
 	const groupIds = new Set(groups.map((group) => group.group_id));
 
 	const applyLabel = (category) => {
@@ -35,8 +37,8 @@ export const getCategoryOptions = ({ includeSystem = false } = {}) => {
 	};
 
 	const systemCategories = includeSystem
-		? referenceCategories.filter((category) =>
-				category && systemCategoryIds.has(category.category_id),
+		? referenceCategories.filter(
+				(category) => category && systemCategoryIds.has(category.category_id),
 			)
 		: [];
 
@@ -74,7 +76,9 @@ export const getCategoryOptions = ({ includeSystem = false } = {}) => {
 	const orderedUsers = [];
 	groups.forEach((group) => {
 		const bucket = buckets.get(group.group_id) || [];
-		bucket.forEach((category) => orderedUsers.push(applyLabel(category)));
+		bucket.forEach((category) => {
+			orderedUsers.push(applyLabel(category));
+		});
 		buckets.delete(group.group_id);
 	});
 
@@ -82,12 +86,14 @@ export const getCategoryOptions = ({ includeSystem = false } = {}) => {
 		if (key === UNCATEGORIZED_KEY) {
 			return;
 		}
-		bucket.forEach((category) => orderedUsers.push(applyLabel(category)));
+		bucket.forEach((category) => {
+			orderedUsers.push(applyLabel(category));
+		});
 	});
 
-	(buckets.get(UNCATEGORIZED_KEY) || []).forEach((category) =>
-		orderedUsers.push(applyLabel(category)),
-	);
+	(buckets.get(UNCATEGORIZED_KEY) || []).forEach((category) => {
+		orderedUsers.push(applyLabel(category));
+	});
 
 	const orderedSystems = systemCategories
 		.map(applyLabel)

@@ -1,22 +1,22 @@
 import { selectors } from "../../constants.js";
+import { waitForPendingAllocations } from "../../services/allocationTracker.js";
 import { api } from "../../services/api.js";
 import {
+	populateSelect,
+	setButtonBusy,
+	setFormError,
+} from "../../services/dom.js";
+import {
+	currentMonthStartISO,
+	dollarsToMinor,
 	formatAmount,
 	minorToDollars,
 	todayISO,
-	currentMonthStartISO,
-	dollarsToMinor,
 } from "../../services/format.js";
-import {
-	populateSelect,
-	setFormError,
-	setButtonBusy,
-} from "../../services/dom.js";
 import { store } from "../../store.js";
 import { filterUserFacingCategories } from "../categories/utils.js";
-import { showToast } from "../toast.js";
 import { refreshSelectOptions } from "../reference/index.js";
-import { waitForPendingAllocations } from "../../services/allocationTracker.js";
+import { showToast } from "../toast.js";
 
 let categorySlugDirty = false;
 let loadAllocationsData = async () => {};
@@ -58,7 +58,9 @@ const toggleGroupCollapsed = (groupId) => {
 
 const getUncategorizedBudgetCategories = () => {
 	const state = store.getState();
-	const categories = filterUserFacingCategories(state.budgets.rawCategories || []);
+	const categories = filterUserFacingCategories(
+		state.budgets.rawCategories || [],
+	);
 	return categories
 		.filter((category) => !category.group_id)
 		.sort((a, b) => a.name.localeCompare(b.name));
@@ -67,7 +69,9 @@ const getUncategorizedBudgetCategories = () => {
 const getGroupBudgetCategories = (groupId) => {
 	if (!groupId) return [];
 	const state = store.getState();
-	const categories = filterUserFacingCategories(state.budgets.rawCategories || []);
+	const categories = filterUserFacingCategories(
+		state.budgets.rawCategories || [],
+	);
 	return categories
 		.filter((category) => category.group_id === groupId)
 		.sort((a, b) => a.name.localeCompare(b.name));
@@ -83,7 +87,8 @@ const buildCategoryUpdatePayload = (category, targetGroupId) => ({
 	goal_frequency: category.goal_frequency || null,
 });
 
-const formatCategoryOptionLabel = (label, isSelected) => `${isSelected ? "[x]" : "[ ]"} ${label}`;
+const formatCategoryOptionLabel = (label, isSelected) =>
+	`${isSelected ? "[x]" : "[ ]"} ${label}`;
 
 const refreshSelectOptionIndicators = (selectEl) => {
 	if (!selectEl) return;
@@ -123,7 +128,10 @@ const populateGroupCategorySelect = (selectEl, helperEl, groupId) => {
 		option.value = category.category_id;
 		option.selected = category.group_id === groupId;
 		option.dataset.baseLabel = category.name;
-		option.textContent = formatCategoryOptionLabel(category.name, option.selected);
+		option.textContent = formatCategoryOptionLabel(
+			category.name,
+			option.selected,
+		);
 		selectEl.appendChild(option);
 	});
 	if (helperEl) {
@@ -149,7 +157,9 @@ const getNextGroupSortOrder = () => {
 			: state.budgets.groups) || [];
 	if (!groups.length) return 1;
 	const maxOrder = Math.max(
-		...groups.map((group) => (Number.isFinite(group.sort_order) ? group.sort_order : 0)),
+		...groups.map((group) =>
+			Number.isFinite(group.sort_order) ? group.sort_order : 0,
+		),
 	);
 	return maxOrder + 1;
 };
@@ -197,7 +207,8 @@ const enterGroupReorderMode = () => {
 	const state = store.getState();
 	const orderIds =
 		(state.budgets.reorderDraft?.map((group) => group.group_id) ||
-			state.budgets.groups.map((group) => group.group_id)) ?? [];
+			state.budgets.groups.map((group) => group.group_id)) ??
+		[];
 	const draft = reorderGroupsByIds(state.budgets.groups, orderIds);
 	store.setState((prev) => ({
 		...prev,
@@ -351,7 +362,9 @@ export const loadBudgetsData = async ({ skipPendingCheck = false } = {}) => {
 			0,
 		);
 		const monthDate = new Date(`${month}T00:00:00`);
-		const sortedGroups = (groups || []).sort((a, b) => a.sort_order - b.sort_order);
+		const sortedGroups = (groups || []).sort(
+			(a, b) => a.sort_order - b.sort_order,
+		);
 		const previousState = store.getState();
 		const previousOrderIds =
 			previousState.budgets.reorderDraft?.map((group) => group.group_id) || [];
@@ -579,7 +592,9 @@ export const renderBudgetsPage = () => {
 				editButton.addEventListener("click", (event) => {
 					event.stopPropagation();
 					const cid = editButton.dataset.editCategoryId;
-					const cat = state.budgets.categories.find((c) => c.category_id === cid);
+					const cat = state.budgets.categories.find(
+						(c) => c.category_id === cid,
+					);
 					if (cat) openCategoryModal(cat);
 				});
 			}
@@ -904,7 +919,8 @@ const openCategoryModal = (category = null) => {
 	form.querySelector("input[name='target_date_dt']").value = "";
 	form.querySelector("input[name='target_amount']").value = "";
 	form.querySelector("select[name='frequency']").value = "monthly";
-	form.querySelector("input[name='recurring_date_dt']").value = firstOfNextMonthISO();
+	form.querySelector("input[name='recurring_date_dt']").value =
+		firstOfNextMonthISO();
 	form.querySelector("input[name='recurring_amount']").value = "";
 
 	if (category) {
@@ -1062,8 +1078,12 @@ const openGroupModal = (group = null) => {
 	setFormError(errorEl, "");
 
 	const nameInput = form.querySelector("input[name='name']");
-	const uncategorizedSelect = form.querySelector(selectors.groupUncategorizedSelect);
-	const uncategorizedHelper = form.querySelector(selectors.groupUncategorizedHelper);
+	const uncategorizedSelect = form.querySelector(
+		selectors.groupUncategorizedSelect,
+	);
+	const uncategorizedHelper = form.querySelector(
+		selectors.groupUncategorizedHelper,
+	);
 
 	if (group) {
 		title.textContent = "Edit group";
@@ -1074,7 +1094,11 @@ const openGroupModal = (group = null) => {
 	}
 
 	if (uncategorizedSelect) {
-		populateGroupCategorySelect(uncategorizedSelect, uncategorizedHelper, group?.group_id || null);
+		populateGroupCategorySelect(
+			uncategorizedSelect,
+			uncategorizedHelper,
+			group?.group_id || null,
+		);
 		refreshSelectOptionIndicators(uncategorizedSelect);
 	}
 
@@ -1126,7 +1150,7 @@ const handleGroupFormSubmit = async (event) => {
 			? pendingGroup.group_id
 			: slugifyCategoryName(name);
 		const sortOrder = isEditing
-			? pendingGroup.sort_order ?? 0
+			? (pendingGroup.sort_order ?? 0)
 			: getNextGroupSortOrder();
 
 		if (isEditing) {
@@ -1169,7 +1193,9 @@ const handleGroupFormSubmit = async (event) => {
 			if (!category) {
 				updates.push(
 					Promise.reject(
-						new Error(`Category ${categoryId} is no longer available to assign.`),
+						new Error(
+							`Category ${categoryId} is no longer available to assign.`,
+						),
 					),
 				);
 				return;
@@ -1288,7 +1314,9 @@ const initGroupModal = () => {
 	modal.addEventListener("click", (event) => {
 		if (event.target === modal) closeGroupModal();
 	});
-	const uncategorizedSelect = document.querySelector(selectors.groupUncategorizedSelect);
+	const uncategorizedSelect = document.querySelector(
+		selectors.groupUncategorizedSelect,
+	);
 	uncategorizedSelect?.addEventListener("change", () => {
 		refreshSelectOptionIndicators(uncategorizedSelect);
 	});
@@ -1315,9 +1343,13 @@ export const initBudgets = ({
 
 	const reorderButton = document.querySelector(selectors.budgetsReorderButton);
 	reorderButton?.addEventListener("click", () => enterGroupReorderMode());
-	const reorderSaveButton = document.querySelector(selectors.budgetsReorderSave);
+	const reorderSaveButton = document.querySelector(
+		selectors.budgetsReorderSave,
+	);
 	reorderSaveButton?.addEventListener("click", () => persistGroupReorder());
-	const reorderCancelButton = document.querySelector(selectors.budgetsReorderCancel);
+	const reorderCancelButton = document.querySelector(
+		selectors.budgetsReorderCancel,
+	);
 	reorderCancelButton?.addEventListener("click", () => cancelGroupReorder());
 	updateReorderControls();
 

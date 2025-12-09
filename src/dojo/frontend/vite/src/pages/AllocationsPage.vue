@@ -121,171 +121,193 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, nextTick } from 'vue';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { api } from '../../../static/services/api.js';
-import { formatAmount, currentMonthStartISO, dollarsToMinor, minorToDollars, todayISO } from '../../../static/services/format.js';
-import { filterUserFacingCategories } from '../../../static/components/categories/utils.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, nextTick, reactive, ref } from "vue";
+import { filterUserFacingCategories } from "../../../static/components/categories/utils.js";
+import { api } from "../../../static/services/api.js";
+import {
+	currentMonthStartISO,
+	dollarsToMinor,
+	formatAmount,
+	minorToDollars,
+	todayISO,
+} from "../../../static/services/format.js";
 
 const queryClient = useQueryClient();
 const monthStart = currentMonthStartISO();
-const monthLabel = computed(() => new Date(`${monthStart}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long' }));
+const monthLabel = computed(() =>
+	new Date(`${monthStart}T00:00:00`).toLocaleDateString(undefined, {
+		year: "numeric",
+		month: "long",
+	}),
+);
 
 // Queries
 const allocationsQuery = useQuery({
-  queryKey: ['allocations', monthStart],
-  queryFn: () => api.budgets.allocations(monthStart),
+	queryKey: ["allocations", monthStart],
+	queryFn: () => api.budgets.allocations(monthStart),
 });
 
 const referenceQuery = useQuery({
-    queryKey: ['reference-data'],
-    queryFn: api.reference.load
+	queryKey: ["reference-data"],
+	queryFn: api.reference.load,
 });
 
 // Categories for select
 const categories = computed(() => {
-    const raw = referenceQuery.data.value?.categories || [];
-    return filterUserFacingCategories(raw).sort((a, b) => a.name.localeCompare(b.name));
+	const raw = referenceQuery.data.value?.categories || [];
+	return filterUserFacingCategories(raw).sort((a, b) =>
+		a.name.localeCompare(b.name),
+	);
 });
 
-const isLoading = computed(() => allocationsQuery.isPending.value || allocationsQuery.isFetching.value);
-const allocations = computed(() => allocationsQuery.data.value?.allocations ?? []);
-const inflowMinor = computed(() => allocationsQuery.data.value?.inflow_minor ?? 0);
-const readyToAssignMinor = computed(() => allocationsQuery.data.value?.ready_to_assign_minor ?? 0);
+const isLoading = computed(
+	() => allocationsQuery.isPending.value || allocationsQuery.isFetching.value,
+);
+const allocations = computed(
+	() => allocationsQuery.data.value?.allocations ?? [],
+);
+const inflowMinor = computed(
+	() => allocationsQuery.data.value?.inflow_minor ?? 0,
+);
+const readyToAssignMinor = computed(
+	() => allocationsQuery.data.value?.ready_to_assign_minor ?? 0,
+);
 
 const getCategoryName = (id) => {
-    if (!id) return 'Ready to Assign';
-    const cat = categories.value.find(c => c.category_id === id);
-    return cat ? cat.name : id;
+	if (!id) return "Ready to Assign";
+	const cat = categories.value.find((c) => c.category_id === id);
+	return cat ? cat.name : id;
 };
 
 // Form Logic
 const form = reactive({
-    allocation_date: todayISO(),
-    from_category_id: '',
-    to_category_id: '',
-    memo: '',
-    amount: ''
+	allocation_date: todayISO(),
+	from_category_id: "",
+	to_category_id: "",
+	memo: "",
+	amount: "",
 });
-const formError = ref('');
+const formError = ref("");
 
 const createAllocationMutation = useMutation({
-    mutationFn: api.budgets.createAllocation,
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['allocations'] });
-        queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
-        queryClient.invalidateQueries({ queryKey: ['budget-categories'] }); // Update available amounts in budget page
-    }
+	mutationFn: api.budgets.createAllocation,
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["allocations"] });
+		queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
+		queryClient.invalidateQueries({ queryKey: ["budget-categories"] }); // Update available amounts in budget page
+	},
 });
 
 const isSubmitting = computed(() => createAllocationMutation.isPending.value);
 
 const submitAllocation = async () => {
-    formError.value = '';
-    const amountMinor = Math.abs(dollarsToMinor(form.amount));
-    if (!form.to_category_id) {
-        formError.value = "Choose the destination category.";
-        return;
-    }
-    if (form.from_category_id && form.from_category_id === form.to_category_id) {
-        formError.value = "Source and destination categories must differ.";
-        return;
-    }
-    if (amountMinor === 0) {
-        formError.value = "Amount must be greater than zero.";
-        return;
-    }
-    // TODO: Client-side validation for available funds? 
-    // Legacy code does: if (fromCategoryId) getCategoryAvailableMinor... 
-    // This requires budget-categories data which is not fetched here yet (only reference data).
-    // I could fetch budget-categories or just let the backend fail/validate.
-    // Given legacy code does it, maybe I should useQuery budget-categories too?
-    // Let's rely on backend or simple check against RTA if from is empty.
-    if (!form.from_category_id && readyToAssignMinor.value < amountMinor) {
-         formError.value = "Ready-to-Assign is insufficient for this allocation.";
-         return;
-    }
+	formError.value = "";
+	const amountMinor = Math.abs(dollarsToMinor(form.amount));
+	if (!form.to_category_id) {
+		formError.value = "Choose the destination category.";
+		return;
+	}
+	if (form.from_category_id && form.from_category_id === form.to_category_id) {
+		formError.value = "Source and destination categories must differ.";
+		return;
+	}
+	if (amountMinor === 0) {
+		formError.value = "Amount must be greater than zero.";
+		return;
+	}
+	// TODO: Client-side validation for available funds?
+	// Legacy code does: if (fromCategoryId) getCategoryAvailableMinor...
+	// This requires budget-categories data which is not fetched here yet (only reference data).
+	// I could fetch budget-categories or just let the backend fail/validate.
+	// Given legacy code does it, maybe I should useQuery budget-categories too?
+	// Let's rely on backend or simple check against RTA if from is empty.
+	if (!form.from_category_id && readyToAssignMinor.value < amountMinor) {
+		formError.value = "Ready-to-Assign is insufficient for this allocation.";
+		return;
+	}
 
-    try {
-        await createAllocationMutation.mutateAsync({
-            allocation_date: form.allocation_date,
-            to_category_id: form.to_category_id,
-            from_category_id: form.from_category_id || null,
-            amount_minor: amountMinor,
-            memo: form.memo || null
-        });
-        form.amount = '';
-        form.memo = '';
-        // Date and cats stay? Legacy clears amount, keeps others? 
-        // Legacy: amountInput.value = ""; amountInput.focus();
-    } catch (e) {
-        formError.value = e.message || "Allocation failed";
-    }
+	try {
+		await createAllocationMutation.mutateAsync({
+			allocation_date: form.allocation_date,
+			to_category_id: form.to_category_id,
+			from_category_id: form.from_category_id || null,
+			amount_minor: amountMinor,
+			memo: form.memo || null,
+		});
+		form.amount = "";
+		form.memo = "";
+		// Date and cats stay? Legacy clears amount, keeps others?
+		// Legacy: amountInput.value = ""; amountInput.focus();
+	} catch (e) {
+		formError.value = e.message || "Allocation failed";
+	}
 };
 
 // Inline Edit
 const editingId = ref(null);
 const editForm = reactive({
-    concept_id: null,
-    allocation_date: '',
-    to_category_id: '',
-    amount: '',
-    memo: ''
+	concept_id: null,
+	allocation_date: "",
+	to_category_id: "",
+	amount: "",
+	memo: "",
 });
 const updateAllocationMutation = useMutation({
-    mutationFn: ({ id, payload }) => api.budgets.updateAllocation(id, payload),
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['allocations'] });
-        queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
-        queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
-    }
+	mutationFn: ({ id, payload }) => api.budgets.updateAllocation(id, payload),
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["allocations"] });
+		queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
+		queryClient.invalidateQueries({ queryKey: ["budget-categories"] });
+	},
 });
 
 const deleteAllocationMutation = useMutation({
-    mutationFn: api.budgets.deleteAllocation,
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['allocations'] });
-        queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
-        queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
-    }
+	mutationFn: api.budgets.deleteAllocation,
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["allocations"] });
+		queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
+		queryClient.invalidateQueries({ queryKey: ["budget-categories"] });
+	},
 });
 
 const deleteAllocation = async (id) => {
-    try {
-        await deleteAllocationMutation.mutateAsync(id);
-        editingId.value = null;
-    } catch (e) {
-        alert(e.message || "Failed to delete allocation");
-    }
+	try {
+		await deleteAllocationMutation.mutateAsync(id);
+		editingId.value = null;
+	} catch (e) {
+		alert(e.message || "Failed to delete allocation");
+	}
 };
 
 const startEditing = (alloc) => {
-    if (editingId.value === alloc.concept_id) return;
-    editingId.value = alloc.concept_id;
-    editForm.concept_id = alloc.concept_id;
-    editForm.allocation_date = alloc.allocation_date;
-    editForm.to_category_id = alloc.to_category_id;
-    editForm.amount = minorToDollars(alloc.amount_minor);
-    editForm.memo = alloc.memo || '';
+	if (editingId.value === alloc.concept_id) return;
+	editingId.value = alloc.concept_id;
+	editForm.concept_id = alloc.concept_id;
+	editForm.allocation_date = alloc.allocation_date;
+	editForm.to_category_id = alloc.to_category_id;
+	editForm.amount = minorToDollars(alloc.amount_minor);
+	editForm.memo = alloc.memo || "";
 };
 
-const cancelEdit = () => { editingId.value = null; };
+const cancelEdit = () => {
+	editingId.value = null;
+};
 
 const saveEdit = async () => {
-    try {
-         await updateAllocationMutation.mutateAsync({
-             id: editForm.concept_id,
-             payload: {
-                 allocation_date: editForm.allocation_date,
-                 to_category_id: editForm.to_category_id,
-                 amount_minor: Math.abs(dollarsToMinor(editForm.amount)),
-                 memo: editForm.memo
-             }
-         });
-         editingId.value = null;
-    } catch (e) {
-        alert(e.message || "Failed to update allocation");
-    }
+	try {
+		await updateAllocationMutation.mutateAsync({
+			id: editForm.concept_id,
+			payload: {
+				allocation_date: editForm.allocation_date,
+				to_category_id: editForm.to_category_id,
+				amount_minor: Math.abs(dollarsToMinor(editForm.amount)),
+				memo: editForm.memo,
+			},
+		});
+		editingId.value = null;
+	} catch (e) {
+		alert(e.message || "Failed to update allocation");
+	}
 };
-
 </script>

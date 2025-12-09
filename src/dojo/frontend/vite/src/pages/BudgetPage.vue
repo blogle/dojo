@@ -297,11 +297,17 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, watch } from 'vue';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { api } from '../../../static/services/api.js';
-import { formatAmount, currentMonthStartISO, dollarsToMinor, minorToDollars, todayISO } from '../../../static/services/format.js';
-import { filterUserFacingCategories } from '../../../static/components/categories/utils.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, reactive, ref, watch } from "vue";
+import { filterUserFacingCategories } from "../../../static/components/categories/utils.js";
+import { api } from "../../../static/services/api.js";
+import {
+	currentMonthStartISO,
+	dollarsToMinor,
+	formatAmount,
+	minorToDollars,
+	todayISO,
+} from "../../../static/services/format.js";
 
 const queryClient = useQueryClient();
 const monthStart = currentMonthStartISO();
@@ -313,296 +319,409 @@ const dragHandleIcon = `<svg viewBox="0 0 16 16" aria-hidden="true" focusable="f
 
 // Queries
 const categoriesQuery = useQuery({
-  queryKey: ['budget-categories', monthStart],
-  queryFn: () => api.budgets.categories(monthStart),
+	queryKey: ["budget-categories", monthStart],
+	queryFn: () => api.budgets.categories(monthStart),
 });
 
 const groupsQuery = useQuery({
-  queryKey: ['budget-category-groups'],
-  queryFn: api.budgets.groups,
+	queryKey: ["budget-category-groups"],
+	queryFn: api.budgets.groups,
 });
 
 const readyToAssignQuery = useQuery({
-  queryKey: ['ready-to-assign', monthStart],
-  queryFn: () => api.readyToAssign.current(monthStart),
+	queryKey: ["ready-to-assign", monthStart],
+	queryFn: () => api.readyToAssign.current(monthStart),
 });
 
-const isLoading = computed(() => categoriesQuery.isPending.value || groupsQuery.isPending.value);
+const isLoading = computed(
+	() => categoriesQuery.isPending.value || groupsQuery.isPending.value,
+);
 
 // Computed Data
 const categories = computed(() => {
-    const raw = categoriesQuery.data.value || [];
-    const normalized = raw.map(c => ({
-        ...c,
-        available_minor: c.available_minor ?? 0,
-        activity_minor: c.activity_minor ?? 0,
-        allocated_minor: c.allocated_minor ?? 0,
-    }));
-    return filterUserFacingCategories(normalized).map(c => {
-        let goalText = "";
-        if (c.goal_type === "target_date" && c.goal_amount_minor) {
-            goalText = `Goal: ${formatAmount(c.goal_amount_minor)} by ${c.goal_target_date || "?"}`;
-        } else if (c.goal_type === "recurring" && c.goal_amount_minor) {
-            const freq = c.goal_frequency ? c.goal_frequency.charAt(0).toUpperCase() + c.goal_frequency.slice(1) : "Recurring";
-            goalText = `${freq}: ${formatAmount(c.goal_amount_minor)}`;
-        }
-        return { ...c, goal_text: goalText };
-    });
+	const raw = categoriesQuery.data.value || [];
+	const normalized = raw.map((c) => ({
+		...c,
+		available_minor: c.available_minor ?? 0,
+		activity_minor: c.activity_minor ?? 0,
+		allocated_minor: c.allocated_minor ?? 0,
+	}));
+	return filterUserFacingCategories(normalized).map((c) => {
+		let goalText = "";
+		if (c.goal_type === "target_date" && c.goal_amount_minor) {
+			goalText = `Goal: ${formatAmount(c.goal_amount_minor)} by ${c.goal_target_date || "?"}`;
+		} else if (c.goal_type === "recurring" && c.goal_amount_minor) {
+			const freq = c.goal_frequency
+				? c.goal_frequency.charAt(0).toUpperCase() + c.goal_frequency.slice(1)
+				: "Recurring";
+			goalText = `${freq}: ${formatAmount(c.goal_amount_minor)}`;
+		}
+		return { ...c, goal_text: goalText };
+	});
 });
 
-const groups = computed(() => [...(groupsQuery.data.value || [])].sort((a, b) => a.sort_order - b.sort_order));
+const groups = computed(() =>
+	[...(groupsQuery.data.value || [])].sort(
+		(a, b) => a.sort_order - b.sort_order,
+	),
+);
 
 const displayedGroups = computed(() => {
-    const baseGroups = isReorderMode.value && reorderDraft.value.length ? reorderDraft.value : groups.value;
-    const grouped = {};
-    baseGroups.forEach(g => { grouped[g.group_id] = { ...g, items: [] }; });
-    grouped.uncategorized = { group_id: 'uncategorized', name: 'Uncategorized', items: [] };
+	const baseGroups =
+		isReorderMode.value && reorderDraft.value.length
+			? reorderDraft.value
+			: groups.value;
+	const grouped = {};
+	baseGroups.forEach((g) => {
+		grouped[g.group_id] = { ...g, items: [] };
+	});
+	grouped.uncategorized = {
+		group_id: "uncategorized",
+		name: "Uncategorized",
+		items: [],
+	};
 
-    categories.value.forEach(cat => {
-        const gid = cat.group_id || 'uncategorized';
-        if (grouped[gid]) {
-            grouped[gid].items.push(cat);
-        } else {
-             grouped.uncategorized.items.push(cat);
-        }
-    });
-    
-    // Convert back to array respecting sort order
-    const result = baseGroups.map(g => grouped[g.group_id]);
-    if (grouped.uncategorized.items.length > 0) {
-        result.push(grouped.uncategorized);
-    }
-    return result;
+	categories.value.forEach((cat) => {
+		const gid = cat.group_id || "uncategorized";
+		if (grouped[gid]) {
+			grouped[gid].items.push(cat);
+		} else {
+			grouped.uncategorized.items.push(cat);
+		}
+	});
+
+	// Convert back to array respecting sort order
+	const result = baseGroups.map((g) => grouped[g.group_id]);
+	if (grouped.uncategorized.items.length > 0) {
+		result.push(grouped.uncategorized);
+	}
+	return result;
 });
 
-const readyToAssign = computed(() => readyToAssignQuery.data.value?.ready_to_assign_minor ?? 0);
-const activityMinor = computed(() => categories.value.reduce((sum, c) => sum + c.activity_minor, 0));
-const availableMinor = computed(() => categories.value.reduce((sum, c) => sum + c.available_minor, 0));
-const monthLabel = computed(() => new Date(`${monthStart}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long' }));
+const readyToAssign = computed(
+	() => readyToAssignQuery.data.value?.ready_to_assign_minor ?? 0,
+);
+const activityMinor = computed(() =>
+	categories.value.reduce((sum, c) => sum + c.activity_minor, 0),
+);
+const availableMinor = computed(() =>
+	categories.value.reduce((sum, c) => sum + c.available_minor, 0),
+);
+const monthLabel = computed(() =>
+	new Date(`${monthStart}T00:00:00`).toLocaleDateString(undefined, {
+		year: "numeric",
+		month: "long",
+	}),
+);
 
 // Helper
 const toggleGroup = (groupId) => {
-    collapsedGroups[groupId] = !collapsedGroups[groupId];
+	collapsedGroups[groupId] = !collapsedGroups[groupId];
 };
 const isCollapsed = (groupId) => !!collapsedGroups[groupId];
 
 // Reorder Logic
 const enterReorderMode = () => {
-    reorderDraft.value = [...groups.value];
-    isReorderMode.value = true;
+	reorderDraft.value = [...groups.value];
+	isReorderMode.value = true;
 };
 const cancelReorder = () => {
-    isReorderMode.value = false;
-    reorderDraft.value = [];
+	isReorderMode.value = false;
+	reorderDraft.value = [];
 };
 
 let draggedItem = null;
 const handleDragStart = (e, group) => {
-    draggedItem = group;
-    e.dataTransfer.effectAllowed = 'move';
+	draggedItem = group;
+	e.dataTransfer.effectAllowed = "move";
 };
 const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+	e.preventDefault();
+	e.dataTransfer.dropEffect = "move";
 };
-const handleDrop = (e, targetGroup) => {
-    if (!draggedItem || draggedItem === targetGroup) return;
-    const fromIndex = reorderDraft.value.findIndex(g => g.group_id === draggedItem.group_id);
-    const toIndex = reorderDraft.value.findIndex(g => g.group_id === targetGroup.group_id);
-    if (fromIndex !== -1 && toIndex !== -1) {
-        const item = reorderDraft.value.splice(fromIndex, 1)[0];
-        reorderDraft.value.splice(toIndex, 0, item);
-    }
-    draggedItem = null;
+const handleDrop = (_e, targetGroup) => {
+	if (!draggedItem || draggedItem === targetGroup) return;
+	const fromIndex = reorderDraft.value.findIndex(
+		(g) => g.group_id === draggedItem.group_id,
+	);
+	const toIndex = reorderDraft.value.findIndex(
+		(g) => g.group_id === targetGroup.group_id,
+	);
+	if (fromIndex !== -1 && toIndex !== -1) {
+		const item = reorderDraft.value.splice(fromIndex, 1)[0];
+		reorderDraft.value.splice(toIndex, 0, item);
+	}
+	draggedItem = null;
 };
-const handleDragEnd = () => { draggedItem = null; };
+const handleDragEnd = () => {
+	draggedItem = null;
+};
 
 const updateGroupMutation = useMutation({
-    mutationFn: ({ groupId, payload }) => api.budgets.updateGroup(groupId, payload),
-    onSuccess: () => {
-       queryClient.invalidateQueries({ queryKey: ['budget-category-groups'] });
-    }
+	mutationFn: ({ groupId, payload }) =>
+		api.budgets.updateGroup(groupId, payload),
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ["budget-category-groups"] });
+	},
 });
 
 const saveReorder = async () => {
-    try {
-        const updates = reorderDraft.value.map((group, index) => 
-             api.budgets.updateGroup(group.group_id, {
-                 name: group.name,
-                 sort_order: index + 1,
-                 is_active: group.is_active !== false
-             })
-        );
-        await Promise.all(updates);
-        queryClient.invalidateQueries({ queryKey: ['budget-category-groups'] });
-        isReorderMode.value = false;
-    } catch (e) {
-        alert(e.message || "Failed to save order");
-    }
+	try {
+		const updates = reorderDraft.value.map((group, index) =>
+			api.budgets.updateGroup(group.group_id, {
+				name: group.name,
+				sort_order: index + 1,
+				is_active: group.is_active !== false,
+			}),
+		);
+		await Promise.all(updates);
+		queryClient.invalidateQueries({ queryKey: ["budget-category-groups"] });
+		isReorderMode.value = false;
+	} catch (e) {
+		alert(e.message || "Failed to save order");
+	}
 };
 
 // --- Category Modal Logic ---
 const categoryModalOpen = ref(false);
 const categoryForm = reactive({
-    isEditing: false,
-    category_id: null,
-    name: '',
-    group_id: '',
-    goal_type: 'recurring',
-    target_date_dt: '',
-    target_amount: '',
-    frequency: 'monthly',
-    recurring_date_dt: '',
-    recurring_amount: ''
+	isEditing: false,
+	category_id: null,
+	name: "",
+	group_id: "",
+	goal_type: "recurring",
+	target_date_dt: "",
+	target_amount: "",
+	frequency: "monthly",
+	recurring_date_dt: "",
+	recurring_amount: "",
 });
-const categoryFormError = ref('');
-const createCategoryMutation = useMutation({ mutationFn: api.budgets.createCategory, onSuccess: () => invalidateAll() });
-const updateCategoryMutation = useMutation({ mutationFn: ({ id, payload }) => api.budgets.updateCategory(id, payload), onSuccess: () => invalidateAll() });
-const isSubmittingCategory = computed(() => createCategoryMutation.isPending.value || updateCategoryMutation.isPending.value);
+const categoryFormError = ref("");
+const createCategoryMutation = useMutation({
+	mutationFn: api.budgets.createCategory,
+	onSuccess: () => invalidateAll(),
+});
+const updateCategoryMutation = useMutation({
+	mutationFn: ({ id, payload }) => api.budgets.updateCategory(id, payload),
+	onSuccess: () => invalidateAll(),
+});
+const isSubmittingCategory = computed(
+	() =>
+		createCategoryMutation.isPending.value ||
+		updateCategoryMutation.isPending.value,
+);
 
 const firstOfNextMonthISO = () => {
-    const today = new Date();
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const m = `${nextMonth.getMonth() + 1}`.padStart(2, "0");
-    const d = `${nextMonth.getDate()}`.padStart(2, "0");
-    return `${nextMonth.getFullYear()}-${m}-${d}`;
+	const today = new Date();
+	const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+	const m = `${nextMonth.getMonth() + 1}`.padStart(2, "0");
+	const d = `${nextMonth.getDate()}`.padStart(2, "0");
+	return `${nextMonth.getFullYear()}-${m}-${d}`;
 };
 
 const openCategoryModal = (cat = null) => {
-    categoryFormError.value = '';
-    if (cat) {
-        categoryForm.isEditing = true;
-        categoryForm.category_id = cat.category_id;
-        categoryForm.name = cat.name;
-        categoryForm.group_id = cat.group_id || '';
-        categoryForm.goal_type = cat.goal_type || 'recurring';
-        categoryForm.target_date_dt = cat.goal_target_date || '';
-        categoryForm.target_amount = cat.goal_amount_minor ? minorToDollars(cat.goal_amount_minor) : '';
-        categoryForm.frequency = cat.goal_frequency || 'monthly';
-        categoryForm.recurring_date_dt = cat.goal_target_date || '';
-        categoryForm.recurring_amount = cat.goal_amount_minor ? minorToDollars(cat.goal_amount_minor) : '';
-        if (cat.goal_type === 'target_date') {
-             categoryForm.recurring_date_dt = firstOfNextMonthISO(); 
-        } else {
-             categoryForm.target_date_dt = '';
-        }
-    } else {
-        categoryForm.isEditing = false;
-        categoryForm.category_id = null;
-        categoryForm.name = '';
-        categoryForm.group_id = '';
-        categoryForm.goal_type = 'recurring';
-        categoryForm.target_date_dt = '';
-        categoryForm.target_amount = '';
-        categoryForm.frequency = 'monthly';
-        categoryForm.recurring_date_dt = firstOfNextMonthISO();
-        categoryForm.recurring_amount = '';
-    }
-    categoryModalOpen.value = true;
+	categoryFormError.value = "";
+	if (cat) {
+		categoryForm.isEditing = true;
+		categoryForm.category_id = cat.category_id;
+		categoryForm.name = cat.name;
+		categoryForm.group_id = cat.group_id || "";
+		categoryForm.goal_type = cat.goal_type || "recurring";
+		categoryForm.target_date_dt = cat.goal_target_date || "";
+		categoryForm.target_amount = cat.goal_amount_minor
+			? minorToDollars(cat.goal_amount_minor)
+			: "";
+		categoryForm.frequency = cat.goal_frequency || "monthly";
+		categoryForm.recurring_date_dt = cat.goal_target_date || "";
+		categoryForm.recurring_amount = cat.goal_amount_minor
+			? minorToDollars(cat.goal_amount_minor)
+			: "";
+		if (cat.goal_type === "target_date") {
+			categoryForm.recurring_date_dt = firstOfNextMonthISO();
+		} else {
+			categoryForm.target_date_dt = "";
+		}
+	} else {
+		categoryForm.isEditing = false;
+		categoryForm.category_id = null;
+		categoryForm.name = "";
+		categoryForm.group_id = "";
+		categoryForm.goal_type = "recurring";
+		categoryForm.target_date_dt = "";
+		categoryForm.target_amount = "";
+		categoryForm.frequency = "monthly";
+		categoryForm.recurring_date_dt = firstOfNextMonthISO();
+		categoryForm.recurring_amount = "";
+	}
+	categoryModalOpen.value = true;
 };
-const closeCategoryModal = () => { categoryModalOpen.value = false; };
+const closeCategoryModal = () => {
+	categoryModalOpen.value = false;
+};
 
 const submitCategoryForm = async () => {
-    const goalAmount = categoryForm.goal_type === 'target_date' ? categoryForm.target_amount : categoryForm.recurring_amount;
-    const goalDate = categoryForm.goal_type === 'target_date' ? categoryForm.target_date_dt : categoryForm.recurring_date_dt;
-    
-    const payload = {
-        name: categoryForm.name,
-        is_active: true,
-        group_id: categoryForm.group_id || null,
-        goal_type: categoryForm.goal_type,
-        goal_amount_minor: dollarsToMinor(goalAmount),
-        goal_target_date: goalDate || null,
-        goal_frequency: categoryForm.goal_type === 'recurring' ? categoryForm.frequency : null,
-    };
-    
-    try {
-        if (categoryForm.isEditing) {
-            await updateCategoryMutation.mutateAsync({ id: categoryForm.category_id, payload });
-        } else {
-            // Slug is auto-generated by backend if not provided? Legacy code allows editing slug on create, but here I'm skipping it for simplicity as backend generates it from name usually.
-            // Actually legacy code `slugifyCategoryName` implies frontend generates it if user types, but let's see. 
-            // The legacy code sends `category_id` (slug) on create.
-            // I'll assume backend handles it or I need to slugify.
-            const slug = categoryForm.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "category";
-            await createCategoryMutation.mutateAsync({ ...payload, category_id: slug });
-        }
-        closeCategoryModal();
-    } catch (e) {
-        categoryFormError.value = e.message || 'Failed to save';
-    }
+	const goalAmount =
+		categoryForm.goal_type === "target_date"
+			? categoryForm.target_amount
+			: categoryForm.recurring_amount;
+	const goalDate =
+		categoryForm.goal_type === "target_date"
+			? categoryForm.target_date_dt
+			: categoryForm.recurring_date_dt;
+
+	const payload = {
+		name: categoryForm.name,
+		is_active: true,
+		group_id: categoryForm.group_id || null,
+		goal_type: categoryForm.goal_type,
+		goal_amount_minor: dollarsToMinor(goalAmount),
+		goal_target_date: goalDate || null,
+		goal_frequency:
+			categoryForm.goal_type === "recurring" ? categoryForm.frequency : null,
+	};
+
+	try {
+		if (categoryForm.isEditing) {
+			await updateCategoryMutation.mutateAsync({
+				id: categoryForm.category_id,
+				payload,
+			});
+		} else {
+			// Slug is auto-generated by backend if not provided? Legacy code allows editing slug on create, but here I'm skipping it for simplicity as backend generates it from name usually.
+			// Actually legacy code `slugifyCategoryName` implies frontend generates it if user types, but let's see.
+			// The legacy code sends `category_id` (slug) on create.
+			// I'll assume backend handles it or I need to slugify.
+			const slug =
+				categoryForm.name
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, "_")
+					.replace(/^_+|_+$/g, "") || "category";
+			await createCategoryMutation.mutateAsync({
+				...payload,
+				category_id: slug,
+			});
+		}
+		closeCategoryModal();
+	} catch (e) {
+		categoryFormError.value = e.message || "Failed to save";
+	}
 };
 
 // --- Group Modal Logic ---
 const groupModalOpen = ref(false);
-const groupForm = reactive({ isEditing: false, group_id: null, name: '', selectedUncategorized: [] });
-const groupFormError = ref('');
-const createGroupMutation = useMutation({ mutationFn: api.budgets.createGroup, onSuccess: () => invalidateAll() });
-const isSubmittingGroup = computed(() => createGroupMutation.isPending.value || updateGroupMutation.isPending.value);
+const groupForm = reactive({
+	isEditing: false,
+	group_id: null,
+	name: "",
+	selectedUncategorized: [],
+});
+const groupFormError = ref("");
+const createGroupMutation = useMutation({
+	mutationFn: api.budgets.createGroup,
+	onSuccess: () => invalidateAll(),
+});
+const isSubmittingGroup = computed(
+	() =>
+		createGroupMutation.isPending.value || updateGroupMutation.isPending.value,
+);
 
 const uncategorizedAndGroupCategories = computed(() => {
-    if (!groupForm.group_id && !groupModalOpen.value) return [];
-    // Show uncategorized + categories currently in this group
-    return categories.value.filter(c => !c.group_id || c.group_id === groupForm.group_id).sort((a,b) => a.name.localeCompare(b.name));
+	if (!groupForm.group_id && !groupModalOpen.value) return [];
+	// Show uncategorized + categories currently in this group
+	return categories.value
+		.filter((c) => !c.group_id || c.group_id === groupForm.group_id)
+		.sort((a, b) => a.name.localeCompare(b.name));
 });
 
 const openGroupModal = (group = null) => {
-    groupFormError.value = '';
-    if (group) {
-        groupForm.isEditing = true;
-        groupForm.group_id = group.group_id;
-        groupForm.name = group.name;
-        // Pre-select categories in this group
-        groupForm.selectedUncategorized = categories.value.filter(c => c.group_id === group.group_id).map(c => c.category_id);
-    } else {
-        groupForm.isEditing = false;
-        groupForm.group_id = null;
-        groupForm.name = '';
-        groupForm.selectedUncategorized = [];
-    }
-    groupModalOpen.value = true;
+	groupFormError.value = "";
+	if (group) {
+		groupForm.isEditing = true;
+		groupForm.group_id = group.group_id;
+		groupForm.name = group.name;
+		// Pre-select categories in this group
+		groupForm.selectedUncategorized = categories.value
+			.filter((c) => c.group_id === group.group_id)
+			.map((c) => c.category_id);
+	} else {
+		groupForm.isEditing = false;
+		groupForm.group_id = null;
+		groupForm.name = "";
+		groupForm.selectedUncategorized = [];
+	}
+	groupModalOpen.value = true;
 };
-const closeGroupModal = () => { groupModalOpen.value = false; };
+const closeGroupModal = () => {
+	groupModalOpen.value = false;
+};
 
 const submitGroupForm = async () => {
-    try {
-        const slug = groupForm.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "group";
-        const groupId = groupForm.isEditing ? groupForm.group_id : slug;
-        
-        if (groupForm.isEditing) {
-             // sort_order is preserved in updateGroup if not passed? No, legacy passes it.
-             const original = groups.value.find(g => g.group_id === groupId);
-             await updateGroupMutation.mutateAsync({ groupId, payload: { name: groupForm.name, is_active: true, sort_order: original?.sort_order ?? 0 } });
-        } else {
-             const maxOrder = Math.max(...groups.value.map(g => g.sort_order || 0), 0);
-             await createGroupMutation.mutateAsync({ group_id: groupId, name: groupForm.name, sort_order: maxOrder + 1, is_active: true });
-        }
+	try {
+		const slug =
+			groupForm.name
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, "_")
+				.replace(/^_+|_+$/g, "") || "group";
+		const groupId = groupForm.isEditing ? groupForm.group_id : slug;
 
-        // Handle category moves
-        const selected = new Set(groupForm.selectedUncategorized);
-        const currentGroupCats = categories.value.filter(c => c.group_id === groupId);
-        const updates = [];
+		if (groupForm.isEditing) {
+			// sort_order is preserved in updateGroup if not passed? No, legacy passes it.
+			const original = groups.value.find((g) => g.group_id === groupId);
+			await updateGroupMutation.mutateAsync({
+				groupId,
+				payload: {
+					name: groupForm.name,
+					is_active: true,
+					sort_order: original?.sort_order ?? 0,
+				},
+			});
+		} else {
+			const maxOrder = Math.max(
+				...groups.value.map((g) => g.sort_order || 0),
+				0,
+			);
+			await createGroupMutation.mutateAsync({
+				group_id: groupId,
+				name: groupForm.name,
+				sort_order: maxOrder + 1,
+				is_active: true,
+			});
+		}
 
-        // Add to group
-        for (const catId of selected) {
-            const cat = categories.value.find(c => c.category_id === catId);
-            if (cat && cat.group_id !== groupId) {
-                 updates.push(api.budgets.updateCategory(catId, { ...cat, group_id: groupId }));
-            }
-        }
-        // Remove from group
-        for (const cat of currentGroupCats) {
-            if (!selected.has(cat.category_id)) {
-                 updates.push(api.budgets.updateCategory(cat.category_id, { ...cat, group_id: null }));
-            }
-        }
-        
-        if (updates.length) await Promise.all(updates);
-        invalidateAll();
-        closeGroupModal();
-    } catch (e) {
-        groupFormError.value = e.message || "Failed to save group";
-    }
+		// Handle category moves
+		const selected = new Set(groupForm.selectedUncategorized);
+		const currentGroupCats = categories.value.filter(
+			(c) => c.group_id === groupId,
+		);
+		const updates = [];
+
+		// Add to group
+		for (const catId of selected) {
+			const cat = categories.value.find((c) => c.category_id === catId);
+			if (cat && cat.group_id !== groupId) {
+				updates.push(
+					api.budgets.updateCategory(catId, { ...cat, group_id: groupId }),
+				);
+			}
+		}
+		// Remove from group
+		for (const cat of currentGroupCats) {
+			if (!selected.has(cat.category_id)) {
+				updates.push(
+					api.budgets.updateCategory(cat.category_id, {
+						...cat,
+						group_id: null,
+					}),
+				);
+			}
+		}
+
+		if (updates.length) await Promise.all(updates);
+		invalidateAll();
+		closeGroupModal();
+	} catch (e) {
+		groupFormError.value = e.message || "Failed to save group";
+	}
 };
 
 // --- Detail Modals ---
@@ -611,132 +730,187 @@ const activeBudgetDetail = ref(null);
 const groupDetailModalOpen = ref(false);
 const activeGroupDetail = ref(null);
 
-const openBudgetDetailModal = (cat) => { activeBudgetDetail.value = cat; budgetDetailModalOpen.value = true; };
-const closeBudgetDetailModal = () => { budgetDetailModalOpen.value = false; activeBudgetDetail.value = null; };
-
-const openGroupDetailModal = (group) => { 
-    // Need to augment group with item details from categories list which might be updated
-    const items = categories.value.filter(c => c.group_id === group.group_id);
-    activeGroupDetail.value = { ...group, items }; 
-    groupDetailModalOpen.value = true; 
+const openBudgetDetailModal = (cat) => {
+	activeBudgetDetail.value = cat;
+	budgetDetailModalOpen.value = true;
 };
-const closeGroupDetailModal = () => { groupDetailModalOpen.value = false; activeGroupDetail.value = null; };
+const closeBudgetDetailModal = () => {
+	budgetDetailModalOpen.value = false;
+	activeBudgetDetail.value = null;
+};
+
+const openGroupDetailModal = (group) => {
+	// Need to augment group with item details from categories list which might be updated
+	const items = categories.value.filter((c) => c.group_id === group.group_id);
+	activeGroupDetail.value = { ...group, items };
+	groupDetailModalOpen.value = true;
+};
+const closeGroupDetailModal = () => {
+	groupDetailModalOpen.value = false;
+	activeGroupDetail.value = null;
+};
 
 const editCategoryFromDetail = () => {
-    const cat = activeBudgetDetail.value;
-    closeBudgetDetailModal();
-    openCategoryModal(cat);
+	const cat = activeBudgetDetail.value;
+	closeBudgetDetailModal();
+	openCategoryModal(cat);
 };
 
 const editGroupFromDetail = () => {
-    const group = groups.value.find(g => g.group_id === activeGroupDetail.value.group_id);
-    closeGroupDetailModal();
-    openGroupModal(group);
+	const group = groups.value.find(
+		(g) => g.group_id === activeGroupDetail.value.group_id,
+	);
+	closeGroupDetailModal();
+	openGroupModal(group);
 };
 
 // Quick Allocations
 const createAllocationMutation = useMutation({
-    mutationFn: api.budgets.createAllocation,
-    onSuccess: () => {
-        invalidateAll();
-    }
+	mutationFn: api.budgets.createAllocation,
+	onSuccess: () => {
+		invalidateAll();
+	},
 });
 
 const handleQuickAllocation = async (to_category_id, amount_minor, memo) => {
-    if (readyToAssign.value < amount_minor) {
-        alert("Not enough Ready to Assign funds.");
-        return;
-    }
-    try {
-        await createAllocationMutation.mutateAsync({
-            to_category_id,
-            amount_minor,
-            allocation_date: todayISO(),
-            memo
-        });
-        closeBudgetDetailModal();
-    } catch (e) {
-        alert(e.message || "Allocation failed");
-    }
+	if (readyToAssign.value < amount_minor) {
+		alert("Not enough Ready to Assign funds.");
+		return;
+	}
+	try {
+		await createAllocationMutation.mutateAsync({
+			to_category_id,
+			amount_minor,
+			allocation_date: todayISO(),
+			memo,
+		});
+		closeBudgetDetailModal();
+	} catch (e) {
+		alert(e.message || "Allocation failed");
+	}
 };
 
-const handleGroupQuickAllocation = async (allocations, label) => {
-    const total = allocations.reduce((sum, a) => sum + a.amount_minor, 0);
-    if (readyToAssign.value < total) {
-        alert("Not enough Ready to Assign funds.");
-        return;
-    }
-    try {
-        await Promise.all(allocations.map(a => api.budgets.createAllocation({
-            to_category_id: a.category_id,
-            amount_minor: a.amount_minor,
-            allocation_date: todayISO(),
-            memo: a.memo
-        })));
-        closeGroupDetailModal();
-    } catch (e) {
-        alert(e.message || "Allocation failed");
-    }
+const handleGroupQuickAllocation = async (allocations, _label) => {
+	const total = allocations.reduce((sum, a) => sum + a.amount_minor, 0);
+	if (readyToAssign.value < total) {
+		alert("Not enough Ready to Assign funds.");
+		return;
+	}
+	try {
+		await Promise.all(
+			allocations.map((a) =>
+				api.budgets.createAllocation({
+					to_category_id: a.category_id,
+					amount_minor: a.amount_minor,
+					allocation_date: todayISO(),
+					memo: a.memo,
+				}),
+			),
+		);
+		closeGroupDetailModal();
+	} catch (e) {
+		alert(e.message || "Allocation failed");
+	}
 };
 
 const budgetQuickActions = computed(() => {
-    if (!activeBudgetDetail.value) return [];
-    const cat = activeBudgetDetail.value;
-    const actions = [];
-    if (cat.goal_amount_minor > 0) {
-        const needed = Math.max(0, cat.goal_amount_minor - cat.available_minor);
-        if (needed > 0) actions.push({ label: 'Fund Goal', amount: needed });
-    }
-    if (cat.last_month_allocated_minor > 0) {
-        actions.push({ label: 'Budgeted Last Month', amount: cat.last_month_allocated_minor });
-    }
-    const spentLast = Math.max(0, -1 * (cat.last_month_activity_minor || 0)); // Activity is signed? Yes. Outflow is negative.
-    if (spentLast > 0) {
-        actions.push({ label: 'Spent Last Month', amount: spentLast });
-    }
-    return actions;
+	if (!activeBudgetDetail.value) return [];
+	const cat = activeBudgetDetail.value;
+	const actions = [];
+	if (cat.goal_amount_minor > 0) {
+		const needed = Math.max(0, cat.goal_amount_minor - cat.available_minor);
+		if (needed > 0) actions.push({ label: "Fund Goal", amount: needed });
+	}
+	if (cat.last_month_allocated_minor > 0) {
+		actions.push({
+			label: "Budgeted Last Month",
+			amount: cat.last_month_allocated_minor,
+		});
+	}
+	const spentLast = Math.max(0, -1 * (cat.last_month_activity_minor || 0)); // Activity is signed? Yes. Outflow is negative.
+	if (spentLast > 0) {
+		actions.push({ label: "Spent Last Month", amount: spentLast });
+	}
+	return actions;
 });
 
 const groupDetailStats = computed(() => {
-    if (!activeGroupDetail.value) return { leftover: 0, budgeted: 0, activity: 0, available: 0 };
-    return activeGroupDetail.value.items.reduce((acc, cat) => ({
-        leftover: acc.leftover + (cat.available_minor - cat.allocated_minor - cat.activity_minor),
-        budgeted: acc.budgeted + cat.allocated_minor,
-        activity: acc.activity + cat.activity_minor,
-        available: acc.available + cat.available_minor
-    }), { leftover: 0, budgeted: 0, activity: 0, available: 0 });
+	if (!activeGroupDetail.value)
+		return { leftover: 0, budgeted: 0, activity: 0, available: 0 };
+	return activeGroupDetail.value.items.reduce(
+		(acc, cat) => ({
+			leftover:
+				acc.leftover +
+				(cat.available_minor - cat.allocated_minor - cat.activity_minor),
+			budgeted: acc.budgeted + cat.allocated_minor,
+			activity: acc.activity + cat.activity_minor,
+			available: acc.available + cat.available_minor,
+		}),
+		{ leftover: 0, budgeted: 0, activity: 0, available: 0 },
+	);
 });
 
 const groupQuickActions = computed(() => {
-    if (!activeGroupDetail.value) return [];
-    const items = activeGroupDetail.value.items;
-    const actions = [];
-    
-    // Fund Underfunded
-    const fundAllocations = items
-        .filter(cat => cat.goal_amount_minor > 0 && (cat.goal_amount_minor - cat.available_minor) > 0)
-        .map(cat => ({ category_id: cat.category_id, amount_minor: cat.goal_amount_minor - cat.available_minor, memo: 'Group Quick Allocation - Fund Goal' }));
-    if (fundAllocations.length) actions.push({ label: 'Fund Underfunded', total: fundAllocations.reduce((s,a) => s + a.amount_minor, 0), allocations: fundAllocations });
+	if (!activeGroupDetail.value) return [];
+	const items = activeGroupDetail.value.items;
+	const actions = [];
 
-    // Budgeted Last Month
-    const budgetedAllocations = items
-        .filter(cat => cat.last_month_allocated_minor > 0)
-        .map(cat => ({ category_id: cat.category_id, amount_minor: cat.last_month_allocated_minor, memo: 'Group Quick Allocation - Budgeted Last Month' }));
-    if (budgetedAllocations.length) actions.push({ label: 'Budgeted Last Month', total: budgetedAllocations.reduce((s,a) => s + a.amount_minor, 0), allocations: budgetedAllocations });
+	// Fund Underfunded
+	const fundAllocations = items
+		.filter(
+			(cat) =>
+				cat.goal_amount_minor > 0 &&
+				cat.goal_amount_minor - cat.available_minor > 0,
+		)
+		.map((cat) => ({
+			category_id: cat.category_id,
+			amount_minor: cat.goal_amount_minor - cat.available_minor,
+			memo: "Group Quick Allocation - Fund Goal",
+		}));
+	if (fundAllocations.length)
+		actions.push({
+			label: "Fund Underfunded",
+			total: fundAllocations.reduce((s, a) => s + a.amount_minor, 0),
+			allocations: fundAllocations,
+		});
 
-    // Spent Last Month
-    const spentAllocations = items
-        .filter(cat => (-1 * cat.last_month_activity_minor) > 0)
-        .map(cat => ({ category_id: cat.category_id, amount_minor: -1 * cat.last_month_activity_minor, memo: 'Group Quick Allocation - Spent Last Month' }));
-    if (spentAllocations.length) actions.push({ label: 'Spent Last Month', total: spentAllocations.reduce((s,a) => s + a.amount_minor, 0), allocations: spentAllocations });
+	// Budgeted Last Month
+	const budgetedAllocations = items
+		.filter((cat) => cat.last_month_allocated_minor > 0)
+		.map((cat) => ({
+			category_id: cat.category_id,
+			amount_minor: cat.last_month_allocated_minor,
+			memo: "Group Quick Allocation - Budgeted Last Month",
+		}));
+	if (budgetedAllocations.length)
+		actions.push({
+			label: "Budgeted Last Month",
+			total: budgetedAllocations.reduce((s, a) => s + a.amount_minor, 0),
+			allocations: budgetedAllocations,
+		});
 
-    return actions;
+	// Spent Last Month
+	const spentAllocations = items
+		.filter((cat) => -1 * cat.last_month_activity_minor > 0)
+		.map((cat) => ({
+			category_id: cat.category_id,
+			amount_minor: -1 * cat.last_month_activity_minor,
+			memo: "Group Quick Allocation - Spent Last Month",
+		}));
+	if (spentAllocations.length)
+		actions.push({
+			label: "Spent Last Month",
+			total: spentAllocations.reduce((s, a) => s + a.amount_minor, 0),
+			allocations: spentAllocations,
+		});
+
+	return actions;
 });
 
 const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
-    queryClient.invalidateQueries({ queryKey: ['budget-category-groups'] });
-    queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
-    queryClient.invalidateQueries({ queryKey: ['allocations'] });
+	queryClient.invalidateQueries({ queryKey: ["budget-categories"] });
+	queryClient.invalidateQueries({ queryKey: ["budget-category-groups"] });
+	queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
+	queryClient.invalidateQueries({ queryKey: ["allocations"] });
 };
 </script>

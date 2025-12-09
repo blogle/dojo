@@ -1,18 +1,15 @@
 import { selectors, statusToggleIcons } from "../../constants.js";
 import { api } from "../../services/api.js";
+import { setButtonBusy, setFormError } from "../../services/dom.js";
 import {
-	formatAmount,
 	dollarsToMinor,
+	formatAmount,
 	todayISO,
 } from "../../services/format.js";
-import {
-	setFormError,
-	setButtonBusy,
-} from "../../services/dom.js";
+import { makeRowEditable } from "../../services/ui-ledger.js";
 import { store } from "../../store.js";
 import { getCategoryOptions } from "../categories/utils.js";
 import { refreshSelectOptions } from "../reference/index.js";
-import { makeRowEditable } from "../../services/ui-ledger.js";
 
 let transactionsBodyEl = null;
 let detachInlineEscHandler = null;

@@ -1,12 +1,17 @@
+from collections.abc import Generator
+from datetime import date
+
+import duckdb
 import pytest
 from fastapi.testclient import TestClient
-from datetime import date
+
 from dojo.core.app import create_app
 from dojo.core.config import Settings
 from dojo.core.db import connection_dep
 
+
 @pytest.fixture
-def client(in_memory_db):
+def client(in_memory_db: duckdb.DuckDBPyConnection) -> Generator[TestClient, None, None]:
     settings = Settings(
         db_path=":memory:", 
         run_startup_migrations=False,
@@ -14,7 +19,7 @@ def client(in_memory_db):
     )
     app = create_app(settings)
     
-    def override_db():
+    def override_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
         yield in_memory_db
 
     app.dependency_overrides[connection_dep] = override_db
@@ -22,7 +27,7 @@ def client(in_memory_db):
     with TestClient(app) as c:
         yield c
 
-def test_payday_assignment_flow(client):
+def test_payday_assignment_flow(client: TestClient) -> None:
     """
     Integration test for User Story 01: Payday Assignment.
     Verifies that recording an inflow increases Ready to Assign,

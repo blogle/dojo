@@ -310,353 +310,380 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { api } from '../../../static/services/api.js';
-import { currentMonthStartISO, dollarsToMinor, formatAmount, todayISO } from '../../../static/services/format.js';
-import { statusToggleIcons } from '../../../static/constants.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, nextTick, reactive, ref, watch } from "vue";
+import { statusToggleIcons } from "../../../static/constants.js";
+import { api } from "../../../static/services/api.js";
+import {
+	currentMonthStartISO,
+	dollarsToMinor,
+	formatAmount,
+	todayISO,
+} from "../../../static/services/format.js";
 
 const queryClient = useQueryClient();
 const monthStart = currentMonthStartISO();
 
 const invalidateLedgerQueries = async () => {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['transactions'] }),
-    queryClient.invalidateQueries({ queryKey: ['budget-allocations'] }),
-    queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] }),
-    queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    queryClient.invalidateQueries({ queryKey: ['budget-categories'] }),
-  ]);
+	await Promise.all([
+		queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+		queryClient.invalidateQueries({ queryKey: ["budget-allocations"] }),
+		queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] }),
+		queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+		queryClient.invalidateQueries({ queryKey: ["budget-categories"] }),
+	]);
 };
 
 const transactionForm = reactive({
-  transaction_date: todayISO(),
-  account_id: '',
-  category_id: '',
-  memo: '',
-  amount: '',
-  flow: 'outflow',
+	transaction_date: todayISO(),
+	account_id: "",
+	category_id: "",
+	memo: "",
+	amount: "",
+	flow: "outflow",
 });
 
-const formError = ref('');
-const inlineError = ref('');
+const formError = ref("");
+const inlineError = ref("");
 const editingId = ref(null);
 const inlineSubmitting = ref(false);
 const inlineForm = reactive({
-  transaction_date: todayISO(),
-  account_id: '',
-  category_id: '',
-  memo: '',
-  inflow: '',
-  outflow: '',
-  status: 'pending',
+	transaction_date: todayISO(),
+	account_id: "",
+	category_id: "",
+	memo: "",
+	inflow: "",
+	outflow: "",
+	status: "pending",
 });
 
 const statusIcons = statusToggleIcons;
 
 const isValidDateInput = (value) => {
-  if (!value) {
-    return false;
-  }
-  const parsed = Date.parse(`${value}T00:00:00`);
-  return Number.isFinite(parsed);
+	if (!value) {
+		return false;
+	}
+	const parsed = Date.parse(`${value}T00:00:00`);
+	return Number.isFinite(parsed);
 };
 
 const toMinor = (value) => {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-  return dollarsToMinor(parsed);
+	if (value === null || value === undefined || value === "") {
+		return null;
+	}
+	const parsed = Number.parseFloat(value);
+	if (!Number.isFinite(parsed)) {
+		return null;
+	}
+	return dollarsToMinor(parsed);
 };
 
 const referenceQuery = useQuery({
-  queryKey: ['reference-data'],
-  queryFn: () => api.reference.load(),
+	queryKey: ["reference-data"],
+	queryFn: () => api.reference.load(),
 });
 
 const transactionsQuery = useQuery({
-  queryKey: ['transactions'],
-  queryFn: () => api.transactions.list(100),
-  refetchOnWindowFocus: false,
+	queryKey: ["transactions"],
+	queryFn: () => api.transactions.list(100),
+	refetchOnWindowFocus: false,
 });
 
 const allocationsQuery = useQuery({
-  queryKey: ['budget-allocations', monthStart],
-  queryFn: () => api.budgets.allocations(monthStart),
-  refetchOnWindowFocus: false,
+	queryKey: ["budget-allocations", monthStart],
+	queryFn: () => api.budgets.allocations(monthStart),
+	refetchOnWindowFocus: false,
 });
 
-const referenceError = computed(() => referenceQuery.error.value?.message || '');
-const transactionsError = computed(() => transactionsQuery.error.value?.message || '');
-const allocationsError = computed(() => allocationsQuery.error.value?.message || '');
+const referenceError = computed(
+	() => referenceQuery.error.value?.message || "",
+);
+const transactionsError = computed(
+	() => transactionsQuery.error.value?.message || "",
+);
+const allocationsError = computed(
+	() => allocationsQuery.error.value?.message || "",
+);
 
 const isLoadingReference = computed(
-  () => referenceQuery.isPending.value || referenceQuery.isFetching.value,
+	() => referenceQuery.isPending.value || referenceQuery.isFetching.value,
 );
 const isLoadingAllocations = computed(
-  () => allocationsQuery.isPending.value || allocationsQuery.isFetching.value,
+	() => allocationsQuery.isPending.value || allocationsQuery.isFetching.value,
 );
 
 const createTransaction = useMutation({
-  mutationFn: (payload) => api.transactions.create(payload),
-  onSuccess: () => invalidateLedgerQueries(),
+	mutationFn: (payload) => api.transactions.create(payload),
+	onSuccess: () => invalidateLedgerQueries(),
 });
 
 const updateTransaction = useMutation({
-  mutationFn: ({ concept_id: conceptId, ...payload }) =>
-    api.transactions.update(conceptId, payload),
-  onMutate: async (payload) => {
-    await queryClient.cancelQueries({ queryKey: ['transactions'] });
-    const previous = queryClient.getQueryData(['transactions']) ?? [];
-    const updated = previous.map((tx) =>
-      tx?.concept_id === payload.concept_id
-        ? {
-            ...tx,
-            ...payload,
-            amount_minor: payload.amount_minor,
-            transaction_date: payload.transaction_date,
-            account_id: payload.account_id,
-            category_id: payload.category_id,
-            memo: payload.memo,
-            status: payload.status,
-          }
-        : tx,
-    );
-    queryClient.setQueryData(['transactions'], updated);
-    return { previous };
-  },
-  onError: (_error, _payload, context) => {
-    if (context?.previous) {
-      queryClient.setQueryData(['transactions'], context.previous);
-    }
-  },
-  onSettled: () => invalidateLedgerQueries(),
+	mutationFn: ({ concept_id: conceptId, ...payload }) =>
+		api.transactions.update(conceptId, payload),
+	onMutate: async (payload) => {
+		await queryClient.cancelQueries({ queryKey: ["transactions"] });
+		const previous = queryClient.getQueryData(["transactions"]) ?? [];
+		const updated = previous.map((tx) =>
+			tx?.concept_id === payload.concept_id
+				? {
+						...tx,
+						...payload,
+						amount_minor: payload.amount_minor,
+						transaction_date: payload.transaction_date,
+						account_id: payload.account_id,
+						category_id: payload.category_id,
+						memo: payload.memo,
+						status: payload.status,
+					}
+				: tx,
+		);
+		queryClient.setQueryData(["transactions"], updated);
+		return { previous };
+	},
+	onError: (_error, _payload, context) => {
+		if (context?.previous) {
+			queryClient.setQueryData(["transactions"], context.previous);
+		}
+	},
+	onSettled: () => invalidateLedgerQueries(),
 });
 
 const accounts = computed(() => referenceQuery.data.value?.accounts ?? []);
 const categories = computed(() => referenceQuery.data.value?.categories ?? []);
 const transactions = computed(() => {
-  const data = transactionsQuery.data.value ?? [];
-  return [...data].sort((a, b) => {
-    const aDate = a?.transaction_date ? new Date(`${a.transaction_date}T00:00:00`) : 0;
-    const bDate = b?.transaction_date ? new Date(`${b.transaction_date}T00:00:00`) : 0;
-    return bDate - aDate;
-  });
+	const data = transactionsQuery.data.value ?? [];
+	return [...data].sort((a, b) => {
+		const aDate = a?.transaction_date
+			? new Date(`${a.transaction_date}T00:00:00`)
+			: 0;
+		const bDate = b?.transaction_date
+			? new Date(`${b.transaction_date}T00:00:00`)
+			: 0;
+		return bDate - aDate;
+	});
 });
 
 const monthSpendMinor = computed(() => {
-  const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-  return transactions.value.reduce((total, tx) => {
-    if (!tx?.transaction_date) return total;
-    const date = new Date(`${tx.transaction_date}T00:00:00`);
-    if (date.getMonth() === month && date.getFullYear() === year && tx.amount_minor < 0) {
-      return total + Math.abs(tx.amount_minor);
-    }
-    return total;
-  }, 0);
+	const now = new Date();
+	const month = now.getMonth();
+	const year = now.getFullYear();
+	return transactions.value.reduce((total, tx) => {
+		if (!tx?.transaction_date) return total;
+		const date = new Date(`${tx.transaction_date}T00:00:00`);
+		if (
+			date.getMonth() === month &&
+			date.getFullYear() === year &&
+			tx.amount_minor < 0
+		) {
+			return total + Math.abs(tx.amount_minor);
+		}
+		return total;
+	}, 0);
 });
 
 const monthSpend = computed(() => formatAmount(monthSpendMinor.value));
 const monthBudgetedMinor = computed(() => {
-  const allocations = allocationsQuery.data.value?.allocations ?? [];
-  return allocations.reduce((total, entry) => {
-    if (!entry?.from_category_id) {
-      return total + (entry.amount_minor || 0);
-    }
-    return total;
-  }, 0);
+	const allocations = allocationsQuery.data.value?.allocations ?? [];
+	return allocations.reduce((total, entry) => {
+		if (!entry?.from_category_id) {
+			return total + (entry.amount_minor || 0);
+		}
+		return total;
+	}, 0);
 });
 const monthBudgeted = computed(() => formatAmount(monthBudgetedMinor.value));
 
 const isCreating = computed(() => createTransaction.isPending.value);
-const isLoadingTransactions = computed(() => transactionsQuery.isPending.value || transactionsQuery.isFetching.value);
+const isLoadingTransactions = computed(
+	() => transactionsQuery.isPending.value || transactionsQuery.isFetching.value,
+);
 
 const resetForm = () => {
-  transactionForm.transaction_date = todayISO();
-  transactionForm.account_id = '';
-  transactionForm.category_id = '';
-  transactionForm.memo = '';
-  transactionForm.amount = '';
-  transactionForm.flow = 'outflow';
+	transactionForm.transaction_date = todayISO();
+	transactionForm.account_id = "";
+	transactionForm.category_id = "";
+	transactionForm.memo = "";
+	transactionForm.amount = "";
+	transactionForm.flow = "outflow";
 };
 
 const formatAmountDisplay = (minor) => formatAmount(minor);
 
 const handleTransactionSubmit = async () => {
-  formError.value = '';
-  const amountMinor = toMinor(transactionForm.amount);
-  if (!isValidDateInput(transactionForm.transaction_date)) {
-    formError.value = 'Enter a valid date (YYYY-MM-DD).';
-    return;
-  }
-  if (!transactionForm.account_id || !transactionForm.category_id) {
-    formError.value = 'Account and category are required.';
-    return;
-  }
-  if (amountMinor === null) {
-    formError.value = 'Enter a valid amount.';
-    return;
-  }
-  const normalizedAmount = Math.abs(amountMinor);
-  if (normalizedAmount === 0) {
-    formError.value = 'Amount must be non-zero.';
-    return;
-  }
-  const signedAmount = transactionForm.flow === 'outflow' ? -normalizedAmount : normalizedAmount;
-  const payload = {
-    transaction_date: transactionForm.transaction_date || todayISO(),
-    account_id: transactionForm.account_id,
-    category_id: transactionForm.category_id,
-    memo: transactionForm.memo?.trim() || null,
-    amount_minor: signedAmount,
-    status: 'pending',
-  };
-  try {
-    await createTransaction.mutateAsync(payload);
-    resetForm();
-  } catch (error) {
-    formError.value = error?.message || 'Failed to save transaction.';
-  }
+	formError.value = "";
+	const amountMinor = toMinor(transactionForm.amount);
+	if (!isValidDateInput(transactionForm.transaction_date)) {
+		formError.value = "Enter a valid date (YYYY-MM-DD).";
+		return;
+	}
+	if (!transactionForm.account_id || !transactionForm.category_id) {
+		formError.value = "Account and category are required.";
+		return;
+	}
+	if (amountMinor === null) {
+		formError.value = "Enter a valid amount.";
+		return;
+	}
+	const normalizedAmount = Math.abs(amountMinor);
+	if (normalizedAmount === 0) {
+		formError.value = "Amount must be non-zero.";
+		return;
+	}
+	const signedAmount =
+		transactionForm.flow === "outflow" ? -normalizedAmount : normalizedAmount;
+	const payload = {
+		transaction_date: transactionForm.transaction_date || todayISO(),
+		account_id: transactionForm.account_id,
+		category_id: transactionForm.category_id,
+		memo: transactionForm.memo?.trim() || null,
+		amount_minor: signedAmount,
+		status: "pending",
+	};
+	try {
+		await createTransaction.mutateAsync(payload);
+		resetForm();
+	} catch (error) {
+		formError.value = error?.message || "Failed to save transaction.";
+	}
 };
 
 const isEditing = (tx) => editingId.value === tx.transaction_version_id;
-const isSavingInline = (tx) => updateTransaction.isPending.value && isEditing(tx);
+const isSavingInline = (tx) =>
+	updateTransaction.isPending.value && isEditing(tx);
 
 const deletingIds = reactive(new Set());
 
 const handleDelete = async (tx) => {
-  if (!tx?.concept_id) return;
-  // Determine if we should confirm. For now, let's just do it as requested (click -> animate -> gone).
-  // Ideally, "click a red trash can" is explicit enough, but a confirm is safer. 
-  // The prompt implies a direct action: "When clicked, we mark the row as inactive..."
-  // I'll skip confirm for now to match the "fluid" feel, or maybe add it if it feels too dangerous.
-  // "click a row to make it editable... click a red trash can" -> fairly deliberate.
-  
-  deletingIds.add(tx.transaction_version_id);
-  
-  // Start animation immediately
-  try {
-    // Wait for animation duration (match CSS transition)
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await api.transactions.delete(tx.concept_id);
-    editingId.value = null; // Exit edit mode
-  } catch (error) {
-    console.error(error);
-    deletingIds.delete(tx.transaction_version_id);
-    // Ideally show a toast here, but for now we'll just log it and revert the state
-    alert(error.message || 'Failed to delete transaction.');
-  }
+	if (!tx?.concept_id) return;
+	// Determine if we should confirm. For now, let's just do it as requested (click -> animate -> gone).
+	// Ideally, "click a red trash can" is explicit enough, but a confirm is safer.
+	// The prompt implies a direct action: "When clicked, we mark the row as inactive..."
+	// I'll skip confirm for now to match the "fluid" feel, or maybe add it if it feels too dangerous.
+	// "click a row to make it editable... click a red trash can" -> fairly deliberate.
+
+	deletingIds.add(tx.transaction_version_id);
+
+	// Start animation immediately
+	try {
+		// Wait for animation duration (match CSS transition)
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		await api.transactions.delete(tx.concept_id);
+		editingId.value = null; // Exit edit mode
+	} catch (error) {
+		console.error(error);
+		deletingIds.delete(tx.transaction_version_id);
+		// Ideally show a toast here, but for now we'll just log it and revert the state
+		alert(error.message || "Failed to delete transaction.");
+	}
 };
 
 const populateInlineForm = (tx) => {
-  inlineForm.transaction_date = tx.transaction_date || todayISO();
-  inlineForm.account_id = tx.account_id || '';
-  inlineForm.category_id = tx.category_id || '';
-  inlineForm.memo = tx.memo || '';
-  inlineForm.status = tx.status === 'cleared' ? 'cleared' : 'pending';
-  if (tx.amount_minor < 0) {
-    inlineForm.outflow = (Math.abs(tx.amount_minor) / 100).toFixed(2);
-    inlineForm.inflow = '';
-  } else {
-    inlineForm.inflow = (Math.abs(tx.amount_minor) / 100).toFixed(2);
-    inlineForm.outflow = '';
-  }
-  inlineError.value = '';
+	inlineForm.transaction_date = tx.transaction_date || todayISO();
+	inlineForm.account_id = tx.account_id || "";
+	inlineForm.category_id = tx.category_id || "";
+	inlineForm.memo = tx.memo || "";
+	inlineForm.status = tx.status === "cleared" ? "cleared" : "pending";
+	if (tx.amount_minor < 0) {
+		inlineForm.outflow = (Math.abs(tx.amount_minor) / 100).toFixed(2);
+		inlineForm.inflow = "";
+	} else {
+		inlineForm.inflow = (Math.abs(tx.amount_minor) / 100).toFixed(2);
+		inlineForm.outflow = "";
+	}
+	inlineError.value = "";
 };
 
 const handleRowClick = async (tx) => {
-  if (isEditing(tx)) {
-    return;
-  }
-  editingId.value = tx.transaction_version_id;
-  populateInlineForm(tx);
-  await nextTick();
+	if (isEditing(tx)) {
+		return;
+	}
+	editingId.value = tx.transaction_version_id;
+	populateInlineForm(tx);
+	await nextTick();
 };
 
 const validateInlinePayload = () => {
-  if (!isValidDateInput(inlineForm.transaction_date)) {
-    inlineError.value = 'Enter a valid date (YYYY-MM-DD).';
-    return null;
-  }
-  if (!inlineForm.account_id || !inlineForm.category_id) {
-    inlineError.value = 'Account and category are required.';
-    return null;
-  }
-  const inflowMinor = toMinor(inlineForm.inflow);
-  const outflowMinor = toMinor(inlineForm.outflow);
-  const hasInflow = inflowMinor !== null && inflowMinor !== 0;
-  const hasOutflow = outflowMinor !== null && outflowMinor !== 0;
+	if (!isValidDateInput(inlineForm.transaction_date)) {
+		inlineError.value = "Enter a valid date (YYYY-MM-DD).";
+		return null;
+	}
+	if (!inlineForm.account_id || !inlineForm.category_id) {
+		inlineError.value = "Account and category are required.";
+		return null;
+	}
+	const inflowMinor = toMinor(inlineForm.inflow);
+	const outflowMinor = toMinor(inlineForm.outflow);
+	const hasInflow = inflowMinor !== null && inflowMinor !== 0;
+	const hasOutflow = outflowMinor !== null && outflowMinor !== 0;
 
-  if (hasInflow && hasOutflow) {
-    inlineError.value = 'Enter either an inflow or an outflow, not both.';
-    return null;
-  }
+	if (hasInflow && hasOutflow) {
+		inlineError.value = "Enter either an inflow or an outflow, not both.";
+		return null;
+	}
 
-  const pickedMinor = hasInflow ? Math.abs(inflowMinor) : hasOutflow ? Math.abs(outflowMinor) : null;
+	const pickedMinor = hasInflow
+		? Math.abs(inflowMinor)
+		: hasOutflow
+			? Math.abs(outflowMinor)
+			: null;
 
-  if (!pickedMinor) {
-    inlineError.value = 'Amount must be non-zero.';
-    return null;
-  }
+	if (!pickedMinor) {
+		inlineError.value = "Amount must be non-zero.";
+		return null;
+	}
 
-  const signedAmount = hasInflow ? pickedMinor : -pickedMinor;
-  return { signedAmount };
+	const signedAmount = hasInflow ? pickedMinor : -pickedMinor;
+	return { signedAmount };
 };
 
 const saveInlineEdit = async (tx) => {
-  if (!tx || !isEditing(tx)) {
-    return;
-  }
-  inlineError.value = '';
-  const validation = validateInlinePayload();
-  if (!validation) {
-    return;
-  }
-  const payload = {
-    concept_id: tx.concept_id,
-    transaction_date: inlineForm.transaction_date || todayISO(),
-    account_id: inlineForm.account_id,
-    category_id: inlineForm.category_id,
-    memo: inlineForm.memo?.trim() || null,
-    amount_minor: validation.signedAmount,
-    status: inlineForm.status,
-  };
-  try {
-    inlineSubmitting.value = true;
-    await updateTransaction.mutateAsync(payload);
-    editingId.value = null;
-  } catch (error) {
-    inlineError.value = error?.message || 'Failed to save changes.';
-  } finally {
-    inlineSubmitting.value = false;
-  }
+	if (!tx || !isEditing(tx)) {
+		return;
+	}
+	inlineError.value = "";
+	const validation = validateInlinePayload();
+	if (!validation) {
+		return;
+	}
+	const payload = {
+		concept_id: tx.concept_id,
+		transaction_date: inlineForm.transaction_date || todayISO(),
+		account_id: inlineForm.account_id,
+		category_id: inlineForm.category_id,
+		memo: inlineForm.memo?.trim() || null,
+		amount_minor: validation.signedAmount,
+		status: inlineForm.status,
+	};
+	try {
+		inlineSubmitting.value = true;
+		await updateTransaction.mutateAsync(payload);
+		editingId.value = null;
+	} catch (error) {
+		inlineError.value = error?.message || "Failed to save changes.";
+	} finally {
+		inlineSubmitting.value = false;
+	}
 };
 
 const toggleInlineStatus = () => {
-  inlineForm.status = inlineForm.status === 'cleared' ? 'pending' : 'cleared';
+	inlineForm.status = inlineForm.status === "cleared" ? "pending" : "cleared";
 };
 
 watch(
-  () => inlineForm.inflow,
-  (value) => {
-    if (value && Number.parseFloat(value) !== 0) {
-      inlineForm.outflow = '';
-    }
-  },
+	() => inlineForm.inflow,
+	(value) => {
+		if (value && Number.parseFloat(value) !== 0) {
+			inlineForm.outflow = "";
+		}
+	},
 );
 
 watch(
-  () => inlineForm.outflow,
-  (value) => {
-    if (value && Number.parseFloat(value) !== 0) {
-      inlineForm.inflow = '';
-    }
-  },
+	() => inlineForm.outflow,
+	(value) => {
+		if (value && Number.parseFloat(value) !== 0) {
+			inlineForm.inflow = "";
+		}
+	},
 );
 </script>
