@@ -1089,6 +1089,34 @@ def update_allocation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.delete(
+    "/budget/allocations/{concept_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_allocation(
+    concept_id: UUID,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: TransactionEntryService = _TRANSACTION_SERVICE_DEP,
+) -> Response:
+    """
+    Deletes (deactivates) a budget allocation.
+
+    Parameters
+    ----------
+    concept_id : UUID
+        The concept ID of the allocation to delete.
+    conn : duckdb.DuckDBPyConnection
+        Dependency that provides a DuckDB connection.
+    service : TransactionEntryService
+        Dependency that provides the transaction entry service.
+    """
+    try:
+        service.delete_allocation(conn, concept_id)
+    except (BudgetingError, InvalidTransactionError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/budget/allocations", response_model=BudgetAllocationsResponse)
 def list_allocations(
     month: date | None = _BUDGET_MONTH_QUERY,

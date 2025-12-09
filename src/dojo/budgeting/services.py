@@ -732,6 +732,53 @@ class TransactionEntryService:
 
         return self._category_state_for_month(dao, cmd.to_category_id, new_month_start)
 
+    def delete_allocation(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        concept_id: UUID,
+    ) -> None:
+        """
+        Deletes (deactivates) a budget allocation using SCD-2 logic.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            The DuckDB connection object.
+        concept_id : UUID
+            The concept ID of the allocation to delete.
+        """
+        dao = BudgetingDAO(conn)
+        # Fetch current active state
+        row = conn.execute(
+            """
+            SELECT amount_minor, month_start, from_category_id, to_category_id
+            FROM budget_allocations
+            WHERE concept_id = ? AND is_active = TRUE
+            """,
+            [concept_id],
+        ).fetchone()
+
+        if not row:
+            raise InvalidTransactionError("Allocation not found or not active.")
+
+        amount_minor, month_start, from_category_id, to_category_id = row
+
+        with dao.transaction():
+            # Retire the allocation
+            conn.execute(
+                load_sql("scd2_retire_allocation.sql"),
+                {"concept_id": concept_id},
+            )
+
+            # Revert allocation impact
+            # 1. Decrease destination allocated/available
+            dao.adjust_category_allocation(to_category_id, month_start, -amount_minor, -amount_minor)
+
+            # 2. Increase source available (if from a category) or just drop it (if from RTA, implicit)
+            if from_category_id:
+                # Revert outflow from source (add back)
+                dao.adjust_category_allocation(from_category_id, month_start, amount_minor, amount_minor)
+
     def list_recent(
         self,
         conn: duckdb.DuckDBPyConnection,

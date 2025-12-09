@@ -69,11 +69,12 @@
             <th>From</th>
             <th>To</th>
             <th>Memo</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="allocations-body">
-          <tr v-if="isLoading"><td colspan="5" class="u-muted">Loading allocations…</td></tr>
-          <tr v-else-if="!allocations.length"><td colspan="5" class="u-muted">No allocations recorded for this month.</td></tr>
+          <tr v-if="isLoading"><td colspan="6" class="u-muted">Loading allocations…</td></tr>
+          <tr v-else-if="!allocations.length"><td colspan="6" class="u-muted">No allocations recorded for this month.</td></tr>
           <tr
             v-for="alloc in allocations"
             :key="alloc.concept_id"
@@ -90,6 +91,9 @@
                    </select>
                 </td>
                 <td><input type="text" v-model="editForm.memo" @keydown.enter.prevent="saveEdit" @keydown.esc.prevent="cancelEdit"></td>
+                <td>
+                    <button class="button button--small button--danger" @click.stop="deleteAllocation(alloc.concept_id)" type="button">Delete</button>
+                </td>
              </template>
              <template v-else>
                 <td>{{ alloc.allocation_date || '—' }}</td>
@@ -97,6 +101,7 @@
                 <td>{{ getCategoryName(alloc.from_category_id) }}</td>
                 <td>{{ getCategoryName(alloc.to_category_id) }}</td>
                 <td>{{ alloc.memo || '—' }}</td>
+                <td></td>
              </template>
           </tr>
         </tbody>
@@ -225,6 +230,25 @@ const updateAllocationMutation = useMutation({
         queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
     }
 });
+
+const deleteAllocationMutation = useMutation({
+    mutationFn: api.budgets.deleteAllocation,
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['allocations'] });
+        queryClient.invalidateQueries({ queryKey: ['ready-to-assign'] });
+        queryClient.invalidateQueries({ queryKey: ['budget-categories'] });
+    }
+});
+
+const deleteAllocation = async (id) => {
+    if (!confirm("Are you sure you want to delete this allocation?")) return;
+    try {
+        await deleteAllocationMutation.mutateAsync(id);
+        editingId.value = null;
+    } catch (e) {
+        alert(e.message || "Failed to delete allocation");
+    }
+};
 
 const startEditing = (alloc) => {
     if (editingId.value === alloc.concept_id) return;

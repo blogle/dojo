@@ -180,6 +180,12 @@ export const api = {
 			await invalidateLedgerQueries();
 			return result;
 		},
+		deleteAllocation: async (conceptId) => {
+			await fetchJSON(`/api/budget/allocations/${conceptId}`, {
+				method: "DELETE",
+			});
+			await invalidateLedgerQueries();
+		},
 	},
 };
 
