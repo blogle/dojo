@@ -108,7 +108,7 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 
 		// Check for edit mode and delete button
 		cy.get("#allocations-body tr.is-editing").should("exist").as("editRow");
-		cy.get("@editRow").contains("button", "Delete").should("exist").as("deleteBtn");
+		cy.get("@editRow").find("button[title='Delete allocation']").should("exist").as("deleteBtn");
 
 		// Setup confirm handler
 		cy.on("window:confirm", () => true);

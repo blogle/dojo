@@ -92,7 +92,17 @@
                 </td>
                 <td><input type="text" v-model="editForm.memo" @keydown.enter.prevent="saveEdit" @keydown.esc.prevent="cancelEdit"></td>
                 <td>
-                    <button class="button button--small button--danger" @click.stop="deleteAllocation(alloc.concept_id)" type="button">Delete</button>
+                    <button
+                      type="button"
+                      class="action-button"
+                      title="Delete allocation"
+                      @click.stop="deleteAllocation(alloc.concept_id)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
                 </td>
              </template>
              <template v-else>
