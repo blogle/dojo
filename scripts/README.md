@@ -109,6 +109,22 @@ scripts/release --bump minor
 scripts/release --bump patch --notes-file /tmp/dojo-release-notes.md
 ```
 
+### `scripts/update-frontend-deps`
+
+- **Description**: Updates the `npmDepsHash` in `flake.nix` by prefetching dependencies from `src/dojo/frontend/vite/package-lock.json`. Use this after changing frontend dependencies to ensure reproducible Nix builds.
+- **Underlying tools**: `prefetch-npm-deps`
+- **Options**: None.
+- **Behavior**:
+  - Calculates the new hash using `prefetch-npm-deps`.
+  - Updates `flake.nix` in place with the new hash.
+  - Prints the new hash to stdout.
+
+#### Example usage
+
+```
+scripts/update-frontend-deps
+```
+
 ## Notes for Agents
 
 1. When asked to run tests, call `run-tests` (with optional skip flags) instead of invoking `pytest`, `npx cypress`, or other tooling directly.
