@@ -110,9 +110,6 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		cy.get("#allocations-body tr.is-editing").should("exist").as("editRow");
 		cy.get("@editRow").find("button[title='Delete allocation']").should("exist").as("deleteBtn");
 
-		// Setup confirm handler
-		cy.on("window:confirm", () => true);
-
 		// Click delete
 		cy.intercept("DELETE", "/api/budget/allocations/*").as("deleteAllocation");
 		cy.get("@deleteBtn").click();

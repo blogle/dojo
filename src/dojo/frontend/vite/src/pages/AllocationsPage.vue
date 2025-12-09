@@ -251,7 +251,6 @@ const deleteAllocationMutation = useMutation({
 });
 
 const deleteAllocation = async (id) => {
-    if (!confirm("Are you sure you want to delete this allocation?")) return;
     try {
         await deleteAllocationMutation.mutateAsync(id);
         editingId.value = null;
