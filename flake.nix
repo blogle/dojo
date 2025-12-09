@@ -55,7 +55,7 @@
         pname = "dojo-frontend";
         version = "0.0.0";
         src = ./src/dojo/frontend/vite;
-        npmDepsHash = "sha256-+TocTOZG0/j+rZQa4Cx1cGbzjDEztc96V0zP933e9Yo=";
+        npmDepsHash = "sha256-ZmNN0gN2afIFMn8q7+xFV+URTLOa+8ApG9Q2ZAKHu0M=";
         nodejs = pkgs.nodejs_20;
         npmBuild = "npm run build";
         installPhase = ''
