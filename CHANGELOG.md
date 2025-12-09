@@ -8,15 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Vue 3 / Vite Frontend**: Complete migration of the frontend to Vue 3 SFCs and Vite, offering improved performance and developer experience.
+- **Deletion Support**: Ability to delete allocations and transactions, implemented with SCD2 safety (soft deletes) and updated UI controls.
 - Python integration test suite (`tests/integration`) for verifying core API logic independently of the frontend.
 - Collapsible budget groups with stable table layout and bulk category assignment from the group modal.
+- Controllable system clock for budgeting flows to facilitate time-travel testing.
 
 ### Changed
+- Refined UI aesthetics: updated color palette to cohesive earth tones, standardized sentence case for labels, and removed redundant help text.
 - Validated and updated Cypress E2E tests to reflect the completed Vue frontend migration.
 - Default recurring budget due dates to the start of the next month.
 - Documented Kubernetes consumption patterns and extracted release-note tooling into a reusable CLI.
 
 ### Fixed
+- Transaction status toggles: restored visual states and ensured status updates are correctly handled via API.
 - Allocation dropdowns now mirror budget table order, show system categories first, and hide group placeholders from selection.
 - Hardened DuckDB migrations against DDL serialization races and centralized backup logic for Kubernetes deploys.
 - CI reliability: in-cluster watcher pattern, clearer image build paths, and more robust run-tests artifact collection.
