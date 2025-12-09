@@ -54,10 +54,19 @@
       mkFrontend = pkgs: pkgs.buildNpmPackage {
         pname = "dojo-frontend";
         version = "0.0.0";
-        src = ./src/dojo/frontend/vite;
+        src = ./src/dojo/frontend;
+        sourceRoot = "frontend/vite";
         npmDepsHash = "sha256-ZmNN0gN2afIFMn8q7+xFV+URTLOa+8ApG9Q2ZAKHu0M=";
         nodejs = pkgs.nodejs_20;
         npmBuild = "npm run build";
+
+        postPatch = ''
+          sed -i 's|outDir: path.resolve(__dirname, "../static/dist")|outDir: "dist"|' vite.config.js
+        '';
+
+        # Prevent cypress from trying to download binary during build
+        CYPRESS_INSTALL_BINARY = "0";
+
         installPhase = ''
           mkdir -p $out/dist
           cp -r dist/. $out/dist
