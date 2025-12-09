@@ -39,6 +39,7 @@ Move the SPA from imperative DOM rewrites to a declarative Vue 3 app backed by T
 - [x] (2025-12-06 09:00Z) Implemented Vue versions of `AccountsPage`, `BudgetPage`, `AllocationsPage`, and `TransfersPage`.
 - [x] (2025-12-06 09:15Z) Updated router to serve new pages and verified build success.
 - [x] (2025-12-06 09:30Z) Verified `npm run build` succeeds and `scripts/run-tests --skip-e2e` passes. Migration of all pages is complete.
+- [x] (2025-12-09 12:00Z) Removed `LegacyHost`, legacy routing, and legacy static files (`index.html`, `main.js`, `store.js`, etc.) after migrating shared dependencies to `vite/src`.
 
 ## Surprises & Discoveries
 

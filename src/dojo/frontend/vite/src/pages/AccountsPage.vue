@@ -192,12 +192,9 @@ import { computed, reactive, ref } from "vue";
 import {
 	accountGroupDefinitions,
 	accountTypeMapping,
-} from "../../../static/constants.js";
-import {
-	api,
-	postOpeningBalanceTransaction,
-} from "../../../static/services/api.js";
-import { formatAmount } from "../../../static/services/format.js";
+} from "../constants.js";
+import { api, postOpeningBalanceTransaction } from "../services/api.js";
+import { formatAmount } from "../services/format.js";
 
 const queryClient = useQueryClient();
 const filter = ref("all");

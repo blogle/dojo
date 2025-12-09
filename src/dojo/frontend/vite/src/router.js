@@ -1,5 +1,4 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import LegacyHost from "./components/LegacyHost.vue";
 import AccountsPage from "./pages/AccountsPage.vue";
 import AllocationsPage from "./pages/AllocationsPage.vue";
 import BudgetPage from "./pages/BudgetPage.vue";
@@ -33,7 +32,7 @@ const routes = [
 	},
 	{
 		path: "/:pathMatch(.*)*",
-		component: LegacyHost,
+		redirect: "/transactions",
 	},
 ];
 

@@ -1,3 +1,4 @@
+import queryClient from "../queryClient.js";
 import { todayISO } from "./format.js";
 
 const parseError = async (response) => {
@@ -33,14 +34,13 @@ export const fetchJSON = async (url, options = {}) => {
 const defaultHeaders = { "Content-Type": "application/json" };
 
 const invalidateQueries = async (queryKeys = []) => {
-	const client = typeof window !== "undefined" ? window.dojoQueryClient : null;
-	if (!client?.invalidateQueries) {
+	if (!queryClient?.invalidateQueries) {
 		return;
 	}
 	try {
 		await Promise.all(
 			queryKeys.map((queryKey) =>
-				client.invalidateQueries({ queryKey: [queryKey] }),
+				queryClient.invalidateQueries({ queryKey: [queryKey] }),
 			),
 		);
 	} catch (error) {

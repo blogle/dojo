@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../static/services/api.js";
+import { api } from "./services/api.js";
+import queryClient from "./queryClient.js";
+
+// Mock the queryClient module
+vi.mock("./queryClient.js", () => ({
+	default: {
+		invalidateQueries: vi.fn(),
+	},
+}));
 
 const mockResponse = (payload = {}) => ({
 	ok: true,
@@ -20,31 +28,27 @@ describe("legacy mutation invalidations", () => {
 
 	beforeEach(() => {
 		originalFetch = globalThis.fetch;
+		vi.clearAllMocks();
 	});
 
 	afterEach(() => {
 		globalThis.fetch = originalFetch;
-		window.dojoQueryClient = undefined;
 		vi.restoreAllMocks();
 	});
 
 	it("invalidates shared queries after creating a transaction", async () => {
-		const invalidateQueries = vi.fn().mockResolvedValue();
-		window.dojoQueryClient = { invalidateQueries };
 		globalThis.fetch = vi.fn().mockResolvedValue(mockResponse({ ok: true }));
 
 		await api.transactions.create({ memo: "test" });
 
-		expect(invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
-		const calledKeys = invalidateQueries.mock.calls.map(
+		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
+		const calledKeys = queryClient.invalidateQueries.mock.calls.map(
 			([args]) => args?.queryKey?.[0],
 		);
 		expect(calledKeys).toEqual(LEDGER_KEYS);
 	});
 
 	it("uses the update endpoint and invalidates queries after editing a transaction", async () => {
-		const invalidateQueries = vi.fn().mockResolvedValue();
-		window.dojoQueryClient = { invalidateQueries };
 		const fetchMock = vi.fn().mockResolvedValue(mockResponse({ ok: true }));
 		globalThis.fetch = fetchMock;
 
@@ -54,6 +58,6 @@ describe("legacy mutation invalidations", () => {
 			"/api/transactions/tx-123",
 			expect.objectContaining({ method: "PUT" }),
 		);
-		expect(invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
+		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
 	});
 });

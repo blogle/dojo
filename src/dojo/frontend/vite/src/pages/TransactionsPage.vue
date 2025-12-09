@@ -312,14 +312,14 @@
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, nextTick, reactive, ref, watch } from "vue";
-import { statusToggleIcons } from "../../../static/constants.js";
-import { api } from "../../../static/services/api.js";
+import { statusToggleIcons } from "../constants.js";
+import { api } from "../services/api.js";
 import {
 	currentMonthStartISO,
 	dollarsToMinor,
 	formatAmount,
 	todayISO,
-} from "../../../static/services/format.js";
+} from "../services/format.js";
 
 const queryClient = useQueryClient();
 const monthStart = currentMonthStartISO();

@@ -299,15 +299,14 @@
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, reactive, ref, watch } from "vue";
-import { filterUserFacingCategories } from "../../../static/components/categories/utils.js";
-import { api } from "../../../static/services/api.js";
+import { filterUserFacingCategories } from "../utils/categories.js";
+import { api } from "../services/api.js";
 import {
 	currentMonthStartISO,
 	dollarsToMinor,
 	formatAmount,
 	minorToDollars,
-	todayISO,
-} from "../../../static/services/format.js";
+} from "../services/format.js";
 
 const queryClient = useQueryClient();
 const monthStart = currentMonthStartISO();

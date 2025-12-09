@@ -57,8 +57,8 @@
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
-import { api } from "../../../static/services/api.js";
-import { dollarsToMinor, todayISO } from "../../../static/services/format.js";
+import { api } from "../services/api.js";
+import { dollarsToMinor, todayISO } from "../services/format.js";
 
 const queryClient = useQueryClient();
 
