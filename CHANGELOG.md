@@ -8,27 +8,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- None yet.
+
+### Changed
+- None yet.
+
+### Deprecated
+- None yet.
+
+### Removed
+- None yet.
+
+### Fixed
+- None yet.
+
+### Security
+- None yet.
+
+## [v0.1.2] - 2025-12-11
+```markdown
+## v0.1.2 - 2025-12-11
+
+### Added
 - **Vue 3 / Vite Frontend**: Complete migration of the frontend to Vue 3 SFCs and Vite, offering improved performance and developer experience.
 - **Deletion Support**: Ability to delete allocations and transactions, implemented with SCD2 safety (soft deletes) and updated UI controls.
 - Python integration test suite (`tests/integration`) for verifying core API logic independently of the frontend.
 - Collapsible budget groups with stable table layout and bulk category assignment from the group modal.
 - Controllable system clock for budgeting flows to facilitate time-travel testing.
+- Added a title to the transactions page for improved user experience.
+- Enabled reordering of budget categories directly on the budgets page.
+- New development scripts (`prefetch-npm-deps`, `update-frontend-deps`, `search-logs`) for enhanced developer workflow.
 
 ### Changed
-- Refined UI aesthetics: updated color palette to cohesive earth tones, standardized sentence case for labels, and removed redundant help text.
-- Validated and updated Cypress E2E tests to reflect the completed Vue frontend migration.
+- Refined UI aesthetics: updated color palette to cohesive earth tones, standardized sentence case for labels, removed redundant help text, and improved delete button styling for consistency.
+- Validated and updated Cypress E2E tests to reflect the completed Vue frontend migration and new features.
 - Default recurring budget due dates to the start of the next month.
 - Documented Kubernetes consumption patterns and extracted release-note tooling into a reusable CLI.
+- Removed legacy SPA code and dependencies following the Vue migration.
+- Streamlined allocation deletion by removing the confirmation dialog to align with transaction deletion UX.
 
 ### Fixed
 - Transaction status toggles: restored visual states and ensured status updates are correctly handled via API.
 - Allocation dropdowns now mirror budget table order, show system categories first, and hide group placeholders from selection.
 - Hardened DuckDB migrations against DDL serialization races and centralized backup logic for Kubernetes deploys.
-- CI reliability: in-cluster watcher pattern, clearer image build paths, and more robust run-tests artifact collection.
-- Cypress stability: enforced Anti-Flake network rules, stabilized specs, and refreshed testing docs.
+- CI reliability: addressed issues with frontend asset injection, `npmDepsHash` updates, and Cypress/frontend build paths in `flake.nix`.
+- Cypress stability: enforced Anti-Flake network rules, stabilized specs, and refreshed testing documentation.
+- Resolved runtime errors on the `TransactionsPage` and removed visible migration markers from the UI.
+- Fixed linter errors and configured Biome for consistent code style enforcement.
 
 ### Breaking
 - None.
+```
 
 ## [v0.1.1] - 2025-12-01
 
