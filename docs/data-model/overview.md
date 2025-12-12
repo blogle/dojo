@@ -12,7 +12,7 @@ The data model is designed around a few core entities: accounts, budget categori
 
 -   **Central Journal:** The `transactions` table acts as a central, immutable journal of all financial events. It is designed as a Type 2 Slowly Changing Dimension (SCD), meaning that edits to transactions create new versions rather than overwriting old data. This provides a full, auditable history.
 -   **Service-Oriented Tables:** Tables are grouped logically by the service that owns them. For example, `budget_categories` and `budget_allocations` belong to the Budgeting service, while `accounts` and `positions` belong to the Accounts and Investments services.
--   **Monthly Caching:** For performance, the `budget_category_monthly_state` table acts as a cache of budget data aggregated by month. This avoids costly re-calculations when viewing monthly budget summaries.
+-   **Monthly Caching:** For performance, the `budget_category_monthly_state` table acts as a cache of budget data aggregated by month. This avoids costly re-calculations when viewing monthly budget summaries. Migrations now replay the ledger to rebuild this cache automatically, and `scripts/rebuild-caches` can be run manually whenever data drift is suspected.
 -   **Class Table Inheritance:** The `accounts` table uses a "class table inheritance" pattern. A central `accounts` table stores common attributes, while specialized `*_account_details` tables store data specific to each account type (e.g., `credit_account_details`, `investment_account_details`).
 
 ## Table Inventory

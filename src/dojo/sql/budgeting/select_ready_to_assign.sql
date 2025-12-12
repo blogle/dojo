@@ -7,8 +7,8 @@ WITH on_budget_cash AS (
         AND account_role = 'on_budget'
 ),
 
-category_flow AS (
-    SELECT COALESCE(SUM(s.allocated_minor + s.inflow_minor - s.activity_minor), 0) AS committed_minor
+category_state AS (
+    SELECT COALESCE(SUM(s.available_minor), 0) AS available_minor
     FROM budget_category_monthly_state AS s
     INNER JOIN budget_categories AS c ON s.category_id = c.category_id
     WHERE
@@ -16,6 +16,6 @@ category_flow AS (
         AND c.is_system IS NOT TRUE
 )
 
-SELECT on_budget_cash.balance_minor - category_flow.committed_minor AS ready_to_assign_minor
+SELECT on_budget_cash.balance_minor - category_state.available_minor AS ready_to_assign_minor
 FROM on_budget_cash
-CROSS JOIN category_flow;
+CROSS JOIN category_state;

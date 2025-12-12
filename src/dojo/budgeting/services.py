@@ -491,6 +491,7 @@ class TransactionEntryService:
             The "Ready to Assign" amount in minor units.
         """
         dao = BudgetingDAO(conn)
+        dao.ensure_all_category_month_states(month_start)
         return dao.ready_to_assign(month_start)
 
     def month_cash_inflow(self, conn: duckdb.DuckDBPyConnection, month_start: date) -> int:
@@ -2004,6 +2005,7 @@ class BudgetCategoryAdminService:
         dao = BudgetingDAO(conn)
         # Coerce the month_start to the first day of the month.
         month = self._coerce_month_start(month_start)
+        dao.ensure_all_category_month_states(month)
         # Calculate the start of the previous month for historical data retrieval.
         if month.month == 1:
             prev_month = date(month.year - 1, 12, 1)

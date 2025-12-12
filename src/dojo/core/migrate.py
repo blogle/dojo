@@ -1,7 +1,9 @@
 """DuckDB migration runner with per-statement execution and validation."""
 
 import argparse
+import importlib
 import logging
+import os
 import re
 import shutil
 import time
@@ -14,6 +16,7 @@ import duckdb
 
 from dojo.core.config import Settings, get_settings
 from dojo.core.db import get_connection
+
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +216,13 @@ def apply_migrations(
             logger.exception("Migration %s failed; already rolled back statement batches", sql_file.name)
             raise
     logger.info("Migration processing complete")
+    if not dry_run:
+        skip_cache = os.getenv("DOJO_SKIP_CACHE_REBUILD", "").lower() in {"1", "true", "yes"}
+        if skip_cache:
+            logger.info("Skipping cache rebuild due to DOJO_SKIP_CACHE_REBUILD")
+        else:
+            cache_module = importlib.import_module("dojo.core.cache_rebuild")
+            cache_module.rebuild_caches(conn)
 
 
 def migrate(

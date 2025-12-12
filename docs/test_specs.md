@@ -136,6 +136,18 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     3. Account balance matches target ($100.00).
 * **Expected End State:** Ledger matches external reality; difference captured in transaction.
 
+### Spec 2.9: Account Balance Cache Integrity
+* **Test Level:** Property + Integration (maintenance command)
+* **Initial Condition:** Randomized mix of account creations, edits, transfers, voids; `transactions` table contains authoritative history; `accounts.current_balance_minor` populated by prior operations.
+* **Action:**
+    - Recompute each account balance directly from active transaction versions.
+    - Compare to `accounts.current_balance_minor` during normal operations; also run the cache rebuild helper and confirm convergence.
+* **Validations:**
+    1. For every `account_id`, the sum of active transaction `amount_minor` equals the cached `current_balance_minor`.
+    2. Any mismatch causes the test to fail (not silently repaired) before the rebuild runs.
+    3. Invoking the rebuild command brings caches back in sync and logs the before/after delta.
+* **Expected End State:** Day-to-day mutations cannot leave `accounts` cache out of sync; the rebuild path serves as a verified remediation.
+
 ---
 
 ## Domain 3: Ready to Assign and Allocations
@@ -215,6 +227,18 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     1. Operation blocked or requires reassignment (merge).
     2. Transactions never orphaned (null category).
 * **Expected End State:** Integrity preserved; no orphaned data.
+
+### Spec 3.9: Budget Cache Integrity
+* **Test Level:** Property + Integration
+* **Initial Condition:** Randomized allocations, transactions, rollovers, credit reserves; `budget_category_monthly_state` contains cached rows for multiple months.
+* **Action:**
+    - Rebuild expected monthly aggregates directly from `transactions`, `budget_allocations`, and credit-payment reserve rules.
+    - Compare every `(category_id, month_start)` cache row to these recomputed values during normal test runs.
+* **Validations:**
+    1. `allocated_minor`, `inflow_minor`, `activity_minor`, and `available_minor` in the cache exactly match the recomputed ledger aggregates.
+    2. Drift is detected immediately (test failure) rather than tolerated until a rebuild job runs.
+    3. The cache rebuild helper, when invoked, restores parity and emits diagnostics about any repaired rows.
+* **Expected End State:** Cached monthly state remains a faithful mirror of the ledger, and automated tests guard against silent drift.
 
 ---
 

@@ -72,6 +72,19 @@ scripts/search-logs dojo-run-tests-abcd --tests --list
   - Runs the migration runner; removes the file on success.
   - Emits `[OK] scripts/run-migrations-check (migrations applied cleanly)` on success or `[FAIL] ... (see <path>)` on failure.
 
+### `scripts/rebuild-caches`
+
+- **Description**: Replays the ledger to rebuild `accounts.current_balance_minor` and `budget_category_monthly_state` so caches stay consistent after logic fixes. Use this after repairing budgeting math or when migrating pre-existing data.
+- **Underlying tools**: `python -m dojo.core.cache_rebuild` (wraps DuckDB statements inside one transaction).
+- **Options**:
+  - `--database PATH`: override the DuckDB path (defaults to `dojo.core.config` setting).
+  - `--skip-accounts`: skip the account balance rebuild.
+  - `--skip-budget`: skip the budget category cache rebuild.
+  - `-h`/`--help`: show usage.
+- **Behavior**:
+  - Opens a single-writer DuckDB connection, recalculates caches from the immutable ledger, and logs before/after counts.
+  - Fails fast if the database is not writable.
+
 ### `scripts/extract-release-notes`
 
 - **Description**: Extracts the release notes for a specific version tag (e.g. `v0.1.1`) from `CHANGELOG.md`. Designed for use in CI/CD pipelines to populate GitHub Release bodies.

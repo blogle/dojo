@@ -410,6 +410,7 @@ Suggested approach:
   - Reads the current schema version from a metadata table.
   - Applies forward migrations if needed.
   - Refuses to start if a downgrade would be required.
+- After migrations complete, the app now replays the ledger to rebuild cached tables (`accounts.current_balance_minor` and `budget_category_monthly_state`). Set `DOJO_SKIP_CACHE_REBUILD=1` to skip this step during emergency boots, or run `scripts/rebuild-caches` manually for maintenance windows.
 
 For small deployments, migrations can also be applied manually via a separate job or script, as long as forward-only migrations and backups are respected.
 

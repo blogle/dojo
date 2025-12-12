@@ -65,7 +65,7 @@ This is the master table for all accounts. It stores the common information shar
     -   `is_active` (BOOLEAN): A flag to soft-delete an account.
     -   `opened_on` (DATE): The date the account was opened.
 
-> **Temporal boundary:** The `accounts` table is an authoritative cache of the latest balance per account, not a temporal history. All immutable, temporal ledger history lives in the `transactions` table. The application updates `accounts.current_balance_minor` in place (via `update_account_balance.sql`) to keep API reads fast while the versioned transaction log remains the source of truth for historical reconstruction.
+> **Temporal boundary:** The `accounts` table is an authoritative cache of the latest balance per account, not a temporal history. All immutable, temporal ledger history lives in the `transactions` table. The application updates `accounts.current_balance_minor` in place (via `update_account_balance.sql`) to keep API reads fast while the versioned transaction log remains the source of truth for historical reconstruction. Every deploy now triggers a cache rebuild after migrations to realign balances with the ledger, and `scripts/rebuild-caches` can be used manually when needed.
 
 ### Account Detail Tables
 
@@ -120,6 +120,6 @@ This operation soft-deletes an account, hiding it from most views but preserving
 
 ## Invariants Local to the Service
 
--   **Balance Synchronization:** The `current_balance_minor` in the `accounts` table is a cached value. It must always be equal to the sum of all `amount_minor` values in the `transactions` table for that `account_id`. The application is responsible for updating the cached balance whenever a new transaction is created or an existing one is modified or deleted.
+-   **Balance Synchronization:** The `current_balance_minor` in the `accounts` table is a cached value. It must always be equal to the sum of all `amount_minor` values in the `transactions` table for that `account_id`. The application is responsible for updating the cached balance whenever a new transaction is created or an existing one is modified or deleted, and the cache rebuild command replays the ledger to self-heal historical drift.
 -   **One-to-One Details:** Every account in the `accounts` table must have exactly one corresponding record in one of the `*_account_details` tables, determined by its `account_class`. This is enforced by application logic.
 -   **Credit Account Categories:** For every `credit` class account, a corresponding "payment" category must exist in the `budget_categories` table. This is used to budget for credit card payments. This relationship is established by migration `0010_credit_payment_group.sql` and maintained by the application.

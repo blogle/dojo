@@ -1706,6 +1706,18 @@ class BudgetingDAO:
             },
         )
 
+    def ensure_all_category_month_states(self, month_start: date) -> None:
+        """Seed month state rows for every non-system category before reporting."""
+        sql = _sql("seed_all_category_month_states.sql")
+        previous_month = _previous_month_start(month_start)
+        self._conn.execute(
+            sql,
+            {
+                "month_start": month_start,
+                "previous_month": previous_month,
+            },
+        )
+
     def adjust_category_allocation(
         self,
         category_id: str,
