@@ -1284,9 +1284,6 @@ class TransactionEntryService:
         """
         # Determine the base sign based on incoming/outgoing.
         sign = 1 if direction == "incoming" else -1
-        # Invert the sign for liability accounts, as increases in liabilities are negative balance changes.
-        if account.account_type == "liability":
-            sign *= -1
         return amount_minor * sign
 
     def _account_balance_delta(self, amount_minor: int, account: AccountRecord) -> int:
@@ -1466,7 +1463,6 @@ class TransactionEntryService:
                     dao,
                     account_record,
                     month_start,
-                    # Reverse the amount for the credit payment reserve.
                     -transaction.amount_minor,
                 )
 
@@ -1535,36 +1531,16 @@ class TransactionEntryService:
 
         This method ensures that funds are correctly moved into or out of
         the dedicated payment category for a credit card.
-
-        Parameters
-        ----------
-        dao : BudgetingDAO
-            The Data Access Object for budgeting operations.
-        account_record : AccountRecord
-            The credit card account record.
-        month_start : date
-            The start date of the month for which the adjustment is made.
-        amount_minor : int
-            The amount of the transaction in minor units.
-            A negative amount indicates an increase in spending (more to reserve),
-            a positive amount indicates a decrease in spending (less to reserve).
         """
-        # Derive the payment category ID for the credit card account.
+
         payment_category_id = derive_payment_category_id(account_record.account_id)
-        # Attempt to retrieve the payment category.
         payment_category = dao.get_category_optional(payment_category_id)
         if payment_category is None:
-            # If no payment category exists for the credit card, do nothing.
             return
-        # The delta for the reserve is the absolute value of the transaction amount.
         delta = abs(amount_minor)
         if delta == 0:
             return
-        # The sign of the adjustment depends on whether spending increased or decreased.
-        # Negative transaction amount (spending) means more to reserve (positive delta).
-        # Positive transaction amount (return) means less to reserve (negative delta).
         sign = 1 if amount_minor < 0 else -1
-        # Adjust the inflow and available amounts of the payment category.
         dao.adjust_category_inflow(payment_category.category_id, month_start, sign * delta, sign * delta)
 
 
