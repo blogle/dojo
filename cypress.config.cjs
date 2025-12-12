@@ -1,6 +1,7 @@
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
+const codeCoverageTask = require("@bahmutov/cypress-code-coverage/plugin");
 
 const defineConfig = (config) => config;
 const log = (...args) => console.info("[cypress-config]", ...args);
@@ -142,9 +143,11 @@ module.exports = defineConfig({
 		video: false,
 		defaultCommandTimeout: 10000,
 		setupNodeEvents(on, config) {
+			codeCoverageTask(on, config);
 			on("before:run", async () => {
 				await ensureServer();
 			});
+
 			on("before:spec", async () => {
 				await ensureServer();
 			});

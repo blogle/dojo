@@ -61,9 +61,12 @@ The landing page now behaves like a lightweight spreadsheet: the first row is an
 ### 5. Execute the automated tests
 
 ```bash
-pytest
-npx cypress run --e2e --browser <browser> [--headed]
+scripts/run-tests
+# gather python + Cypress coverage artifacts (clears coverage/ automatically)
+scripts/run-tests --skip-e2e --coverage
 ```
+
+The wrapper handles Vitest, pytest, and Cypress orchestration with terse summaries. When you pass `--coverage`, it collects backend coverage (via `pytest-cov`) plus frontend coverage (via `@bahmutov/cypress-code-coverage`) and writes reports into `coverage/`. Remove the `coverage/` directory before manual reruns; the script already does this any time `--coverage` is supplied.
 
 The Cypress run spins up a dedicated DuckDB database (`data/e2e-ledger.duckdb`) and launches the FastAPI server automatically via `cypress.config.cjs`, so no additional setup is required.
 
@@ -196,8 +199,8 @@ We welcome contributions! Please follow these guidelines.
 
 - **Run Tests**:
   ```bash
-  pytest
-  npx cypress run --e2e --browser <browser> [--headed]
+  scripts/run-tests
+  scripts/run-tests --skip-e2e --coverage  # backend coverage + artifacts under coverage/
   ```
 - **Style Rules**: We rely on Ruff for lint+format and Pyright for type checking.
   ```bash

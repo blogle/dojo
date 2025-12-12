@@ -6,6 +6,7 @@ to ensure consistent and isolated testing for the Dojo application.
 """
 
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 
 import duckdb
@@ -43,3 +44,32 @@ def in_memory_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     finally:
         # Ensure the connection is closed after the test completes.
         conn.close()
+
+
+@pytest.fixture(autouse=True)
+def fixed_clock(monkeypatch: pytest.MonkeyPatch):
+    """Freeze ``dojo.core.clock.now`` so recorded_at timestamps stay deterministic."""
+    from dojo.core import clock
+
+    default_timestamp = datetime(2025, 1, 15, 12, 0, tzinfo=UTC)
+    current_timestamp = default_timestamp
+
+    def _tick() -> datetime:
+        nonlocal current_timestamp
+        value = current_timestamp
+        current_timestamp = value + timedelta(seconds=1)
+        return value
+
+    def _set_current(target: datetime | str | None = None) -> datetime:
+        nonlocal current_timestamp
+        if target is None:
+            current_timestamp = default_timestamp
+        elif isinstance(target, str):
+            normalized = target.replace("Z", "+00:00")
+            current_timestamp = datetime.fromisoformat(normalized)
+        else:
+            current_timestamp = target
+        return current_timestamp
+
+    monkeypatch.setattr(clock, "now", _tick)
+    yield _set_current

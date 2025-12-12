@@ -4,6 +4,8 @@ __pycache__/
 .hypothesis/
 .uv-cache/
 .xdg/*
+coverage/
+.nyc_output/
 *.pyc
 artifacts/
 data/*.duckdb

@@ -24,10 +24,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest",
-  "pyright",
+  "coverage[toml]",
   "hypothesis",
+  "pyright",
+  "pytest",
   "pytest-asyncio",
+  "pytest-cov",
 ]
 
 [tool.setuptools.packages.find]

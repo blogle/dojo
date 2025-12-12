@@ -9,7 +9,7 @@ Budgeting, ledger, and reporting behavior must remain trustworthy even as the pr
 ## Progress
 
 - [x] (2025-12-11 18:20Z) Captured baseline audit of existing suites and recorded plan scope.
-- [ ] (2025-12-11 18:20Z) Milestone 1 — Coverage instrumentation and deterministic fixtures.
+- [x] (2025-12-11 22:00Z) Milestone 1 — Coverage instrumentation and deterministic fixtures.
 - [ ] (2025-12-11 18:20Z) Milestone 2 — Spec-complete unit and property coverage.
 - [ ] (2025-12-11 18:20Z) Milestone 3 — Spec-complete integration coverage.
 - [ ] (2025-12-11 18:20Z) Milestone 4 — Spec-complete Cypress journeys and cleanup.
@@ -18,16 +18,18 @@ Budgeting, ledger, and reporting behavior must remain trustworthy even as the pr
 ## Surprises & Discoveries
 
 - Observation: No project-level coverage tooling is configured; `pyproject.toml` contains no `pytest-cov` reference (confirmed via `rg -n "pytest-cov" pyproject.toml`). Evidence: ripgrep returned no matches on 2025-12-11, so coverage gates must be added.
+- Observation: Hypothesis `settings` does not accept a `seed=` keyword; deterministic property runs required exporting `HYPOTHESIS_SEED` before registering our custom profile. Evidence: pytest import error reproduced on 2025-12-11 until the environment variable approach replaced the unsupported parameter.
 
 ## Decision Log
 
 - Decision: Use `pytest-cov` plus a repo-level `.coveragerc` for Python suites and `@bahmutov/cypress-code-coverage` + `c8` for Cypress so frontend/backend coverage can be aggregated. Rationale: aligns with priority on fast feedback and allows `scripts/run-tests` to emit a single summary target. Date/Author: 2025-12-11 / Codex.
 - Decision: Replace the legacy `tests/integration/test_payday_assignment.py` with spec-specific integration modules per domain, then retire the legacy file once all new suites are in place. Rationale: the existing test only covers Domain 3.1 superficially and overlaps fully with Cypress user story 01; focusing on domain-specific modules reduces duplication. Date/Author: 2025-12-11 / Codex.
 - Decision: Consolidate Cypress coverage to the seven Domain 8 flows and retire UI-only allocation stories (`cypress/e2e/user-stories/07` and `09`–`11`, `17`–`19`) after their assertions are captured at unit or integration layers. Rationale: Domain 8 demands zero-flake journeys, and the extra 13 UI scripts increase runtime without mapping to current specs. Date/Author: 2025-12-11 / Codex.
+- Decision: Introduce an autouse pytest fixture that monkeypatches `dojo.core.clock.now()` with a deterministic, monotonic UTC ticker so ledger operations and integration tests share reproducible timestamps. Rationale: ordering-sensitive SCD-2 assertions (e.g., `list_recent`) flake when `recorded_at` ties; the fixture enforces deterministic ordering. Date/Author: 2025-12-11 / Codex.
 
 ## Outcomes & Retrospective
 
-To be updated after each milestone to summarize measurable coverage gains, removed flake, and any remaining risks.
+- (2025-12-11) Milestone 1 complete: `scripts/run-tests --skip-e2e --coverage` emits backend coverage (72.6% overall, 87%+ in DAOs) plus `coverage/coverage.xml`, `coverage/coverage.json`, and leaves Cypress lcov scaffolding ready for Milestone 4. Deterministic Hypothesis and clock fixtures removed flakes in `tests/unit/budgeting/test_transactions.py`.
 
 ## Context and Orientation
 
@@ -59,7 +61,7 @@ Domain 10 (Budget Goals) currently only verifies goal CRUD (`tests/unit/budgetin
 
 ### Milestone 1 — Coverage Instrumentation and Deterministic Fixtures
 
-Outcome: `scripts/run-tests` accepts `--coverage`, installs/configures `pytest-cov`, produces `coverage.xml`, and collects Cypress coverage via `@bahmutov/cypress-code-coverage`. Hypothesis stateful tests receive seeded RNG per run, and a shared clock helper (wrapping `dojo.core.clock`) ensures fixed timestamps for month-boundary tests. Acceptance: running `scripts/run-tests --skip-e2e --coverage` records ≥60% backend coverage baseline and stores artifacts under `coverage/`.
+Outcome: `scripts/run-tests` accepts `--coverage`, installs/configures `pytest-cov`, produces `coverage.xml`, and collects Cypress coverage via `@bahmutov/cypress-code-coverage`. Hypothesis stateful tests receive seeded RNG per run via a `HYPOTHESIS_SEED` environment helper, and a shared clock helper (wrapping `dojo.core.clock`) ensures fixed timestamps for month-boundary tests and monotonic `recorded_at` ordering. Acceptance: running `scripts/run-tests --skip-e2e --coverage` records ≥60% backend coverage baseline and stores artifacts under `coverage/`.
 
 ### Milestone 2 — Spec-Complete Unit & Property Coverage
 

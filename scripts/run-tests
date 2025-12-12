@@ -20,6 +20,10 @@ SKIP_FRONTEND=0
 SKIP_PROPERTY=0
 SKIP_INTEGRATION=0
 SKIP_E2E=0
+COVERAGE=0
+PYTHON_COVERAGE_RAN=0
+E2E_COVERAGE_RAN=0
+readonly COVERAGE_DIR="coverage"
 
 declare -A FILTERS_PATTERN=()
 FILTERED=0
@@ -29,11 +33,12 @@ usage() {
 NAME
     ${SCRIPT_NAME} - run frontend unit, pytest suites, and Cypress e2e with unified reporting
 SYNOPSIS
-    scripts/${SCRIPT_NAME} [--skip-frontend] [--skip-property] [--skip-integration] [--skip-e2e] [--filter SUITE[:PATTERN]] [-h|--help]
+    scripts/${SCRIPT_NAME} [--skip-frontend] [--skip-property] [--skip-integration] [--skip-e2e] [--filter SUITE[:PATTERN]] [--coverage] [-h|--help]
 DESCRIPTION
     Runs frontend unit tests (Vitest), Python unit/property/integration suites, and e2e tests (Cypress with Chrome),
     printing a terse [OK]/[FAIL] summary per suite. Failures reference a temp log for the full output.
-    Use --filter to target a single suite (e.g., --filter frontend or --filter e2e:01-payday-assignment).
+    Use --filter to target a single suite (e.g., --filter frontend or --filter e2e:01-payday-assignment). Pass --coverage
+    to enable pytest-cov instrumentation + Cypress code coverage artifacts under coverage/.
 EOF
 }
 
@@ -72,6 +77,10 @@ parse_args() {
                 ;;
             --filter=*)
                 add_filter "${1#*=}"
+                shift
+                ;;
+            --coverage)
+                COVERAGE=1
                 shift
                 ;;
             *)
@@ -189,6 +198,12 @@ run_suite() {
 
 parse_args "$@"
 
+if [[ "$COVERAGE" -eq 1 ]]; then
+    rm -rf "$COVERAGE_DIR"
+    rm -rf .nyc_output
+    mkdir -p "$COVERAGE_DIR"
+fi
+
 pids=()
 if [[ "$SKIP_FRONTEND" -eq 1 ]]; then
     echo "[SKIP] frontend tests (--skip-frontend)"
@@ -205,7 +220,12 @@ else
 fi
 
 if should_run_suite unit; then
-    unit_cmd=(python -m pytest tests/unit)
+    if [[ "$COVERAGE" -eq 1 ]]; then
+        unit_cmd=(env COVERAGE_FILE="${COVERAGE_DIR}/.coverage.unit" python -m pytest --cov=src/dojo --cov-config=.coveragerc --cov-report=term-missing:skip-covered tests/unit)
+        PYTHON_COVERAGE_RAN=1
+    else
+        unit_cmd=(python -m pytest tests/unit)
+    fi
     unit_pattern=$(suite_pattern unit)
     if [[ -n "$unit_pattern" ]]; then
         unit_cmd+=(-k "$unit_pattern")
@@ -219,7 +239,12 @@ fi
 if [[ "$SKIP_PROPERTY" -eq 1 ]]; then
     echo "[SKIP] property tests (--skip-property)"
 elif should_run_suite property; then
-    prop_cmd=(python -m pytest tests/property)
+    if [[ "$COVERAGE" -eq 1 ]]; then
+        prop_cmd=(env COVERAGE_FILE="${COVERAGE_DIR}/.coverage.property" python -m pytest --cov=src/dojo --cov-config=.coveragerc --cov-report=term-missing:skip-covered tests/property)
+        PYTHON_COVERAGE_RAN=1
+    else
+        prop_cmd=(python -m pytest tests/property)
+    fi
     prop_pattern=$(suite_pattern property)
     if [[ -n "$prop_pattern" ]]; then
         prop_cmd+=(-k "$prop_pattern")
@@ -235,7 +260,12 @@ if [[ "$SKIP_INTEGRATION" -eq 1 ]]; then
 elif [[ ! -d tests/integration ]]; then
     echo "[SKIP] integration tests (tests/integration missing)"
 elif should_run_suite integration; then
-    int_cmd=(python -m pytest tests/integration)
+    if [[ "$COVERAGE" -eq 1 ]]; then
+        int_cmd=(env COVERAGE_FILE="${COVERAGE_DIR}/.coverage.integration" python -m pytest --cov=src/dojo --cov-config=.coveragerc --cov-report=term-missing:skip-covered tests/integration)
+        PYTHON_COVERAGE_RAN=1
+    else
+        int_cmd=(python -m pytest tests/integration)
+    fi
     int_pattern=$(suite_pattern integration)
     if [[ -n "$int_pattern" ]]; then
         int_cmd+=(-k "$int_pattern")
@@ -249,7 +279,12 @@ fi
 if [[ "$SKIP_E2E" -eq 1 ]]; then
     echo "[SKIP] e2e tests (--skip-e2e)"
 elif should_run_suite e2e; then
-    e2e_cmd=(npx cypress run --e2e --browser chrome)
+    if [[ "$COVERAGE" -eq 1 ]]; then
+        e2e_cmd=(env CYPRESS_COVERAGE=1 npx cypress run --e2e --browser chrome)
+        E2E_COVERAGE_RAN=1
+    else
+        e2e_cmd=(npx cypress run --e2e --browser chrome)
+    fi
     e2e_pattern=$(suite_pattern e2e)
     if [[ -n "$e2e_pattern" ]]; then
         if [[ "$e2e_pattern" == */* ]]; then
@@ -274,6 +309,33 @@ for pid in "${pids[@]}"; do
         had_failure=1
     fi
 done
+
+if [[ "$COVERAGE" -eq 1 ]]; then
+    if [[ "$PYTHON_COVERAGE_RAN" -eq 1 ]]; then
+        if ls "${COVERAGE_DIR}"/.coverage.* >/dev/null 2>&1; then
+            if python -m coverage combine "$COVERAGE_DIR" >/dev/null 2>&1; then
+                python -m coverage xml -o "${COVERAGE_DIR}/coverage.xml" >/dev/null
+                python -m coverage json -o "${COVERAGE_DIR}/coverage.json" >/dev/null
+                echo "[OK] python coverage artifacts written to ${COVERAGE_DIR}/coverage.xml"
+            else
+                echo "[WARN] failed to combine python coverage data" >&2
+            fi
+        else
+            echo "[WARN] coverage enabled but no python suites produced data" >&2
+        fi
+    fi
+    if [[ "$E2E_COVERAGE_RAN" -eq 1 ]]; then
+        if [[ -d .nyc_output ]] && ls .nyc_output/* >/dev/null 2>&1; then
+            if npx c8 report --clean false --temp-directory .nyc_output --reporter=lcov --reports-dir "$COVERAGE_DIR" >/dev/null 2>&1; then
+                echo "[OK] cypress coverage artifacts written to ${COVERAGE_DIR}/lcov.info"
+            else
+                echo "[WARN] failed to write cypress coverage report" >&2
+            fi
+        else
+            echo "[WARN] coverage enabled but no Cypress coverage data found" >&2
+        fi
+    fi
+fi
 
 if [[ "$had_failure" -ne 0 ]]; then
     echo "[FAIL] ${SCRIPT_NAME} (one or more suites failed) log dir: ${RUN_DIR}"

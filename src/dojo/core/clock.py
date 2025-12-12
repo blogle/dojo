@@ -1,7 +1,12 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import Header, HTTPException
+
+
+def now() -> datetime:
+    """Return a timezone-aware UTC timestamp for ledger writes and tests."""
+    return datetime.now(UTC)
 
 
 def get_system_date(x_test_date: Annotated[str | None, Header()] = None) -> date:

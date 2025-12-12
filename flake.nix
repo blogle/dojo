@@ -56,7 +56,7 @@
         version = "0.0.0";
         src = ./src/dojo/frontend;
         sourceRoot = "frontend/vite";
-        npmDepsHash = "sha256-ZmNN0gN2afIFMn8q7+xFV+URTLOa+8ApG9Q2ZAKHu0M=";
+        npmDepsHash = "sha256-8IzhX7EwOjVX4LIui9wdmPNmWkHGbkULf4HjcKOuIiM=";
         nodejs = pkgs.nodejs_20;
         npmBuild = "npm run build";
 

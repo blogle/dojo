@@ -1,0 +1,21 @@
+[run]
+branch = True
+parallel = True
+source =
+    src/dojo
+data_file = coverage/.coverage
+omit =
+    tests/*
+    cypress/*
+    src/dojo/frontend/*
+
+[report]
+show_missing = True
+skip_covered = True
+precision = 1
+fail_under = 0
+
+[paths]
+source =
+    src/dojo
+    */site-packages/dojo

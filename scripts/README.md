@@ -23,12 +23,15 @@ the progressive-disclosure and logging conventions defined by GenTool.
   - `--skip-property`: omit the Hypothesis-heavy property suite
   - `--skip-integration`: omit the integration PyTest suite (or skip if no suite directory)
   - `--skip-e2e`: omit the Cypress end-to-end run
-  - `--filter SUITE[:PATTERN]`: target a single suite; e.g. `--filter unit:budgeting` or `--filter e2e:01-payday-assignment`
-  - `-h`/`--help`: show the manpage-style header
+- `--filter SUITE[:PATTERN]`: target a single suite; e.g. `--filter unit:budgeting` or `--filter e2e:01-payday-assignment`
+- `--coverage`: enable pytest-cov instrumentation for Python suites and Cypress code coverage, writing reports under `coverage/`
+- `-h`/`--help`: show the manpage-style header
+
 - **Behavior**:
   - Shrinks verbose logs on success by deleting per-suite temp files.
   - Keeps temp logs when a suite fails and points to them as `(log: /tmp/dojo-run-tests-...)`.
   - Prints final `[OK] scripts/run-tests (all requested suites passed)` or `[FAIL] scripts/run-tests (one or more suites failed)` line.
+  - When `--coverage` is provided, clears `coverage/` and `.nyc_output/`, runs pytest with `pytest-cov`, and emits `coverage/coverage.xml`, `coverage/coverage.json`, and `coverage/lcov.info` after combining all suites.
 
 #### Example usage
 

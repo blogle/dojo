@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 import duckdb
 
+from dojo.core import clock
 from dojo.budgeting.dao import (
     AccountRecord,
     BudgetAllocationRecord,
@@ -164,7 +165,7 @@ class TransactionEntryService:
         # Generate a unique ID for this specific version of the transaction.
         transaction_version_id = uuid4()
         # Record the current UTC time as the transaction's recorded_at timestamp.
-        recorded_at = datetime.now(UTC)
+        recorded_at = clock.now()
         # Determine the start of the month for budgeting purposes.
         month_start = cmd.transaction_date.replace(day=1)
         # Calculate the activity delta for the category. Outflows are positive activity.
@@ -335,7 +336,7 @@ class TransactionEntryService:
             self._reverse_transaction_effects(dao, existing)
 
             # Close the active transaction
-            recorded_at = datetime.now(UTC)
+            recorded_at = clock.now()
             dao.close_active_transaction(concept_id, recorded_at)
 
     def transfer(
@@ -386,7 +387,7 @@ class TransactionEntryService:
         # Generate a new concept_id if not provided.
         concept_id = cmd.concept_id or uuid4()
         # Record the current UTC time.
-        recorded_at = datetime.now(UTC)
+        recorded_at = clock.now()
         # Determine the start of the month for budgeting purposes.
         month_start = cmd.transaction_date.replace(day=1)
         # Generate unique IDs for each leg of the transfer.
@@ -2033,7 +2034,7 @@ class BudgetCategoryAdminService:
         if not category_id:
             normalized = payload.name.lower()
             normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
-            category_id = normalized.strip("_") or f"category_{int(datetime.now().timestamp())}"
+            category_id = normalized.strip("_") or f"category_{int(clock.now().timestamp())}"
         category_id = str(category_id)
 
         # Check if a category with the determined ID already exists.

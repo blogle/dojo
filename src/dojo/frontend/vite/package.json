@@ -22,7 +22,12 @@
 		"vue-router": "^4.4.5"
 	},
 	"devDependencies": {
+		"@babel/core": "^7.26.0",
+		"@bahmutov/cypress-code-coverage": "^2.7.2",
+		"@rollup/pluginutils": "^5.1.0",
 		"@vitejs/plugin-vue": "^5.1.2",
+		"babel-plugin-istanbul": "^6.1.1",
+		"c8": "^9.1.0",
 		"concurrently": "^9.1.0",
 		"cypress": "^14.5.4",
 		"jsdom": "^24.1.0",

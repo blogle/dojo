@@ -52,6 +52,17 @@ We do **not** use `before()` (once per file). We use `beforeEach()` (once per te
 
 ---
 
+## Coverage Collection
+
+We collect UI coverage through [`@bahmutov/cypress-code-coverage`](https://github.com/bahmutov/cypress-code-coverage) and Babel instrumentation gated behind `CYPRESS_COVERAGE=1`.
+
+- **When to enable**: run `scripts/run-tests --coverage` (or manually set `CYPRESS_COVERAGE=1` before `npx cypress run`). The wrapper clears `coverage/` + `.nyc_output/`, records coverage per spec, and writes `coverage/lcov.info` via `npx c8 report --temp-directory .nyc_output --reports-dir coverage --reporter=lcov`.
+- **Instrumentation**: the Vite config injects a Babel plugin that wraps every Vue/JS source file when `CYPRESS_COVERAGE` is set. Keep that env var **off** for normal dev loops; only toggle it for explicit coverage runs to avoid slowing down HMR.
+- **Support file hooks**: `cypress/support/e2e.js` imports the plugin’s support module so window-level coverage data is scraped automatically after each spec.
+- **Artifacts**: Every run with coverage leaves data in `.nyc_output/` and `coverage/lcov.info`. Delete those directories (or rerun `scripts/run-tests --coverage`, which does it for you) before gathering a new report to avoid mixing runs.
+
+---
+
 ## 1. Interaction Abstraction (Page Objects)
 
 To prevent one HTML change from breaking dozens of tests, we centralize selectors and flows into **Page Objects**.
