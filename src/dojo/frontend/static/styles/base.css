@@ -17,7 +17,7 @@
 	--stone-50: #fafaf9;
 	--stone-300: #d6d3d1;
 	--shadow-hard: 4px 4px 0px 0px rgba(0, 0, 0, 0.75);
-	--border-thick: 2px solid var(--text);
+	--border-thick: 1px solid var(--text);
 }
 
 * {
