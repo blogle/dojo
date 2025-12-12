@@ -18,7 +18,10 @@ export const dollarsToMinor = (value) => {
 	return Math.round(parsed * 100);
 };
 
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+export const todayISO = () => {
+	const today = new Date();
+	return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
 
 export const currentMonthStartISO = () => {
 	const today = new Date();
