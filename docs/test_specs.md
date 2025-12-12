@@ -106,6 +106,36 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     3. Single active version for TX3 post-edit; prior version inactive.
 * **Expected End State:** Balances reflect only new account leg; history preserved.
 
+### Spec 2.6: Backdated Insertion (Historical Ripple)
+* **Test Level:** Integration
+* **Initial Condition:** Current month M; Transaction inserted dated M-2.
+* **Action:** Insert transaction with `transaction_date` in M-2 but `recorded_at` NOW.
+* **Validations:**
+    1. Row inserted correctly with historical date.
+    2. Budget balances for M-2, M-1, and M are recalculated.
+    3. Category available and account running balances update for all subsequent periods.
+* **Expected End State:** History rewritten correctly; ripple effect propagates to current state.
+
+### Spec 2.7: SCD2 Temporal Chain Invariant
+* **Test Level:** Property
+* **Initial Condition:** Randomized sequence of edits/deletes on a transaction.
+* **Action:** Fuzz testing transaction lifecycle.
+* **Validations:**
+    1. Versions form continuous chain: `Version[i].valid_to == Version[i+1].valid_from`.
+    2. Exactly one `is_active=TRUE` version exists.
+    3. Latest version has `valid_to='infinity'`.
+* **Expected End State:** Temporal integrity holds under high churn.
+
+### Spec 2.8: Reconciliation Adjustment Logic
+* **Test Level:** Integration
+* **Initial Condition:** Account balance $95.00; External/User claim $100.00.
+* **Action:** Create reconciliation adjustment.
+* **Validations:**
+    1. Transaction created for delta ($5.00).
+    2. Category defaults to 'Inflow: RTA' (if positive) or requires categorization.
+    3. Account balance matches target ($100.00).
+* **Expected End State:** Ledger matches external reality; difference captured in transaction.
+
 ---
 
 ## Domain 3: Ready to Assign and Allocations
@@ -159,6 +189,33 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     2. No budget category activity unless explicitly categorized.
 * **Expected End State:** Net Worth unchanged; balances shifted only between accounts.
 
+### Spec 3.6: Fundamental Budget Equation Invariant
+* **Test Level:** Property
+* **Initial Condition:** Randomized allocations, transactions, rollovers.
+* **Action:** Compute Available for category in month M.
+* **Validations:**
+    1. `Available(M) == Available(M-1) + Allocations(M) + Activity(M)`.
+    2. `Available(M-1)` correctly includes negative carryover (overspending).
+* **Expected End State:** Equation holds for every category/month pair.
+
+### Spec 3.7: Global Zero-Sum Invariant
+* **Test Level:** Property
+* **Initial Condition:** Entire budget state.
+* **Action:** Sum all cash vs. sum of all envelopes + RTA.
+* **Validations:**
+    1. `Total On-Budget Cash == Total Available + RTA + Future Allocations`.
+    2. Money is never created/destroyed outside double-entry inflows.
+* **Expected End State:** Conservation of funds verified.
+
+### Spec 3.8: Category Deletion Constraints
+* **Test Level:** Integration
+* **Initial Condition:** Category with existing transactions/activity.
+* **Action:** Attempt to delete category.
+* **Validations:**
+    1. Operation blocked or requires reassignment (merge).
+    2. Transactions never orphaned (null category).
+* **Expected End State:** Integrity preserved; no orphaned data.
+
 ---
 
 ## Domain 4: Spending Flows
@@ -206,6 +263,27 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     2. Category A available -$50; Category B available -$40.
     3. RTA unchanged.
 * **Expected End State:** Each envelope reflects its share; total matches spend.
+
+### Spec 4.5: Credit Spend (Overspending/Unfunded)
+* **Test Level:** Integration
+* **Initial Condition:** Credit card zero balance; Category 'Dining' available $20.00.
+* **Action:** Spend $50.00 on Credit Card for 'Dining'.
+* **Validations:**
+    1. Credit balance becomes -$50.00.
+    2. 'Dining' available becomes $0.00 (or -$30.00 if strict, but usually capped at 0 with overspent flag).
+    3. Payment category available increases by only $20.00 (funded portion).
+    4. Remaining $30.00 becomes new uncovered debt.
+* **Expected End State:** Partial coverage recorded; debt increases; category exhausted.
+
+### Spec 4.6: Split Transaction Precision
+* **Test Level:** Unit
+* **Initial Condition:** $10.00 transaction.
+* **Action:** Split 3 ways ($3.333...).
+* **Validations:**
+    1. System forces integer minor units (333, 333, 334 cents).
+    2. Sum of splits exactly equals total.
+    3. No floating point drift.
+* **Expected End State:** Precision maintained without leakage.
 
 ---
 
@@ -396,8 +474,83 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
 
 ---
 
+## Domain 9: System Limits and Stress
+
+**Goal:** Ensure system stability under scale and stress.
+
+### Spec 9.1: High Volume Scale
+* **Test Level:** Performance
+* **Initial Condition:** Database populated with 10,000+ transactions over 10 years.
+* **Action:** Run core queries (RTA, Net Worth, Running Balance).
+* **Validations:**
+    1. RTA calculation < 200ms.
+    2. Net Worth aggregation < 100ms.
+* **Expected End State:** Performance remains within acceptable UX bounds.
+
+---
+
 ## Flakiness and Determinism Requirements
 * Fix clock and month boundaries in tests; seed random property/state-machine tests per run.
 * Reset DB per test/spec; use paired transfer entries explicitly.
 * Assert on integer minor units and stable error shapes.
 * Prefer property/state-machine tests for sequence coverage; keep E2E to critical journeys.
+
+---
+
+## Domain 10: Budget Goals and Targets
+
+**Goal:** Ensure automated budget targets guide the user correctly without "math magic" surprises, specifically handling missed months and existing balances.
+
+### Spec 10.1: Target Date Calculation (Standard)
+* **Test Level:** Unit
+* **Initial Condition:** Category "Vacation"; Target $1,200.00; Due Date 12 months from now; Current Available $0.00.
+* **Action:** Request "Monthly Funding Needed".
+* **Validations:**
+    1. Returns exactly $100.00/month.
+    2. If user budgets $100.00, "Underfunded" amount becomes $0.00.
+* **Expected End State:** Math is linear and precise.
+
+### Spec 10.2: Target Date with Existing Balance (Credit)
+* **Test Level:** Unit
+* **Initial Condition:** Category "Car Insurance"; Target $600.00; Due in 6 months; Current Available $120.00 (from rollover).
+* **Action:** Request "Monthly Funding Needed".
+* **Validations:**
+    1. Calculation: `($600 - $120) / 6 = $80/month`.
+    2. System does *not* ignore existing funds.
+* **Expected End State:** Contribution reduced by existing savings.
+
+### Spec 10.3: Skipped Month / Catch-Up Logic
+* **Test Level:** Integration
+* **Initial Condition:** Goal $1,200 in 12 months ($100/mo). Month 1 passed with $0.00 allocated. Now Month 2.
+* **Action:** View Goal Status for Month 2.
+* **Validations:**
+    1. Status flagged as "Off Track" or "Underfunded".
+    2. Recalculation prompts for catch-up: `($1,200 - $0) / 11 remaining = $109.09/mo`.
+    3. Does *not* silently auto-budget; user must accept new target.
+* **Expected End State:** User alerted to shortfall; path to correction provided.
+
+### Spec 10.4: Recurring Monthly Goal
+* **Test Level:** Integration
+* **Initial Condition:** Category "Netflix"; Monthly Funding Target $15.00.
+* **Action:**
+    1. Month 1: Budget $15.00 -> Goal Met.
+    2. Month 2: Budget $0.00 -> Goal Unmet.
+* **Validations:**
+    1. Month 1 shows green/complete.
+    2. Month 2 shows yellow/underfunded by $15.00.
+    3. Rollover from Month 1 (if unspent) does *not* count towards Month 2 funding goal (it's a funding target, not a balance target).
+* **Expected End State:** Recurring goals strictly check current month's *Allocated* value, distinct from *Available*.
+
+### Spec 10.5: Recurring Interval Goal (Non-Monthly)
+* **Test Level:** Unit
+* **Initial Condition:** Category "Water Bill"; Recurring Target $150.00 every 3 months; Current Available $0.00.
+* **Action:**
+    1. Determine monthly funding needed for this goal.
+    2. Budget $50.00 in Month 1.
+    3. Budget $50.00 in Month 2.
+    4. Budget $50.00 in Month 3.
+* **Validations:**
+    1. Monthly funding needed for the goal correctly calculates as $50.00/month (`$150.00 / 3`).
+    2. After budgeting $50.00 in each month, the goal is considered "Met" for the month.
+    3. The Available balance accumulates to $150.00 by Month 3.
+* **Expected End State:** Periodic expenses are accurately smoothed into consistent monthly funding targets, and the total target amount is available when due.
