@@ -1,6 +1,7 @@
 """Budgeting domain services."""
 
 import re
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import UTC, date, datetime
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
@@ -94,6 +95,22 @@ def derive_payment_category_name(account_name: str) -> str:
     """
     label = account_name.strip() if account_name else "Credit Card"
     return label
+
+
+def split_amount_minor(total_minor: int, part_count: int) -> list[int]:
+    """Split ``total_minor`` into ``part_count`` integer shares without drift."""
+    if part_count <= 0:
+        raise ValueError("part_count must be positive.")
+    if part_count == 1:
+        return [total_minor]
+
+    sign = 1 if total_minor >= 0 else -1
+    absolute_total = abs(total_minor)
+    base_share, remainder = divmod(absolute_total, part_count)
+    shares = [base_share] * part_count
+    for idx in range(1, remainder + 1):
+        shares[-idx] += 1
+    return [share * sign for share in shares]
 
 
 # Constant for the ID of the credit card payment category group.
@@ -2379,3 +2396,61 @@ class BudgetCategoryAdminService:
             last_month_activity_minor=record.last_month_activity_minor,
             last_month_available_minor=record.last_month_available_minor,
         )
+
+
+class GoalCalculator:
+    """Deterministic helpers for Domain 10 goal specifications."""
+
+    _MINOR_QUANTIZER = Decimal("1")
+
+    @staticmethod
+    def target_date_monthly_amount(
+        goal_amount_minor: int,
+        months_remaining: int,
+        current_available_minor: int = 0,
+    ) -> int:
+        """Return the monthly amount required to hit a target-date goal."""
+        if months_remaining <= 0:
+            raise ValueError("months_remaining must be positive.")
+        if goal_amount_minor <= 0:
+            return 0
+        remaining = max(goal_amount_minor - current_available_minor, 0)
+        if remaining == 0:
+            return 0
+        return GoalCalculator._quantize_minor(Decimal(remaining) / Decimal(months_remaining))
+
+    @staticmethod
+    def catch_up_monthly_amount(
+        goal_amount_minor: int,
+        amount_already_funded_minor: int,
+        months_remaining: int,
+    ) -> int:
+        """Recompute the monthly need after skipped months."""
+        if months_remaining <= 0:
+            raise ValueError("months_remaining must be positive.")
+        if goal_amount_minor <= 0:
+            return 0
+        remaining = max(goal_amount_minor - amount_already_funded_minor, 0)
+        if remaining == 0:
+            return 0
+        return GoalCalculator._quantize_minor(Decimal(remaining) / Decimal(months_remaining))
+
+    @staticmethod
+    def recurring_shortfall(goal_amount_minor: int, allocated_this_month_minor: int) -> int:
+        """Return the underfunded amount for recurring monthly goals."""
+        if goal_amount_minor <= 0:
+            return 0
+        return max(goal_amount_minor - allocated_this_month_minor, 0)
+
+    @staticmethod
+    def recurring_interval_monthly_amount(goal_amount_minor: int, interval_months: int) -> int:
+        """Normalize non-monthly recurring goals to a monthly contribution."""
+        if interval_months <= 0:
+            raise ValueError("interval_months must be positive.")
+        if goal_amount_minor <= 0:
+            return 0
+        return GoalCalculator._quantize_minor(Decimal(goal_amount_minor) / Decimal(interval_months))
+
+    @staticmethod
+    def _quantize_minor(value: Decimal) -> int:
+        return int(value.quantize(GoalCalculator._MINOR_QUANTIZER, rounding=ROUND_HALF_UP))

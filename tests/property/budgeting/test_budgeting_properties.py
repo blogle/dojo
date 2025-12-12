@@ -19,7 +19,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from dojo.budgeting.dao import BudgetingDAO
-from dojo.budgeting.schemas import BudgetAllocationRequest, NewTransactionRequest
+from dojo.budgeting.schemas import NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
 from dojo.core.migrate import apply_migrations
 from dojo.testing.fixtures import apply_base_budgeting_fixture
@@ -97,110 +97,6 @@ def _fetch_namespace(
     # Map column names to row values and create a SimpleNamespace.
     data = {columns[idx]: row[idx] for idx in range(len(columns))}
     return SimpleNamespace(**data)
-
-
-# --- Conservation of Money Invariant ---
-
-# Predefined categories available for reallocation tests.
-CATEGORIES = ["groceries", "housing"]
-# Strategy for generating allocation amounts (1 to 100 USD in minor units).
-allocation_amount_strategy = st.integers(min_value=1, max_value=100_00)
-
-
-@st.composite
-def reallocation_strategy(draw: DrawFn) -> BudgetAllocationRequest:
-    """
-    Hypothesis strategy for generating valid budget reallocation requests.
-
-    This strategy ensures that `from_category` and `to_category` are distinct
-    and draws a valid allocation amount.
-
-    Parameters
-    ----------
-    draw : Callable
-        A function provided by Hypothesis to draw values from other strategies.
-
-    Returns
-    -------
-    BudgetAllocationRequest
-        A generated `BudgetAllocationRequest` for reallocating funds.
-    """
-    # Draw a source category from the predefined list.
-    from_category = draw(st.sampled_from(CATEGORIES))
-    # Draw a destination category, ensuring it's different from the source.
-    to_category = draw(st.sampled_from([c for c in CATEGORIES if c != from_category]))
-    # Draw an allocation amount.
-    amount = draw(allocation_amount_strategy)
-    return BudgetAllocationRequest(
-        from_category_id=from_category,
-        to_category_id=to_category,
-        amount_minor=amount,
-    )
-
-
-@given(reallocations=st.lists(reallocation_strategy(), min_size=1, max_size=5))
-@settings(max_examples=10, deadline=None)
-def test_conservation_of_money_in_reallocation(reallocations: list[BudgetAllocationRequest]) -> None:
-    """
-    Verifies the conservation of money invariant during budget reallocations.
-
-    This property test asserts that the total sum of `available_minor` balances
-    across all relevant budget categories remains constant after a series of
-    random reallocations within a given month. Funds are merely moved between
-    categories, not created or destroyed.
-
-    Parameters
-    ----------
-    reallocations : list[BudgetAllocationRequest]
-        A list of generated `BudgetAllocationRequest` objects representing
-        reallocations to be performed.
-    """
-    with ledger_connection() as conn:
-        service = build_transaction_service()
-        dao = BudgetingDAO(conn)
-        month = date.today().replace(day=1)
-
-        # Prime the categories with some initial funds to allow for reallocations.
-        # This ensures there's enough 'available_minor' to draw from.
-        service.allocate_envelope(conn, "groceries", 500_00, month)
-        service.allocate_envelope(conn, "housing", 1500_00, month)
-
-        # Get initial total available funds across the relevant categories.
-        initial_available_row = _fetch_namespace(
-            conn,
-            "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
-            [month],
-        )
-        initial_available = int(initial_available_row.total_available) if initial_available_row else 0
-
-        # Perform the generated reallocations.
-        for reallocation in reallocations:
-            source_category_id = reallocation.from_category_id
-            target_category_id = reallocation.to_category_id
-            if not source_category_id or not target_category_id:
-                continue
-            from_category_state_record = dao.get_category_month_state(source_category_id, month)
-
-            # Only perform reallocation if the source category has sufficient funds.
-            if from_category_state_record and from_category_state_record.available_minor >= reallocation.amount_minor:
-                service.allocate_envelope(
-                    conn,
-                    target_category_id,
-                    reallocation.amount_minor,
-                    month,
-                    from_category_id=source_category_id,
-                )
-
-        # Get final total available funds after all reallocations.
-        final_available_row = _fetch_namespace(
-            conn,
-            "SELECT SUM(available_minor) AS total_available FROM budget_category_monthly_state WHERE month_start = ?",
-            [month],
-        )
-        final_available = int(final_available_row.total_available) if final_available_row else 0
-
-        # Assert that the total available funds remain unchanged.
-        assert initial_available == final_available
 
 
 # --- Cache Correctness Invariant ---

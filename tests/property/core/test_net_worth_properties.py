@@ -49,6 +49,16 @@ def ledger_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 assets_strategy = st.lists(st.integers(min_value=0, max_value=2_000_00), min_size=1, max_size=4)
 liabilities_strategy = st.lists(st.integers(min_value=0, max_value=1_000_00), min_size=1, max_size=4)
 pos_strategy = st.lists(st.integers(min_value=0, max_value=500_00), min_size=0, max_size=3)
+account_strategy = st.lists(
+    st.tuples(
+        st.sampled_from(["asset", "liability"]),
+        st.integers(min_value=1_000, max_value=2_000_00),
+        st.booleans(),
+        st.booleans(),
+    ),
+    min_size=1,
+    max_size=5,
+)
 
 
 @given(
@@ -128,3 +138,43 @@ def test_net_worth_matches_manual_computation(
         assert snapshot.positions_minor == sum(positions)
         # Net worth is calculated as Assets - Liabilities + Positions.
         assert snapshot.net_worth_minor == sum(assets) - sum(liabilities) + sum(positions)
+
+
+@given(accounts=account_strategy)
+@settings(max_examples=15, deadline=None)
+def test_net_worth_equation_respects_account_activation(accounts: list[tuple[str, int, bool, bool]]) -> None:
+    """Spec 7.3: Assets/liabilities equation holds even when accounts toggle active state."""
+    with ledger_connection() as conn:
+        conn.execute("DELETE FROM accounts")
+        for idx, (account_type, amount, is_tracking, is_active) in enumerate(accounts):
+            balance = amount if account_type == "asset" else -amount
+            conn.execute(
+                """
+                INSERT INTO accounts (
+                    account_id, name, account_type, current_balance_minor,
+                    currency, is_active, account_class, account_role
+                )
+                VALUES (?, ?, ?, ?, 'USD', ?, ?, ?)
+                """,
+                [
+                    f"acct_{idx}",
+                    f"Account {idx}",
+                    account_type,
+                    balance,
+                    is_active,
+                    "cash" if account_type == "asset" else "credit",
+                    "tracking" if is_tracking else "on_budget",
+                ],
+            )
+
+        snapshot = current_snapshot(conn)
+        rows = conn.execute(
+            "SELECT account_type, current_balance_minor, is_active FROM accounts",
+        ).fetchall()
+        manual_assets = sum(row[1] for row in rows if row[0] == "asset" and row[2])
+        manual_liabilities = sum(row[1] for row in rows if row[0] == "liability" and row[2])
+        expected_net_worth = manual_assets + manual_liabilities
+
+        assert snapshot.assets_minor == manual_assets
+        assert snapshot.liabilities_minor == manual_liabilities
+        assert snapshot.net_worth_minor == expected_net_worth + snapshot.positions_minor + snapshot.tangibles_minor

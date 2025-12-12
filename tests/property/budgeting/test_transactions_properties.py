@@ -350,3 +350,71 @@ def test_referential_integrity() -> None:
                     amount_minor=100,
                 ),
             )
+
+
+operation_strategy = st.lists(
+    st.one_of(
+        st.tuples(st.just("edit"), amount_strategy),
+        st.tuples(st.just("void"), st.just(0)),
+    ),
+    min_size=1,
+    max_size=5,
+)
+
+
+@given(operations=operation_strategy)
+@settings(max_examples=10, deadline=None)
+def test_temporal_chain_handles_edits_and_voids(operations: list[tuple[str, int]]) -> None:
+    """Spec 2.7: Random edits/voids maintain a continuous temporal chain."""
+    with ledger_connection() as conn:
+        service = build_service()
+        base_amount = operations[0][1] if operations and operations[0][0] == "edit" else 1_00
+        result = service.create(
+            conn,
+            NewTransactionRequest(
+                transaction_date=date.today(),
+                account_id="house_checking",
+                category_id="groceries",
+                amount_minor=base_amount,
+            ),
+        )
+        concept_id = result.concept_id
+        voided = False
+
+        for op, value in operations:
+            if op == "edit" and not voided:
+                service.create(
+                    conn,
+                    NewTransactionRequest(
+                        concept_id=concept_id,
+                        transaction_date=date.today(),
+                        account_id="house_checking",
+                        category_id="groceries",
+                        amount_minor=value,
+                    ),
+                )
+            elif op == "void" and not voided:
+                service.delete_transaction(conn, concept_id)
+                voided = True
+
+        versions = _fetchall_namespaces(
+            conn,
+            """
+            SELECT valid_from, valid_to, is_active
+            FROM transactions
+            WHERE concept_id = ?
+            ORDER BY valid_from
+            """,
+            [str(concept_id)],
+        )
+        assert versions, "expected at least one version"
+
+        for idx in range(len(versions) - 1):
+            assert versions[idx].valid_to == versions[idx + 1].valid_from
+
+        active_rows = sum(1 for row in versions if row.is_active)
+        if voided:
+            assert active_rows == 0
+        else:
+            assert active_rows == 1
+            assert versions[-1].valid_to.year == 9999
