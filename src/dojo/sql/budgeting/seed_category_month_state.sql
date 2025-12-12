@@ -11,7 +11,7 @@ VALUES (
     $month_start,
     0,
     0,
-    $activity_delta,
+    0,
     COALESCE(
         (
             SELECT available_minor
@@ -20,10 +20,6 @@ VALUES (
               AND month_start = $previous_month
         ),
         0
-    ) - $activity_delta
+    )
 )
-ON CONFLICT (category_id, month_start) DO UPDATE
-    SET
-        activity_minor = budget_category_monthly_state.activity_minor + excluded.activity_minor,
-        available_minor = budget_category_monthly_state.available_minor - excluded.activity_minor,
-        updated_at = NOW();
+ON CONFLICT (category_id, month_start) DO NOTHING;

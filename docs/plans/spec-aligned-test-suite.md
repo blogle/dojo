@@ -10,7 +10,8 @@ Budgeting, ledger, and reporting behavior must remain trustworthy even as the pr
 
 - [x] (2025-12-11 18:20Z) Captured baseline audit of existing suites and recorded plan scope.
 - [x] (2025-12-11 22:00Z) Milestone 1 — Coverage instrumentation and deterministic fixtures.
-- [ ] (2025-12-11 18:20Z) Milestone 2 — Spec-complete unit and property coverage.
+- [x] (2025-12-12 16:45Z) Milestone 2 — Spec-complete unit and property coverage.
+- [x] (2025-12-12 20:10Z) Domain 3 rollover fix — `scripts/run-tests --filter property` now passes with Spec 3.6 asserting `Available(M-1)` carryover after seeding month state.
 - [ ] (2025-12-11 18:20Z) Milestone 3 — Spec-complete integration coverage.
 - [ ] (2025-12-11 18:20Z) Milestone 4 — Spec-complete Cypress journeys and cleanup.
 - [ ] (2025-12-11 18:20Z) Milestone 5 — Performance harness and thresholds.
@@ -19,6 +20,7 @@ Budgeting, ledger, and reporting behavior must remain trustworthy even as the pr
 
 - Observation: No project-level coverage tooling is configured; `pyproject.toml` contains no `pytest-cov` reference (confirmed via `rg -n "pytest-cov" pyproject.toml`). Evidence: ripgrep returned no matches on 2025-12-11, so coverage gates must be added.
 - Observation: Hypothesis `settings` does not accept a `seed=` keyword; deterministic property runs required exporting `HYPOTHESIS_SEED` before registering our custom profile. Evidence: pytest import error reproduced on 2025-12-11 until the environment variable approach replaced the unsupported parameter.
+- Surprise: `budget_category_monthly_state` does not roll last month's availability into new months, so Spec 3.6 fails without a rollover job. Evidence: `scripts/search-logs dojo-run-tests-YNkmHQ --property` captured the 2025-12-12 failure (`0 == 6850`), so the new property test is marked `xfail` until the rollover logic is implemented. Resolution (2025-12-12 20:10Z): added `_ensure_category_month_state` + seeding SQL and reran `scripts/run-tests --filter property` to confirm deterministic carryover.
 
 ## Decision Log
 
@@ -26,6 +28,8 @@ Budgeting, ledger, and reporting behavior must remain trustworthy even as the pr
 - Decision: Replace the legacy `tests/integration/test_payday_assignment.py` with spec-specific integration modules per domain, then retire the legacy file once all new suites are in place. Rationale: the existing test only covers Domain 3.1 superficially and overlaps fully with Cypress user story 01; focusing on domain-specific modules reduces duplication. Date/Author: 2025-12-11 / Codex.
 - Decision: Consolidate Cypress coverage to the seven Domain 8 flows and retire UI-only allocation stories (`cypress/e2e/user-stories/07` and `09`–`11`, `17`–`19`) after their assertions are captured at unit or integration layers. Rationale: Domain 8 demands zero-flake journeys, and the extra 13 UI scripts increase runtime without mapping to current specs. Date/Author: 2025-12-11 / Codex.
 - Decision: Introduce an autouse pytest fixture that monkeypatches `dojo.core.clock.now()` with a deterministic, monotonic UTC ticker so ledger operations and integration tests share reproducible timestamps. Rationale: ordering-sensitive SCD-2 assertions (e.g., `list_recent`) flake when `recorded_at` ties; the fixture enforces deterministic ordering. Date/Author: 2025-12-11 / Codex.
+- Decision: Mark the Spec 3.6 property test as `xfail` until month rollover carries `last_month_available_minor` forward; this preserves suite stability while documenting the gap exposed by `scripts/search-logs dojo-run-tests-YNkmHQ --property`. Date/Author: 2025-12-12 / Codex.
+- Decision: Seed category monthly state via `_ensure_category_month_state` + `seed_category_month_state.sql`, update DAO activity math to subtract deltas, and drop the Spec 3.6 `xfail`. Rationale: ensures `Available(M)` reflects carryover + allocations - activity with deterministic property coverage. Date/Author: 2025-12-12 / Codex.
 
 ## Outcomes & Retrospective
 

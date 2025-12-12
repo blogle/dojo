@@ -1678,6 +1678,8 @@ class BudgetingDAO:
         activity_delta : int
             The change in activity amount (in minor units).
         """
+        previous_month = _previous_month_start(month_start)
+        self._ensure_category_month_state(category_id, month_start)
         # Load the SQL query for upserting category monthly state.
         sql = _sql("upsert_category_monthly_state.sql")
         # Execute the upsert query. The `activity_delta` is used twice for UPSERT logic.
@@ -1687,6 +1689,20 @@ class BudgetingDAO:
                 "category_id": category_id,
                 "month_start": month_start,
                 "activity_delta": activity_delta,
+                "previous_month": previous_month,
+            },
+        )
+
+    def _ensure_category_month_state(self, category_id: str, month_start: date) -> None:
+        """Ensure a monthly state row exists, seeding carryover availability."""
+        sql = _sql("seed_category_month_state.sql")
+        previous_month = _previous_month_start(month_start)
+        self._conn.execute(
+            sql,
+            {
+                "category_id": category_id,
+                "month_start": month_start,
+                "previous_month": previous_month,
             },
         )
 
@@ -1711,6 +1727,7 @@ class BudgetingDAO:
         available_delta : int
             The change in the available amount (in minor units).
         """
+        self._ensure_category_month_state(category_id, month_start)
         # Load the SQL query for adjusting category allocation.
         sql = _sql("adjust_category_allocation.sql")
         # Execute the update query with the provided deltas.
@@ -1745,6 +1762,7 @@ class BudgetingDAO:
         available_delta : int
             The change in the available amount (in minor units).
         """
+        self._ensure_category_month_state(category_id, month_start)
         # Load the SQL query for adjusting category inflow.
         sql = _sql("adjust_category_inflow.sql")
         # Execute the update query with the provided deltas.
