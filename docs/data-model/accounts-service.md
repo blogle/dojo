@@ -39,12 +39,20 @@ erDiagram
         TEXT account_id FK
         BIGINT current_fair_value_minor
     }
+    account_reconciliations {
+        UUID reconciliation_id PK
+        TEXT account_id FK
+        TIMESTAMP created_at
+        DATE statement_date
+        BIGINT statement_balance_minor
+    }
 
     accounts ||--|| cash_account_details : "has"
     accounts ||--|| credit_account_details : "has"
     accounts ||--|| investment_account_details : "has"
     accounts ||--|| loan_account_details : "has"
     accounts ||--|| tangible_asset_details : "has"
+    accounts ||--o{ account_reconciliations : "has"
 ```
 
 The Accounts Service owns the central `accounts` table and a set of detail tables that follow a "class table inheritance" pattern.
@@ -84,6 +92,7 @@ A record is expected to exist in exactly one of these tables for each row in `ac
 
 ### Other Owned Tables
 
+-   **`account_reconciliations`**: Stores the history of reconciliation events. Each row represents a "commit" where the user verified that the sum of cleared transactions in Dojo matched their bank statement balance. This history is used to detect subsequent modifications to the ledger that might invalidate previous validations (drift).
 -   **`tangible_assets`**: This table also stores information about tangible assets. Its purpose seems to overlap with `tangible_asset_details`. The application code should be consulted to understand the distinction. It may be a legacy table or used for a different purpose, such as tracking a history of asset values.
 
 ## Shared Tables Used by the Accounts Service

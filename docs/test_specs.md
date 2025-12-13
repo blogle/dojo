@@ -126,15 +126,15 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     3. Latest version has `valid_to='infinity'`.
 * **Expected End State:** Temporal integrity holds under high churn.
 
-### Spec 2.8: Reconciliation Adjustment Logic
+### Spec 2.8: Manual Reconciliation Adjustment
 * **Test Level:** Integration
 * **Initial Condition:** Account balance $95.00; External/User claim $100.00.
-* **Action:** Create reconciliation adjustment.
+* **Action:** User manually creates a transaction for the delta ($5.00) with a specific memo.
 * **Validations:**
     1. Transaction created for delta ($5.00).
     2. Category defaults to 'Inflow: RTA' (if positive) or requires categorization.
     3. Account balance matches target ($100.00).
-* **Expected End State:** Ledger matches external reality; difference captured in transaction.
+* **Expected End State:** Ledger matches external reality; difference captured in user-initiated transaction.
 
 ### Spec 2.9: Account Balance Cache Integrity
 * **Test Level:** Property + Integration (maintenance command)
@@ -147,6 +147,18 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     2. Any mismatch causes the test to fail (not silently repaired) before the rebuild runs.
     3. Invoking the rebuild command brings caches back in sync and logs the before/after delta.
 * **Expected End State:** Day-to-day mutations cannot leave `accounts` cache out of sync; the rebuild path serves as a verified remediation.
+
+### Spec 2.10: Reconciliation Commit & Drift
+* **Test Level:** Integration
+* **Initial Condition:** Account reconciled at T1 (commit exists). Ledger matches Statement.
+* **Action:**
+    1. Insert backdated transaction `Tx_Back` with `date < T1` but `recorded_at > T1`.
+    2. Void/Delete an existing reconciled transaction `Tx_Old` (was active at T1).
+    3. Attempt new reconciliation at T2.
+* **Validations:**
+    1. System flags `Tx_Back` (new insert) and `Tx_Old` (deletion) as "drift".
+    2. New reconciliation cannot proceed until drift is reviewed/cleared.
+* **Expected End State:** Integrity of past reconciliations is guarded against historical edits and deletions.
 
 ---
 
@@ -490,11 +502,12 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
 ### Spec 8.7: Reconciliation UX
 * **Test Level:** E2E
 * **Initial Condition:** Account with known external balance.
-* **Action:** Reconcile; add erroneous transaction; correct it.
+* **Action:** Reconcile; add erroneous transaction; correct it; Click "Finish/Commit".
 * **Validations:**
     1. Reconciliation diff surfaces new transaction; after correction diff clears.
-    2. Balances match external value; RTA and categories unaffected by reconciliation action itself.
-* **Expected End State:** Users can trust reconciliation workflow end-to-end.
+    2. "Finish" button records the reconciliation event (commit).
+    3. Balances match external value; RTA and categories unaffected by reconciliation action itself.
+* **Expected End State:** Users can trust reconciliation workflow end-to-end, and a history record is created.
 
 ---
 

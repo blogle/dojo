@@ -72,3 +72,24 @@ When reconstructing the application's state as it existed at a specific historic
 4.  Filter this result set to exclude any records that were soft-deleted (i.e., those where the final version at that time was an `is_active = FALSE` record).
 
 This complex logic **must** be abstracted into reusable functions within the domain's `service.py` file to prevent errors.
+
+## 4. Reconciliation Logic
+
+Reconciliation is the act of verifying that the application's ledger matches an external source of truth (e.g., a bank statement).
+
+### Rule 1: No Automatic Adjustments
+
+The system **must NEVER** automatically create "adjustment transactions" to force the ledger to match the bank statement. If a discrepancy exists, the user must resolve it by identifying the error (missing transaction, incorrect amount, duplicate entry) and correcting the ledger using the standard SCD2 modification flow. Manual adjustment transactions are a last resort and must be created explicitly by the user.
+
+### Rule 2: Reconciliation as a Commit
+
+A successful reconciliation is a persistent "commit" event stored in the `account_reconciliations` table. It asserts that at a specific point in time (`created_at`), the sum of all *cleared* transactions matched the user-verified statement balance.
+
+### Rule 3: Drift Detection
+
+Subsequent reconciliations must query the SCD2 history to detect "drift" — changes to the ledger that affect a previously reconciled period.
+-   **Drift Query**: Identify any transaction version (active or inactive) where:
+    -   `transaction_date <= Last_Reconciliation.statement_date`
+    -   **AND** (`recorded_at > Last_Reconciliation.created_at` **OR** `valid_to > Last_Reconciliation.created_at`)
+-   This logic captures backdated inserts, edits to reconciled items, deletions of reconciled items, and moving dates in/out of the reconciled window.
+-   These transactions invalidate the previous reconciliation's closing balance and must be flagged to the user.

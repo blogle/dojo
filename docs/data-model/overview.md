@@ -28,6 +28,7 @@ The following tables make up the core data model.
 | `budget_categories`                | Stores all budget categories, both user-defined and system-level.                      | One row per category.                           | `category_id` (TEXT)   | `group_id` -> `budget_category_groups`            | The "envelopes" in the budgeting system. Can have goals associated with them.                                                                                      |
 | `transactions`                     | An immutable, versioned log of all financial transactions.                             | One row per version of a transaction.           | `transaction_version_id` (UUID) | `account_id` -> `accounts`, `category_id` -> `budget_categories` | Implemented as a Type 2 SCD. `concept_id` links different versions of the same transaction.                                                                    |
 | `budget_allocations`               | Records the explicit movement of funds between budget categories.                      | One row per allocation event.                   | `allocation_id` (UUID) | `from_category_id`, `to_category_id` -> `budget_categories` | The mechanism for "filling" the envelopes. `from_category_id` can be NULL, representing an allocation from the general "Available to Budget" pool.                  |
+| `account_reconciliations`          | Stores point-in-time confirmations of account balances against external statements.    | One row per reconciliation event.               | `reconciliation_id` (UUID) | `account_id` -> `accounts`                        | Acts as a "commit" of the ledger state. Used to detect historical drift.                                                                                           |
 | `positions`                        | Stores investment positions within an investment account.                              | One row per instrument in an account.           | `position_id` (UUID)   | `account_id` -> `accounts`                        | Tracks the quantity and market value of stocks, funds, etc.                                                                                                        |
 | `tangible_assets`                  | Stores details about tangible assets like property or vehicles.                        | One row per tangible asset.                     | `tangible_id` (UUID)   | `account_id` -> `accounts`                        | Represents physical assets that contribute to net worth.                                                                                                           |
 
@@ -93,6 +94,13 @@ erDiagram
         TEXT to_category_id FK
         BIGINT amount_minor
     }
+    account_reconciliations {
+        UUID reconciliation_id PK
+        TEXT account_id FK
+        TIMESTAMP created_at
+        DATE statement_date
+        BIGINT statement_balance_minor
+    }
     positions {
         UUID position_id PK
         TEXT account_id FK
@@ -102,6 +110,7 @@ erDiagram
     }
 
     accounts ||--o{ transactions : "has"
+    accounts ||--o{ account_reconciliations : "has"
     accounts ||--o{ positions : "has"
     budget_categories ||--o{ transactions : "has"
     budget_categories ||--o{ budget_category_monthly_state : "has"
