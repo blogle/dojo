@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 
 from tests.integration.helpers import (  # type: ignore[import]
     create_account,
-    fetch_account,
     record_transaction,
 )
 

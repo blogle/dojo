@@ -1,14 +1,13 @@
 """Budgeting domain services."""
 
 import re
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import UTC, date, datetime
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import duckdb
 
-from dojo.core import clock
 from dojo.budgeting.dao import (
     AccountRecord,
     BudgetAllocationRecord,
@@ -56,6 +55,7 @@ from dojo.budgeting.schemas import (
     TransactionUpdateRequest,
 )
 from dojo.budgeting.sql import load_sql
+from dojo.core import clock
 
 
 def derive_payment_category_id(account_id: str) -> str:

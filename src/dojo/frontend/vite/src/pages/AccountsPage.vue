@@ -142,6 +142,16 @@
                 <span>Tracking</span>
               </span>
             </div>
+            <div class="form-panel__actions form-panel__actions--split">
+              <button
+                type="button"
+                class="button button--secondary"
+                data-reconcile-button
+                @click.stop="openReconcileModal"
+              >
+                Reconcile
+              </button>
+            </div>
           </section>
 
           <!-- Add View -->
@@ -183,16 +193,20 @@
         </div>
       </div>
     </div>
+
+    <ReconciliationModal
+      :open="isReconciliationOpen"
+      :account="selectedAccount"
+      @close="closeReconciliationModal"
+    />
   </section>
 </template>
 
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
-import {
-	accountGroupDefinitions,
-	accountTypeMapping,
-} from "../constants.js";
+import { accountGroupDefinitions, accountTypeMapping } from "../constants.js";
+import ReconciliationModal from "../components/ReconciliationModal.vue";
 import { api, postOpeningBalanceTransaction } from "../services/api.js";
 import { formatAmount } from "../services/format.js";
 
@@ -201,6 +215,7 @@ const filter = ref("all");
 const isModalOpen = ref(false);
 const modalView = ref("add"); // 'add' | 'detail'
 const selectedAccount = ref(null);
+const isReconciliationOpen = ref(false);
 
 const addForm = reactive({
 	type: "checking",
@@ -322,6 +337,18 @@ const openDetailModal = (account) => {
 	modalView.value = "detail";
 	selectedAccount.value = account;
 	isModalOpen.value = true;
+};
+
+const openReconcileModal = () => {
+	if (!selectedAccount.value) {
+		return;
+	}
+	isModalOpen.value = false;
+	isReconciliationOpen.value = true;
+};
+
+const closeReconciliationModal = () => {
+	isReconciliationOpen.value = false;
 };
 
 const closeModal = () => {

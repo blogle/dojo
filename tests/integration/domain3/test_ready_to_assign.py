@@ -149,13 +149,13 @@ def test_income_transaction_increases_ready_to_assign_and_net_worth(
     assert _net_worth_minor(api_client) == income
 
     non_system_rows = pristine_db.execute(
-        (
+        
             """
             SELECT COUNT(*) FROM budget_category_monthly_state s
             INNER JOIN budget_categories c ON c.category_id = s.category_id
             WHERE c.is_system IS NOT TRUE
             """
-        )
+        
     ).fetchone()
     assert non_system_rows is not None
     assert non_system_rows[0] == 0

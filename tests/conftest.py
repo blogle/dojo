@@ -5,7 +5,7 @@ This module provides common fixtures, such as an in-memory DuckDB database,
 to ensure consistent and isolated testing for the Dojo application.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
 from importlib import resources
 
@@ -47,7 +47,9 @@ def in_memory_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def fixed_clock(monkeypatch: pytest.MonkeyPatch):
+def fixed_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[Callable[[datetime | str | None], datetime], None, None]:
     """Freeze ``dojo.core.clock.now`` so recorded_at timestamps stay deterministic."""
     from dojo.core import clock
 

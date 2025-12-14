@@ -44,25 +44,46 @@ This table stores the history of successful reconciliations.
     -   A new row is inserted into `account_reconciliations`.
     -   The system may optionally "lock" reconciled transactions (prevent editing without explicit warning) - *Implementation TBD*.
 
-## Detecting Historical Drift (SCD2 Integration)
+## The Reconciliation Worksheet (The Diff)
 
-A key feature of this design is using the SCD2 ledger to detect if previously reconciled history has been tampered with.
+There is no separation between a "Diff Report" and a "Worksheet". There is only **The Reconciliation Worksheet**.
 
-Since `account_reconciliations` records the `created_at` timestamp of the verification, we can detect "Backdated Changes" (Drift).
+The Worksheet presents the user with the set of transactions that explain the difference between the **Last Reconciled State** and the **Current Statement**.
 
-**The Drift Query:**
-We must identify any transaction *version* that affects the reconciled period (`date <= Last_Reconciliation.statement_date`) but was created or retired *after* the reconciliation occurred (`> Last_Reconciliation.created_at`).
+### The Query Logic
 
-This covers:
-1.  **New Backdated Transactions:** `valid_from > Last_Commit` AND `date <= Last_Statement_Date`.
-2.  **Modifications/Deletions of Reconciled Items:** `valid_to > Last_Commit` AND `date <= Last_Statement_Date`.
-3.  **Moving Items Out of Period:** The old version (which was in the period) will be caught by rule #2.
-4.  **Moving Items Into Period:** The new version (which is now in the period) will be caught by rule #1.
+The Worksheet contains all **Active** transaction versions that meet *either* of these criteria:
 
-> **Drift =** Any `concept_id` where at least one version matches:
-> `(valid_from > Last_Commit OR valid_to > Last_Commit) AND transaction_date <= Last_Statement_Date`
+1.  **New or Modified Since Last Commit:** Any transaction where the current version was created *after* the last reconciliation (`recorded_at > Last_Commit`).
+    *   This catches **new transactions** added since the 1st.
+    *   This catches **modifications** to previously pending items (e.g., the tip adjustment from $20 -> $25).
+    *   This catches **corrections** to previously reconciled items (e.g., fixing a wrong date).
+2.  **Pending from Previous Cycle:** Any transaction that existed before the last commit but was left as `status='pending'` (or `uncleared`).
+    *   This catches the $20 pending charge from the 1st that hasn't changed yet.
 
-These changes represent corruptions of the reconciled state and must be presented to the user as a "Drift Report" to be resolved (usually by accepting the new balance) before a new reconciliation can be finalized.
+> **Worksheet Query:**
+> ```sql
+> SELECT * FROM transactions
+> WHERE is_active = TRUE
+> AND (
+>   recorded_at > Last_Reconciliation.created_at  -- Created/Modified since last time
+>   OR
+>   status != 'cleared'                           -- Still pending from before
+> )
+> ORDER BY transaction_date
+> ```
+
+### The User Experience
+
+When the user starts a reconciliation for the 5th of the month:
+1.  They see the $25 cleared charge (modified from $20). It appears because `recorded_at > Last_Commit`.
+2.  They see the 10 new rows added between the 1st and 5th. They appear because `recorded_at > Last_Commit`.
+3.  They see the corrected transaction with the new date. It appears because its new version has `recorded_at > Last_Commit`.
+
+The user's task is simply to review this list against their bank statement.
+-   If the $25 matches the bank, they mark it `cleared`.
+-   If the 10 new rows match, they mark them `cleared`.
+-   Once the calculated **Cleared Balance** matches the **Statement Balance**, they commit.
 
 ## Invariants
 
@@ -74,4 +95,4 @@ These changes represent corruptions of the reconciled state and must be presente
 
 -   `POST /api/accounts/{id}/reconciliations`: Create a new reconciliation (commit).
 -   `GET /api/accounts/{id}/reconciliations/latest`: Get the last checkpoint to determine the starting point.
--   `GET /api/accounts/{id}/reconciliations/drift`: specific query to find SCD2 diffs since the last reconciliation.
+-   `GET /api/accounts/{id}/reconciliations/diff`: specific query to find SCD2 diffs since the last reconciliation.

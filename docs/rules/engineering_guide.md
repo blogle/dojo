@@ -85,11 +85,18 @@ The system **must NEVER** automatically create "adjustment transactions" to forc
 
 A successful reconciliation is a persistent "commit" event stored in the `account_reconciliations` table. It asserts that at a specific point in time (`created_at`), the sum of all *cleared* transactions matched the user-verified statement balance.
 
-### Rule 3: Drift Detection
+### Rule 3: Reconciliation Query Logic
 
-Subsequent reconciliations must query the SCD2 history to detect "drift" — changes to the ledger that affect a previously reconciled period.
--   **Drift Query**: Identify any transaction version (active or inactive) where:
-    -   `transaction_date <= Last_Reconciliation.statement_date`
-    -   **AND** (`recorded_at > Last_Reconciliation.created_at` **OR** `valid_to > Last_Reconciliation.created_at`)
--   This logic captures backdated inserts, edits to reconciled items, deletions of reconciled items, and moving dates in/out of the reconciled window.
--   These transactions invalidate the previous reconciliation's closing balance and must be flagged to the user.
+The reconciliation view must present a unified list of transactions that require review. It should **not** separate "diffs" from "pending" items.
+
+**The Query**:
+Select all **Active** transaction versions where:
+1.  `recorded_at > Last_Reconciliation.created_at` (New or Modified since last check)
+2.  **OR**
+3.  `status != 'cleared'` (Pending items carried over from before)
+
+This simple logic captures:
+-   New transactions.
+-   Edits to previously pending items (e.g., tip adjustments).
+-   Corrections to previously cleared items (e.g., fixing a date).
+-   Old pending items that are now ready to clear.

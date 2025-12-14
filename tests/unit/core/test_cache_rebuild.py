@@ -7,9 +7,10 @@ from importlib import resources
 
 import duckdb
 
+from dojo.core.migrate import apply_migrations
+
 cache_rebuild = importlib.import_module("dojo.core.cache_rebuild")
 rebuild_caches = cache_rebuild.rebuild_caches
-from dojo.core.migrate import apply_migrations
 
 
 def _setup_db() -> duckdb.DuckDBPyConnection:

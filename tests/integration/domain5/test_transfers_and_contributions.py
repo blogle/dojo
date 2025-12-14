@@ -16,9 +16,9 @@ from tests.integration.helpers import (  # type: ignore[import]
     fetch_account,
     fund_ready_to_assign,
     net_worth_minor,
+    perform_transfer,
     ready_to_assign,
     record_transaction,
-    perform_transfer,
 )
 
 FEBRUARY = FEBRUARY_2025

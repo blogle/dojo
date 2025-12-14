@@ -22,6 +22,7 @@ from dojo.budgeting.services import (
 from dojo.core.config import Settings, get_settings
 from dojo.core.db import get_connection
 from dojo.core.migrate import apply_migrations
+from dojo.core.reconciliation_router import router as reconciliation_router
 from dojo.core.routers import router as core_router
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # All API routes will be prefixed with "/api".
     app.include_router(core_router, prefix="/api")
     app.include_router(budgeting_router, prefix="/api")
+    app.include_router(reconciliation_router, prefix="/api")
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

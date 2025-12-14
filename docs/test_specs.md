@@ -148,17 +148,22 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     3. Invoking the rebuild command brings caches back in sync and logs the before/after delta.
 * **Expected End State:** Day-to-day mutations cannot leave `accounts` cache out of sync; the rebuild path serves as a verified remediation.
 
-### Spec 2.10: Reconciliation Commit & Drift
+### Spec 2.10: Reconciliation Worksheet Scope
 * **Test Level:** Integration
-* **Initial Condition:** Account reconciled at T1 (commit exists). Ledger matches Statement.
+* **Initial Condition:** Account reconciled at T1.
+    *   Tx_Cleared (Cleared at T1)
+    *   Tx_Pending (Pending at T1)
 * **Action:**
-    1. Insert backdated transaction `Tx_Back` with `date < T1` but `recorded_at > T1`.
-    2. Void/Delete an existing reconciled transaction `Tx_Old` (was active at T1).
-    3. Attempt new reconciliation at T2.
+    1.  T2: Modify `Tx_Pending` amount (Tip added).
+    2.  T2: Modify `Tx_Cleared` date (Correction).
+    3.  T2: Insert new `Tx_New`.
+    4.  Fetch Reconciliation Worksheet at T3.
 * **Validations:**
-    1. System flags `Tx_Back` (new insert) and `Tx_Old` (deletion) as "drift".
-    2. New reconciliation cannot proceed until drift is reviewed/cleared.
-* **Expected End State:** Integrity of past reconciliations is guarded against historical edits and deletions.
+    1.  Worksheet includes `Tx_Pending` (due to modification).
+    2.  Worksheet includes `Tx_Cleared` (due to modification).
+    3.  Worksheet includes `Tx_New` (due to being new).
+    4.  Worksheet includes any *other* old pending items (due to status).
+* **Expected End State:** A single unified list correctly identifies all items needing review.
 
 ---
 

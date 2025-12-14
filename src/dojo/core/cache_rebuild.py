@@ -5,18 +5,25 @@ from __future__ import annotations
 import argparse
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
+from functools import cache
 from pathlib import Path
-from typing import Iterable
 
 import duckdb
 
 from dojo.budgeting.services import derive_payment_category_id
 from dojo.core.config import Settings, get_settings
 from dojo.core.db import get_connection
+from dojo.core.sql import load_sql
 
 logger = logging.getLogger(__name__)
+
+
+@cache
+def _sql(name: str) -> str:
+    return load_sql(name)
 
 
 @dataclass
@@ -49,20 +56,7 @@ def rebuild_caches(
 
 def _rebuild_account_balances(conn: duckdb.DuckDBPyConnection) -> None:
     logger.info("rebuild accounts.current_balance_minor start")
-    conn.execute(
-        """
-        UPDATE accounts AS a
-        SET current_balance_minor = ledger.balance_minor,
-            updated_at = CURRENT_TIMESTAMP
-        FROM (
-            SELECT account_id, COALESCE(SUM(amount_minor), 0) AS balance_minor
-            FROM transactions
-            WHERE is_active = TRUE
-            GROUP BY account_id
-        ) AS ledger
-        WHERE a.account_id = ledger.account_id
-        """
-    )
+    conn.execute(_sql("rebuild_accounts_current_balance.sql"))
     logger.info("rebuild accounts.current_balance_minor done")
 
 
@@ -128,18 +122,7 @@ def _rebuild_budget_category_month_state(conn: duckdb.DuckDBPyConnection) -> Non
             entry = _ensure_entry(aggregates, month_index, from_category_id, month_start)
             entry.allocated -= amount
 
-    transaction_rows = conn.execute(
-        """
-        SELECT t.account_id,
-               t.category_id,
-               t.transaction_date,
-               t.amount_minor,
-               COALESCE(c.is_system, FALSE) AS is_system
-        FROM transactions AS t
-        JOIN budget_categories AS c ON c.category_id = t.category_id
-        WHERE t.is_active = TRUE
-        """
-    ).fetchall()
+    transaction_rows = conn.execute(_sql("select_active_transactions_with_category_flags.sql")).fetchall()
     for account_id, category_id, transaction_date, amount_minor, is_system in transaction_rows:
         month_start = transaction_date.replace(day=1)
         amount = int(amount_minor)
@@ -162,36 +145,26 @@ def _rebuild_budget_category_month_state(conn: duckdb.DuckDBPyConnection) -> Non
 
     conn.execute("DELETE FROM budget_category_monthly_state")
 
-    insert_rows: list[tuple[str, date, int, int, int, int]] = []
+    insert_rows: list[dict[str, int | str | date]] = []
     for category_id, months in month_index.items():
         running_available = 0
         for month_start in sorted(months):
             entry = aggregates[(category_id, month_start)]
             running_available += entry.allocated + entry.inflow - entry.activity
             insert_rows.append(
-                (
-                    category_id,
-                    month_start,
-                    entry.allocated,
-                    entry.inflow,
-                    entry.activity,
-                    running_available,
-                )
+                {
+                    "category_id": category_id,
+                    "month_start": month_start,
+                    "allocated_minor": entry.allocated,
+                    "inflow_minor": entry.inflow,
+                    "activity_minor": entry.activity,
+                    "available_minor": running_available,
+                }
             )
 
     if insert_rows:
         conn.executemany(
-            """
-            INSERT INTO budget_category_monthly_state (
-                category_id,
-                month_start,
-                allocated_minor,
-                inflow_minor,
-                activity_minor,
-                available_minor
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
+            _sql("insert_budget_category_monthly_state.sql"),
             insert_rows,
         )
     logger.info("rebuild budget_category_monthly_state done rows=%d", len(insert_rows))

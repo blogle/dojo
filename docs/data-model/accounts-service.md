@@ -92,7 +92,7 @@ A record is expected to exist in exactly one of these tables for each row in `ac
 
 ### Other Owned Tables
 
--   **`account_reconciliations`**: Stores the history of reconciliation events. Each row represents a "commit" where the user verified that the sum of cleared transactions in Dojo matched their bank statement balance. This history is used to detect subsequent modifications to the ledger that might invalidate previous validations (drift).
+-   **`account_reconciliations`**: Stores the history of reconciliation events. Each row represents a "commit" where the user verified that the sum of cleared transactions in Dojo matched their bank statement balance. The `created_at` timestamp of the latest record acts as the checkpoint for determining which transactions appear in the next reconciliation worksheet.
 -   **`tangible_assets`**: This table also stores information about tangible assets. Its purpose seems to overlap with `tangible_asset_details`. The application code should be consulted to understand the distinction. It may be a legacy table or used for a different purpose, such as tracking a history of asset values.
 
 ## Shared Tables Used by the Accounts Service

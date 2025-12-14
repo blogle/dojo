@@ -17,6 +17,7 @@ const mockResponse = (payload = {}) => ({
 
 const LEDGER_KEYS = [
 	"transactions",
+	"reconciliation-worksheet",
 	"budget-allocations",
 	"ready-to-assign",
 	"accounts",
@@ -41,7 +42,9 @@ describe("legacy mutation invalidations", () => {
 
 		await api.transactions.create({ memo: "test" });
 
-		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
+		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(
+			LEDGER_KEYS.length,
+		);
 		const calledKeys = queryClient.invalidateQueries.mock.calls.map(
 			([args]) => args?.queryKey?.[0],
 		);
@@ -58,6 +61,8 @@ describe("legacy mutation invalidations", () => {
 			"/api/transactions/tx-123",
 			expect.objectContaining({ method: "PUT" }),
 		);
-		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(LEDGER_KEYS.length);
+		expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(
+			LEDGER_KEYS.length,
+		);
 	});
 });

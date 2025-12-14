@@ -17,7 +17,6 @@ import duckdb
 from dojo.core.config import Settings, get_settings
 from dojo.core.db import get_connection
 
-
 logger = logging.getLogger(__name__)
 
 # Simple regexes to classify statements; conservative on purpose.

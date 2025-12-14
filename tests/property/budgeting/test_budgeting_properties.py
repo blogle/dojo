@@ -18,7 +18,6 @@ import duckdb
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from dojo.budgeting.dao import BudgetingDAO
 from dojo.budgeting.schemas import NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService
 from dojo.core.migrate import apply_migrations

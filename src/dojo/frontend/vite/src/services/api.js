@@ -51,6 +51,7 @@ const invalidateQueries = async (queryKeys = []) => {
 const invalidateLedgerQueries = () =>
 	invalidateQueries([
 		"transactions",
+		"reconciliation-worksheet",
 		"budget-allocations",
 		"ready-to-assign",
 		"accounts",
@@ -104,6 +105,24 @@ export const api = {
 				headers: defaultHeaders,
 				body: JSON.stringify(payload),
 			});
+			await invalidateLedgerQueries();
+			return result;
+		},
+	},
+	reconciliations: {
+		getLatest: async (accountId) =>
+			fetchJSON(`/api/accounts/${accountId}/reconciliations/latest`),
+		getWorksheet: async (accountId) =>
+			fetchJSON(`/api/accounts/${accountId}/reconciliations/worksheet`),
+		create: async (accountId, payload) => {
+			const result = await fetchJSON(
+				`/api/accounts/${accountId}/reconciliations`,
+				{
+					method: "POST",
+					headers: defaultHeaders,
+					body: JSON.stringify(payload),
+				},
+			);
 			await invalidateLedgerQueries();
 			return result;
 		},

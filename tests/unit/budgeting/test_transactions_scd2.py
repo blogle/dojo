@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import threading
+from collections.abc import Callable
+from datetime import date
 from importlib import resources
 from pathlib import Path
-import threading
-from typing import Callable
 
 import duckdb
-import pytest
 
 from dojo.budgeting.schemas import NewTransactionRequest
 from dojo.budgeting.services import TransactionEntryService

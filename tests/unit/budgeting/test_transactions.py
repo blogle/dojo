@@ -532,7 +532,7 @@ def test_transfer_cash_to_liability_updates_category_state(
         "liability",
         "loan",
         "tracking",
-        400000,
+        -400000,
     )
 
     service = TransactionEntryService()
@@ -554,8 +554,8 @@ def test_transfer_cash_to_liability_updates_category_state(
         "SELECT current_balance_minor FROM accounts WHERE account_id = 'house_loan'"
     ).fetchone()
     assert liability is not None
-    # Assert liability balance decreased by the transfer amount.
-    assert liability[0] == 400000 - amount
+    # Paying down a liability moves its (negative) balance toward zero.
+    assert liability[0] == -400000 + amount
     # Assert category available minor reflects the outflow.
     assert response.category.available_minor == -amount
 

@@ -1,8 +1,8 @@
 """Shared fixtures for integration tests."""
 
 from collections.abc import Generator
-from pathlib import Path
 from importlib import resources
+from pathlib import Path
 
 import duckdb
 import pytest

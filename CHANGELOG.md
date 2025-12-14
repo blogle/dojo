@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Account reconciliation: worksheet view + checkpoint commits from Accounts page.
+
 ## [v0.1.2] - 2025-12-11
 
 ### Added

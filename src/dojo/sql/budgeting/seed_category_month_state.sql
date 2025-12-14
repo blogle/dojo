@@ -16,8 +16,9 @@ VALUES (
         (
             SELECT available_minor
             FROM budget_category_monthly_state
-            WHERE category_id = $category_id
-              AND month_start = $previous_month
+            WHERE
+                category_id = $category_id
+                AND month_start = $previous_month
         ),
         0
     )
