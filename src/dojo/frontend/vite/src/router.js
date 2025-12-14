@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import AccountsPage from "./pages/AccountsPage.vue";
-import AllocationsPage from "./pages/AllocationsPage.vue";
 import BudgetPage from "./pages/BudgetPage.vue";
 import TransactionsPage from "./pages/TransactionsPage.vue";
 import TransfersPage from "./pages/TransfersPage.vue";
@@ -21,10 +20,6 @@ const routes = [
 	{
 		path: "/budgets",
 		component: BudgetPage,
-	},
-	{
-		path: "/allocations",
-		component: AllocationsPage,
 	},
 	{
 		path: "/transfers",

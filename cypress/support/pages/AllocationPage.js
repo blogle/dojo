@@ -14,7 +14,7 @@ class AllocationPage {
 	};
 
 	visit() {
-		cy.visit("/#/allocations");
+		cy.visit("/#/budgets");
 	}
 
 	categoryTransfer(fromCategory, toCategory, amountDollars, memo) {
@@ -52,12 +52,17 @@ class AllocationPage {
 	}
 
 	getReadyToAssign() {
-		return this.elements.readyValue().invoke("text").then((text) => {
-			return parseFloat(text.replace(/[^0-9.-]+/g, ""));
-		});
+		return this.elements
+			.readyValue()
+			.invoke("text")
+			.then((text) => {
+				return parseFloat(text.replace(/[^0-9.-]+/g, ""));
+			});
 	}
 
 	createAllocation(date, amount, from, to, memo) {
+		cy.get("[data-testid='open-allocation-modal']").click();
+		this.elements.allocationForm().should("be.visible");
 		this.elements.dateInput().type(date);
 		if (from) {
 			this.elements.fromCategorySelect().select(from);
@@ -73,13 +78,16 @@ class AllocationPage {
 	}
 
 	verifyAllocationRow(index, date, amount, from, to, memo) {
-		this.elements.tableRows().eq(index).within(() => {
-			cy.contains("td", date);
-			cy.contains("td.amount-cell", amount);
-			if (from) cy.contains("td", from);
-			if (to) cy.contains("td", to);
-			if (memo) cy.contains("td", memo);
-		});
+		this.elements
+			.tableRows()
+			.eq(index)
+			.within(() => {
+				cy.contains("td", date);
+				cy.contains("td.amount-cell", amount);
+				if (from) cy.contains("td", from);
+				if (to) cy.contains("td", to);
+				if (memo) cy.contains("td", memo);
+			});
 	}
 
 	editAllocation(index) {

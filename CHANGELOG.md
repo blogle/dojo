@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Account reconciliation: worksheet view + checkpoint commits from Accounts page.
+- Budget allocations now live inside dedicated `AllocationModal` and `AllocationTable` components so the budgets page only orchestrates data while the UI enforces the source-category-availability guard, inline edit/delete mutations, and the new spacing between tables.
+
+### Testing
+- `scripts/lint`
+- `scripts/run-tests` *(fails: Cypress could not load `cypress.config.cjs` because `@bahmutov/cypress-code-coverage/plugin` is missing in the environment; see `/tmp/dojo-run-tests-qMfHQl/e2e-tests-cypress.log` for details)*
 
 ## [v0.1.2] - 2025-12-11
 

@@ -171,6 +171,8 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
 
 **Goal:** Ensure RTA changes only via cash-class inflows and explicit allocations, with zero-sum moves between envelopes and guard rails against over-allocation.
 
+BudgetPage now delegates allocation form handling to `AllocationModal` and ledger rendering to `AllocationTable`; the new components encapsulate inline editing state, spacing between tables, and the source-category-availability guard so the UI follows the same invariant checks described below.
+
 ### Spec 3.1: Income to Cash Increases RTA
 * **Test Level:** Integration
 * **Initial Condition:** Cash account; RTA = $0.00; no budgeted funds.
@@ -189,6 +191,7 @@ These specifications are agnostic of the testing tool (e.g., Pytest vs. Cypress)
     1. Sum of budgeted equals total allocated from RTA; RTA never < 0.
     2. Category-to-category moves are zero-sum (source decreases, destination increases equally).
     3. Over-allocations raise 400/validation error and leave state unchanged.
+    4. Client-side guards (and the POST endpoint) block allocation attempts when the source category lacks available funds, matching the new UI constraint.
 * **Expected End State:** Conservation of funds across RTA and envelopes.
 
 ### Spec 3.3: Prevent Over-Allocation

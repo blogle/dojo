@@ -18,13 +18,6 @@
           Transfers
         </RouterLink>
         <RouterLink
-          to="/allocations"
-          class="app-header__link"
-          data-route-link="allocations"
-        >
-          Allocations
-        </RouterLink>
-        <RouterLink
           to="/accounts"
           class="app-header__link"
           data-route-link="accounts"

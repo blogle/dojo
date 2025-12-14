@@ -18,11 +18,11 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		const fixedNow = new Date("2025-01-15T12:00:00Z");
 		cy.clock(fixedNow.getTime());
 
-		// Visit the allocations page and wait for initial data to load
-		cy.visit("/#/allocations");
+		// Visit budgets page (allocations ledger lives here) and wait for initial data to load
+		cy.visit("/#/budgets");
 		cy.wait("@fetchAllocations");
 		// cy.wait("@fetchRTA"); // Flaky, replacing with UI check
-        cy.get("#allocations-ready-value").should("not.contain", "—");
+		cy.get("#allocations-ready-value").should("not.contain", "—");
 
 		// Optional: capture the initial RTA value, so we can assert it changed
 		cy.get("#allocations-ready-value")
@@ -94,7 +94,7 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		const fixedNow = new Date("2025-01-15T12:00:00Z");
 		cy.clock(fixedNow.getTime());
 
-		cy.visit("/#/allocations");
+		cy.visit("/#/budgets");
 		cy.wait("@fetchAllocations");
 
 		// Initial state: Groceries allocated $500.00, RTA $500.00 (from $1000 total)
@@ -103,12 +103,15 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		// Find the Groceries row and click it to edit
 		cy.contains("#allocations-body tr", "Groceries").click();
 
-        // Wait for Vue to update
-        cy.wait(500);
+		// Wait for Vue to update
+		cy.wait(500);
 
 		// Check for edit mode and delete button
 		cy.get("#allocations-body tr.is-editing").should("exist").as("editRow");
-		cy.get("@editRow").find("button[title='Delete allocation']").should("exist").as("deleteBtn");
+		cy.get("@editRow")
+			.find("button[title='Delete allocation']")
+			.should("exist")
+			.as("deleteBtn");
 
 		// Click delete
 		cy.intercept("DELETE", "/api/budget/allocations/*").as("deleteAllocation");

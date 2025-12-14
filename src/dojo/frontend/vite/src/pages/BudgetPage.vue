@@ -6,6 +6,7 @@
         <p class="u-muted u-small-note">Allocate Ready-to-Assign into envelopes.</p>
       </div>
       <div class="budgets-page__actions">
+        <button type="button" class="button button--secondary" data-testid="open-allocation-modal" @click="openAllocationModal()">Allocate funds</button>
         <button type="button" class="button button--secondary" data-testid="create-group-btn" @click="openGroupModal()">+ Add group</button>
         <button type="button" class="button button--primary" data-testid="add-budget-button" @click="openCategoryModal()">+ Add budget</button>
       </div>
@@ -108,6 +109,13 @@
         </tbody>
       </table>
     </div>
+        
+    <AllocationTable
+      :allocations="allocations"
+      :allocationCategories="allocationCategories"
+      :isLoading="isLoadingAllocations"
+      :refreshBudgetData="invalidateAll"
+    />
 
     <!-- Modals -->
     <!-- Category Modal -->
@@ -256,51 +264,63 @@
        </div>
     </div>
 
-     <!-- Group Detail Modal -->
-    <div v-if="groupDetailModalOpen && activeGroupDetail" class="modal-overlay is-visible" id="group-detail-modal" style="display: flex;" @click.self="closeGroupDetailModal">
-       <div class="modal">
-          <header class="modal__header">
-             <div>
-                <p class="stat-card__label">Group detail</p>
-                <h2>{{ activeGroupDetail.name }}</h2>
-             </div>
-             <button class="modal__close" type="button" @click="closeGroupDetailModal">×</button>
-          </header>
-          <div class="modal__body">
-             <div class="budget-detail-summary">
-                <table class="ledger-table">
-                   <tbody>
-                      <tr><td>Left over from last month</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.leftover) }}</td></tr>
-                      <tr><td>Budgeted this month</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.budgeted) }}</td></tr>
-                      <tr><td>Activity</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.activity) }}</td></tr>
-                      <tr><td>Available</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.available) }}</td></tr>
-                   </tbody>
-                </table>
-             </div>
-             <div class="quick-allocations">
-                <p class="stat-card__label">Quick allocations</p>
-                <div class="quick-allocations__actions">
-                    <p v-if="!groupQuickActions.length" class="u-muted u-small-note">No quick allocations available.</p>
-                    <button v-for="action in groupQuickActions" :key="action.label" type="button" class="secondary" @click="handleGroupQuickAllocation(action.allocations, action.label)">
-                      {{ action.label }}: {{ formatAmount(action.total) }}
-                   </button>
-                </div>
-             </div>
-             <div class="form-panel__actions form-panel__actions--split">
-                <button type="button" class="button button--secondary" @click="editGroupFromDetail">Edit group</button>
-             </div>
-          </div>
-       </div>
-    </div>
+    <!-- Group Detail Modal -->
+     <div v-if="groupDetailModalOpen && activeGroupDetail" class="modal-overlay is-visible" id="group-detail-modal" style="display: flex;" @click.self="closeGroupDetailModal">
+        <div class="modal">
+           <header class="modal__header">
+              <div>
+                 <p class="stat-card__label">Group detail</p>
+                 <h2>{{ activeGroupDetail.name }}</h2>
+              </div>
+              <button class="modal__close" type="button" @click="closeGroupDetailModal">×</button>
+           </header>
+           <div class="modal__body">
+              <div class="budget-detail-summary">
+                 <table class="ledger-table">
+                    <tbody>
+                       <tr><td>Left over from last month</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.leftover) }}</td></tr>
+                       <tr><td>Budgeted this month</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.budgeted) }}</td></tr>
+                       <tr><td>Activity</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.activity) }}</td></tr>
+                       <tr><td>Available</td><td class="ledger-table__amount">{{ formatAmount(groupDetailStats.available) }}</td></tr>
+                    </tbody>
+                 </table>
+              </div>
+              <div class="quick-allocations">
+                 <p class="stat-card__label">Quick allocations</p>
+                 <div class="quick-allocations__actions">
+                     <p v-if="!groupQuickActions.length" class="u-muted u-small-note">No quick allocations available.</p>
+                     <button v-for="action in groupQuickActions" :key="action.label" type="button" class="secondary" @click="handleGroupQuickAllocation(action.allocations, action.label)">
+                       {{ action.label }}: {{ formatAmount(action.total) }}
+                    </button>
+                 </div>
+              </div>
+              <div class="form-panel__actions form-panel__actions--split">
+                 <button type="button" class="button button--secondary" @click="editGroupFromDetail">Edit group</button>
+              </div>
+           </div>
+        </div>
+     </div>
+
+    <AllocationModal
+      :open="allocationModalOpen"
+      :allocationCategories="allocationCategories"
+      :readyToAssignMinor="readyToAssignMinor"
+      :refreshBudgetData="invalidateAll"
+      @close="closeAllocationModal"
+    />
+
 
   </section>
-</template>
+ </template>
+
 
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, reactive, ref, watch } from "vue";
 import { filterUserFacingCategories } from "../utils/categories.js";
 import { api } from "../services/api.js";
+import AllocationModal from "../components/AllocationModal.vue";
+import AllocationTable from "../components/AllocationTable.vue";
 import {
 	currentMonthStartISO,
 	dollarsToMinor,
@@ -323,6 +343,11 @@ const categoriesQuery = useQuery({
 	queryFn: () => api.budgets.categories(monthStart),
 });
 
+const allocationsQuery = useQuery({
+	queryKey: ["allocations", monthStart],
+	queryFn: () => api.budgets.allocations(monthStart),
+});
+
 const groupsQuery = useQuery({
 	queryKey: ["budget-category-groups"],
 	queryFn: api.budgets.groups,
@@ -335,6 +360,22 @@ const readyToAssignQuery = useQuery({
 
 const isLoading = computed(
 	() => categoriesQuery.isPending.value || groupsQuery.isPending.value,
+);
+
+const isLoadingAllocations = computed(
+	() => allocationsQuery.isPending.value || allocationsQuery.isFetching.value,
+);
+
+const allocations = computed(
+	() => allocationsQuery.data.value?.allocations ?? [],
+);
+
+const inflowMinor = computed(
+	() => allocationsQuery.data.value?.inflow_minor ?? 0,
+);
+
+const readyToAssignMinor = computed(
+	() => allocationsQuery.data.value?.ready_to_assign_minor ?? 0,
 );
 
 // Computed Data
@@ -359,6 +400,10 @@ const categories = computed(() => {
 		return { ...c, goal_text: goalText };
 	});
 });
+
+const allocationCategories = computed(() =>
+	[...categories.value].sort((a, b) => a.name.localeCompare(b.name)),
+);
 
 const groups = computed(() =>
 	[...(groupsQuery.data.value || [])].sort(
@@ -764,13 +809,15 @@ const editGroupFromDetail = () => {
 	openGroupModal(group);
 };
 
+const allocationModalOpen = ref(false);
+const openAllocationModal = () => {
+	allocationModalOpen.value = true;
+};
+const closeAllocationModal = () => {
+	allocationModalOpen.value = false;
+};
+
 // Quick Allocations
-const createAllocationMutation = useMutation({
-	mutationFn: api.budgets.createAllocation,
-	onSuccess: () => {
-		invalidateAll();
-	},
-});
 
 const handleQuickAllocation = async (to_category_id, amount_minor, memo) => {
 	if (readyToAssign.value < amount_minor) {
@@ -778,12 +825,13 @@ const handleQuickAllocation = async (to_category_id, amount_minor, memo) => {
 		return;
 	}
 	try {
-		await createAllocationMutation.mutateAsync({
+		await api.budgets.createAllocation({
 			to_category_id,
 			amount_minor,
 			allocation_date: todayISO(),
 			memo,
 		});
+		invalidateAll();
 		closeBudgetDetailModal();
 	} catch (e) {
 		alert(e.message || "Allocation failed");
@@ -807,6 +855,7 @@ const handleGroupQuickAllocation = async (allocations, _label) => {
 				}),
 			),
 		);
+		invalidateAll();
 		closeGroupDetailModal();
 	} catch (e) {
 		alert(e.message || "Allocation failed");
