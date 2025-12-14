@@ -9,11 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Account reconciliation: worksheet view + checkpoint commits from Accounts page.
-- Budget allocations now live inside dedicated `AllocationModal` and `AllocationTable` components so the budgets page only orchestrates data while the UI enforces the source-category-availability guard, inline edit/delete mutations, and the new spacing between tables.
+- Cache rebuild utility (`scripts/rebuild-caches`) for recomputing current balances and budgeting state.
+
+### Changed
+- Budget category availability now carries forward across months.
+- Budget allocations UI refactored into `AllocationModal` + `AllocationTable`; the budgets page now focuses on orchestration.
+- `scripts/run-tests` supports `--coverage` and merges pytest + Cypress coverage when enabled.
+- UI polish: refined border thickness and table spacing.
+
+### Fixed
+- Budget/transaction date handling: fixed missing `todayISO` import and timezone formatting drift.
+- Cypress e2e stability: pin backend date via `x-test-date`, stub `Date` in specs (without freezing timers), and anchor fixtures to explicit months.
+- Cypress code coverage is now optional, so `scripts/run-tests` no longer fails when the plugin is missing.
 
 ### Testing
-- `scripts/lint`
-- `scripts/run-tests` *(fails: Cypress could not load `cypress.config.cjs` because `@bahmutov/cypress-code-coverage/plugin` is missing in the environment; see `/tmp/dojo-run-tests-qMfHQl/e2e-tests-cypress.log` for details)*
+- Expanded unit/property coverage for budgeting invariants (goals, spending precision, SCD2 transactions).
+- Expanded and renamed integration coverage (account onboarding, month boundaries, net worth snapshots, transfers, reconciliation).
+
+### Docs
+- Added `docs/test_specs.md`, `docs/architecture/reconciliation.md`, and plans for reconciliation + spec-aligned tests; refreshed rules and data-model docs.
+
+### Removed
+- Removed stale test-spec documentation.
 
 ## [v0.1.2] - 2025-12-11
 
