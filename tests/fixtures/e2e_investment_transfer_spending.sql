@@ -49,12 +49,12 @@ VALUES
     '00000000-0000-0000-0000-0000000f1201',
     'house_checking',
     'opening_balance',
-    CURRENT_DATE,
+    DATE '2025-12-15',
     1000000,
     'Opening balance fixture',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2025-12-15 12:00:00',
+    TIMESTAMP '2025-12-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -64,12 +64,12 @@ VALUES
     '00000000-0000-0000-0000-0000000f1202',
     'brokerage_account',
     'opening_balance',
-    CURRENT_DATE,
+    DATE '2025-12-15',
     200000,
     'Opening balance fixture',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2025-12-15 12:00:00',
+    TIMESTAMP '2025-12-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -79,18 +79,18 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 UPDATE accounts
 SET
     current_balance_minor = 1000000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2025-12-15 12:00:00'
 WHERE account_id = 'house_checking';
 
 UPDATE accounts
 SET
     current_balance_minor = 200000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2025-12-15 12:00:00'
 WHERE account_id = 'brokerage_account';
 
 -- Down Payment Fund monthly budgeting state with $400 available and zero activity.
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2025-12-01' AS month_start
 )
 
 INSERT INTO budget_category_monthly_state (

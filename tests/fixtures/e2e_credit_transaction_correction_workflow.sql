@@ -65,8 +65,8 @@ VALUES
     500000,
     'Opening balance',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -80,8 +80,8 @@ VALUES
     -100000,
     'Opening balance',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -95,8 +95,8 @@ VALUES
     -50000,
     'Opening balance',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'

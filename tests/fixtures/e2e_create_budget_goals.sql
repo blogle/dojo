@@ -14,7 +14,7 @@ ON CONFLICT (account_id) DO UPDATE
         is_active = excluded.is_active,
         account_class = excluded.account_class,
         account_role = excluded.account_role,
-        updated_at = NOW();
+        updated_at = TIMESTAMP '2025-12-15 12:00:00';
 
 INSERT INTO budget_categories (category_id, name, is_active, is_system)
 VALUES ('household_misc', 'Household Misc', TRUE, FALSE)
@@ -23,10 +23,10 @@ ON CONFLICT (category_id) DO UPDATE
         name = excluded.name,
         is_active = excluded.is_active,
         is_system = excluded.is_system,
-        updated_at = NOW();
+        updated_at = TIMESTAMP '2025-12-15 12:00:00';
 
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2025-12-01' AS month_start
 )
 
 INSERT INTO budget_category_monthly_state (

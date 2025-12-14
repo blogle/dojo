@@ -1,4 +1,4 @@
-"""Integration tests for Domain 6 month-boundary behavior."""
+"""Integration tests for month-boundary behavior."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def test_month_flip_carries_available_and_resets_activity(
 ) -> None:
     """Spec 6.1 — the category rollover logic preserves availability while clearing budgeted/activity."""
 
-    cash_account = "domain6_cash"
+    cash_account = "month_boundary_cash"
     create_account(
         api_client,
         account_id=cash_account,
@@ -36,7 +36,7 @@ def test_month_flip_carries_available_and_resets_activity(
         account_class="cash",
         account_role="on_budget",
     )
-    create_category(api_client, category_id="domain6_buffer", name="Buffer")
+    create_category(api_client, category_id="rollover_buffer", name="Buffer")
 
     # January income fills Ready-to-Assign, then the envelope consumes it.
     fund_ready_to_assign(
@@ -47,18 +47,18 @@ def test_month_flip_carries_available_and_resets_activity(
     )
     allocate_from_rta(
         api_client,
-        category_id="domain6_buffer",
+        category_id="rollover_buffer",
         amount_minor=120_000,
         month_start=JANUARY,
     )
 
-    january_state = category_state(api_client, category_id="domain6_buffer", month_start=JANUARY)
+    january_state = category_state(api_client, category_id="rollover_buffer", month_start=JANUARY)
     assert january_state["available_minor"] == 120_000
     assert january_state["allocated_minor"] == 120_000
     assert january_state["activity_minor"] == 0
 
     # Query the next month to trigger rollover.
-    february_state = category_state(api_client, category_id="domain6_buffer", month_start=FEBRUARY)
+    february_state = category_state(api_client, category_id="rollover_buffer", month_start=FEBRUARY)
     assert february_state["available_minor"] == 120_000
     assert february_state["allocated_minor"] == 0
     assert february_state["activity_minor"] == 0
@@ -73,6 +73,6 @@ def test_month_flip_carries_available_and_resets_activity(
         FROM budget_category_monthly_state
         WHERE category_id = ? AND month_start = ?
         """,
-        ["domain6_buffer", FEBRUARY],
+        ["rollover_buffer", FEBRUARY],
     ).fetchone()
     assert row == (0, 0, 120_000)

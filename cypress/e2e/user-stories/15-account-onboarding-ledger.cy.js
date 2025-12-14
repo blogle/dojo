@@ -4,6 +4,8 @@ import transactionPage from "../../support/pages/TransactionPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_account_onboarding_ledger.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 const checkingAccount = {
 	type: "checking",
@@ -62,6 +64,8 @@ describe("User Story 15 — Account Onboarding Ledger Integrity", () => {
 	};
 
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/accounts*").as("fetchAccounts");

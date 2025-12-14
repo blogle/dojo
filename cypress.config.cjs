@@ -1,7 +1,37 @@
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
-const codeCoverageTask = require("@bahmutov/cypress-code-coverage/plugin");
+const COVERAGE_PLUGIN_PATH = path.join(
+	__dirname,
+	"src",
+	"dojo",
+	"frontend",
+	"vite",
+	"node_modules",
+	"@bahmutov",
+	"cypress-code-coverage",
+	"plugin.js",
+);
+
+const registerCodeCoverageTask = (on, config) => {
+	if (!process.env.CYPRESS_COVERAGE) {
+		return;
+	}
+
+	config.env = config.env || {};
+	config.env.CYPRESS_COVERAGE = process.env.CYPRESS_COVERAGE;
+
+	let codeCoverageTask = null;
+	try {
+		codeCoverageTask = require(COVERAGE_PLUGIN_PATH);
+	} catch (error) {
+		throw new Error(
+			`CYPRESS_COVERAGE is set but coverage plugin not found at ${COVERAGE_PLUGIN_PATH}. Run 'npm ci --prefix src/dojo/frontend/vite' then retry.`,
+		);
+	}
+
+	codeCoverageTask(on, config);
+};
 
 const defineConfig = (config) => config;
 const log = (...args) => console.info("[cypress-config]", ...args);
@@ -143,7 +173,7 @@ module.exports = defineConfig({
 		video: false,
 		defaultCommandTimeout: 10000,
 		setupNodeEvents(on, config) {
-			codeCoverageTask(on, config);
+			registerCodeCoverageTask(on, config);
 			on("before:run", async () => {
 				await ensureServer();
 			});
@@ -161,6 +191,9 @@ module.exports = defineConfig({
 						"--disable-dev-shm-usage",
 						"--disable-setuid-sandbox",
 						"--disable-gpu",
+						"--disable-gpu-sandbox",
+						"--use-gl=swiftshader",
+						"--disable-features=VizDisplayCompositor",
 					);
 				}
 				return launchOptions;

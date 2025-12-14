@@ -4,9 +4,13 @@ import allocationPage from "../../support/pages/AllocationPage";
 import budgetPage from "../../support/pages/BudgetPage";
 
 const FIXTURE = "tests/fixtures/e2e_categorized_allocation_ledger.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 11 — Categorized Allocation Ledger Functionality", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
@@ -16,19 +20,17 @@ describe("User Story 11 — Categorized Allocation Ledger Functionality", () => 
 	});
 
 	it("keeps Ready-to-Assign steady while both summary cards and the ledger update", () => {
-		const today = new Date().toISOString().slice(0, 10);
+		const today = Cypress.env("TEST_DATE");
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");
 		cy.wait("@fetchReady");
+		cy.wait("@fetchAllocations");
 
 		budgetPage.verifyAvailableAmount("Groceries", "$150.00");
 		budgetPage.verifyAvailableAmount("Rent", "$50.00");
 		budgetPage.verifyReadyToAssign("$900.00");
 		budgetPage.rememberReadyToAssign();
-
-		allocationPage.visit();
-		cy.wait("@fetchAllocations");
 
 		cy.get("#allocations-inflow-value").should("contain", "$500.00");
 		cy.get("#allocations-ready-value").should("contain", "$900.00");
@@ -39,8 +41,7 @@ describe("User Story 11 — Categorized Allocation Ledger Functionality", () => 
 			"50",
 			"Initial allocation",
 		);
-		cy.wait("@createAllocation");
-		cy.wait("@fetchAllocations");
+		cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
 
 		cy.get("#allocations-body tr")
 			.first()
@@ -59,17 +60,13 @@ describe("User Story 11 — Categorized Allocation Ledger Functionality", () => 
 		budgetPage.verifyAvailableAmount("Groceries", "$100.00");
 		budgetPage.verifyAvailableAmount("Rent", "$100.00");
 
-		allocationPage.visit();
-		cy.wait("@fetchAllocations");
-
 		allocationPage.categoryTransfer(
 			"Groceries",
 			"Rent",
 			"25",
 			"Increase to 75",
 		);
-		cy.wait("@createAllocation");
-		cy.wait("@fetchAllocations");
+		cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);
 
 		cy.get("#allocations-body tr")
 			.first()

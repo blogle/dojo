@@ -1,4 +1,4 @@
-"""Integration tests for Domain 3 Ready-to-Assign specs."""
+"""Integration tests for Ready-to-Assign and allocations specs."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def _perform_transfer(
         "category_id": "account_transfer",
         "amount_minor": amount_minor,
         "transaction_date": txn_date.isoformat(),
-        "memo": "domain3-transfer",
+        "memo": "rta-transfer",
     }
     response = client.post("/api/transfers", json=payload, headers=TEST_HEADERS)
     assert response.status_code == 201, response.text
@@ -135,35 +135,33 @@ def _perform_transfer(
 def test_income_transaction_increases_ready_to_assign_and_net_worth(
     api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
 ) -> None:
-    _create_cash_account(api_client, "domain3_income")
+    _create_cash_account(api_client, "rta_income_cash")
     baseline_rta = _ready_to_assign(api_client, FEBRUARY)
     income = 200_000
 
-    _record_income(api_client, account_id="domain3_income", amount_minor=income, txn_date=date(2025, 2, 10))
+    _record_income(api_client, account_id="rta_income_cash", amount_minor=income, txn_date=date(2025, 2, 10))
 
     updated_rta = _ready_to_assign(api_client, FEBRUARY)
     assert updated_rta - baseline_rta == income
 
-    account = _fetch_account(api_client, "domain3_income")
+    account = _fetch_account(api_client, "rta_income_cash")
     assert account["current_balance_minor"] == income
     assert _net_worth_minor(api_client) == income
 
     non_system_rows = pristine_db.execute(
-        
-            """
+        """
             SELECT COUNT(*) FROM budget_category_monthly_state s
             INNER JOIN budget_categories c ON c.category_id = s.category_id
             WHERE c.is_system IS NOT TRUE
             """
-        
     ).fetchone()
     assert non_system_rows is not None
     assert non_system_rows[0] == 0
 
 
 def test_allocation_guard_blocks_over_budgeting(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
-    _create_cash_account(api_client, "domain3_guard")
-    _record_income(api_client, account_id="domain3_guard", amount_minor=50_000, txn_date=date(2025, 2, 8))
+    _create_cash_account(api_client, "allocation_guard_cash")
+    _record_income(api_client, account_id="allocation_guard_cash", amount_minor=50_000, txn_date=date(2025, 2, 8))
     _create_category(api_client, "housing", "Housing")
 
     payload = {
@@ -181,8 +179,8 @@ def test_allocation_guard_blocks_over_budgeting(api_client: TestClient, pristine
 
 
 def test_category_rollover_carries_available_into_next_month(api_client: TestClient) -> None:
-    _create_cash_account(api_client, "domain3_rollover")
-    _record_income(api_client, account_id="domain3_rollover", amount_minor=120_000, txn_date=date(2025, 1, 10))
+    _create_cash_account(api_client, "rollover_cash")
+    _record_income(api_client, account_id="rollover_cash", amount_minor=120_000, txn_date=date(2025, 1, 10))
     _create_category(api_client, "buffer", "Rollover Buffer")
 
     _allocate_from_rta(
@@ -207,21 +205,21 @@ def test_category_rollover_carries_available_into_next_month(api_client: TestCli
 def test_internal_cash_transfer_is_budget_neutral(
     api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
 ) -> None:
-    _create_cash_account(api_client, "domain3_source")
-    _create_cash_account(api_client, "domain3_sink")
-    _record_income(api_client, account_id="domain3_source", amount_minor=300_000, txn_date=date(2025, 2, 5))
+    _create_cash_account(api_client, "transfer_source_cash")
+    _create_cash_account(api_client, "transfer_sink_cash")
+    _record_income(api_client, account_id="transfer_source_cash", amount_minor=300_000, txn_date=date(2025, 2, 5))
     baseline_rta = _ready_to_assign(api_client, FEBRUARY)
 
     response = _perform_transfer(
         api_client,
-        source_account_id="domain3_source",
-        destination_account_id="domain3_sink",
+        source_account_id="transfer_source_cash",
+        destination_account_id="transfer_sink_cash",
         amount_minor=300_000,
         txn_date=date(2025, 2, 6),
     )
 
-    source = _fetch_account(api_client, "domain3_source")
-    sink = _fetch_account(api_client, "domain3_sink")
+    source = _fetch_account(api_client, "transfer_source_cash")
+    sink = _fetch_account(api_client, "transfer_sink_cash")
     assert source["current_balance_minor"] == 0
     assert sink["current_balance_minor"] == 300_000
 

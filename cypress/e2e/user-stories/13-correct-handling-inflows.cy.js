@@ -5,9 +5,13 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_correct_handling_inflows.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 13 — Correct Handling of Inflows in Ledger", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
@@ -23,7 +27,7 @@ describe("User Story 13 — Correct Handling of Inflows in Ledger", () => {
 	});
 
 	it("renders a refund as a positive inflow and keeps summaries in sync", () => {
-		const today = new Date().toISOString().slice(0, 10);
+		const today = Cypress.env("TEST_DATE");
 
 		transactionPage.visit();
 		cy.wait("@fetchTransactions");
@@ -32,8 +36,8 @@ describe("User Story 13 — Correct Handling of Inflows in Ledger", () => {
 		cy.wait("@fetchBudgets");
 		cy.wait("@fetchReady");
 		budgetPage.verifyActivity("$0.00");
-        // Ensure RTA is loaded (fixture: $1,000 checking - 0 allocated = $1,000)
-        budgetPage.verifyReadyToAssign("$1,000.00");
+		// Ensure RTA is loaded (fixture: $1,000 checking - 0 allocated = $1,000)
+		budgetPage.verifyReadyToAssign("$1,000.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();

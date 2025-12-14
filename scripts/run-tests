@@ -280,10 +280,10 @@ if [[ "$SKIP_E2E" -eq 1 ]]; then
     echo "[SKIP] e2e tests (--skip-e2e)"
 elif should_run_suite e2e; then
     if [[ "$COVERAGE" -eq 1 ]]; then
-        e2e_cmd=(env CYPRESS_COVERAGE=1 npx cypress run --e2e --browser chrome)
+        e2e_cmd=(env CYPRESS_COVERAGE=1 npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome)
         E2E_COVERAGE_RAN=1
     else
-        e2e_cmd=(npx cypress run --e2e --browser chrome)
+        e2e_cmd=(npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome)
     fi
     e2e_pattern=$(suite_pattern e2e)
     if [[ -n "$e2e_pattern" ]]; then
@@ -326,7 +326,7 @@ if [[ "$COVERAGE" -eq 1 ]]; then
     fi
     if [[ "$E2E_COVERAGE_RAN" -eq 1 ]]; then
         if [[ -d .nyc_output ]] && ls .nyc_output/* >/dev/null 2>&1; then
-            if npx c8 report --clean false --temp-directory .nyc_output --reporter=lcov --reports-dir "$COVERAGE_DIR" >/dev/null 2>&1; then
+            if npx --prefix src/dojo/frontend/vite c8 report --clean false --temp-directory .nyc_output --reporter=lcov --reports-dir "$COVERAGE_DIR" >/dev/null 2>&1; then
                 echo "[OK] cypress coverage artifacts written to ${COVERAGE_DIR}/lcov.info"
             else
                 echo "[WARN] failed to write cypress coverage report" >&2

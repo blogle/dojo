@@ -1,4 +1,4 @@
-"""Integration tests for Domain 7 net worth specs."""
+"""Integration tests for net worth snapshot specs."""
 
 from __future__ import annotations
 
@@ -36,10 +36,10 @@ def test_snapshot_includes_tracking_assets_and_sums_classes(
 ) -> None:
     """Spec 7.1 — assets/liabilities arrays aggregate every active account regardless of role."""
 
-    cash_account = "domain7_cash"
-    tracking_asset = "domain7_tracking_asset"
-    credit_account = "domain7_credit"
-    loan_account = "domain7_loan"
+    cash_account = "snapshot_cash"
+    tracking_asset = "snapshot_tracking_asset"
+    credit_account = "snapshot_credit"
+    loan_account = "snapshot_loan"
 
     create_account(
         api_client,
@@ -92,7 +92,7 @@ def test_snapshot_includes_tracking_assets_and_sums_classes(
 def test_inactive_accounts_are_excluded_from_current_snapshot(api_client: TestClient) -> None:
     """Spec 7.2 — deactivating an account removes it from the live net worth feed."""
 
-    cash_account = "domain7_cash_inactive"
+    cash_account = "inactive_cash"
     create_account(
         api_client,
         account_id=cash_account,

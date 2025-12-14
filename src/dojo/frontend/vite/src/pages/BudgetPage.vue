@@ -110,6 +110,17 @@
       </table>
     </div>
         
+    <div class="budgets-summary" role="region" aria-label="Allocation summary">
+      <article class="summary-chip">
+        <span class="summary-chip__label">Cash inflow this month</span>
+        <strong id="allocations-inflow-value">{{ isLoadingAllocations ? "—" : formatAmount(inflowMinor) }}</strong>
+      </article>
+      <article class="summary-chip">
+        <span class="summary-chip__label">Ready to assign (allocations)</span>
+        <strong id="allocations-ready-value">{{ isLoadingAllocations ? "—" : formatAmount(readyToAssignMinor) }}</strong>
+      </article>
+    </div>
+
     <AllocationTable
       :allocations="allocations"
       :allocationCategories="allocationCategories"

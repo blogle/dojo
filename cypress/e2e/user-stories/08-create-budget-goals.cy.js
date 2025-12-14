@@ -1,9 +1,13 @@
 import budgetPage from "../../support/pages/BudgetPage";
 
 const FIXTURE = "tests/fixtures/e2e_create_budget_goals.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 08 — Creating a Budget (Recurring or Target Date)", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");

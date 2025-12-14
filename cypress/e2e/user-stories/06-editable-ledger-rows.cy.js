@@ -6,11 +6,13 @@ import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_editable_ledger_rows.sql";
 // Fixed date: Nov 15, 2025
+const TEST_DATE = "2025-11-15";
 const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 06 — Editable Ledger Rows", () => {
 	beforeEach(() => {
-		cy.clock(FIXED_NOW);
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		// Ensure backend is ready (checking Nov 2025 state)
@@ -36,8 +38,8 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		budgetPage.visit();
 		cy.wait(["@fetchBudgets", "@fetchRTA"]);
 		budgetPage.verifyAvailableAmount("Utilities", "$400.00");
-        // Ensure RTA is loaded (fixture: $5000 checking - $400 allocated = $4600)
-        budgetPage.verifyReadyToAssign("$4,600.00");
+		// Ensure RTA is loaded (fixture: $5000 checking - $400 allocated = $4600)
+		budgetPage.verifyReadyToAssign("$4,600.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();

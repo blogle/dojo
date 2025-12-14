@@ -1,4 +1,4 @@
-"""Integration tests for Domain 5 transfers, contributions, and payments."""
+"""Integration tests for transfers, contributions, and payments."""
 
 from __future__ import annotations
 
@@ -47,8 +47,8 @@ def _set_opening_balance(
 def test_cash_to_credit_payment_consumes_payment_category(api_client: TestClient) -> None:
     """Spec 5.1 — paying a credit card spends only from the earmarked payment envelope."""
 
-    cash_account = "domain5_cash_payment"
-    credit_account = "domain5_credit_payment"
+    cash_account = "payment_cash"
+    credit_account = "payment_card"
     create_account(
         api_client,
         account_id=cash_account,
@@ -100,8 +100,8 @@ def test_cash_to_credit_payment_consumes_payment_category(api_client: TestClient
 def test_cash_to_accessible_transfer_is_budget_neutral(api_client: TestClient) -> None:
     """Spec 5.2 — moving funds to an accessible asset preserves RTA and net worth."""
 
-    cash_account = "domain5_cash_accessible"
-    accessible_account = "domain5_accessible"
+    cash_account = "accessible_transfer_cash"
+    accessible_account = "accessible_transfer_asset"
     create_account(
         api_client,
         account_id=cash_account,
@@ -152,8 +152,8 @@ def test_cash_to_accessible_transfer_is_budget_neutral(api_client: TestClient) -
 def test_accessible_withdrawal_reclassifies_to_income(api_client: TestClient) -> None:
     """Spec 5.3 — withdrawing from an accessible asset raises Ready-to-Assign as income."""
 
-    cash_account = "domain5_cash_withdraw"
-    accessible_account = "domain5_accessible_withdraw"
+    cash_account = "accessible_withdraw_cash"
+    accessible_account = "accessible_withdraw_asset"
     create_account(
         api_client,
         account_id=cash_account,
@@ -201,8 +201,8 @@ def test_accessible_withdrawal_reclassifies_to_income(api_client: TestClient) ->
 def test_cash_to_investment_contribution_is_budget_neutral(api_client: TestClient) -> None:
     """Spec 5.4 — contributing to an investment account keeps RTA and net worth fixed."""
 
-    cash_account = "domain5_cash_invest"
-    investment_account = "domain5_invest"
+    cash_account = "investment_contrib_cash"
+    investment_account = "investment_contrib_investment"
     create_account(
         api_client,
         account_id=cash_account,
@@ -253,8 +253,8 @@ def test_cash_to_investment_contribution_is_budget_neutral(api_client: TestClien
 def test_investment_withdrawal_treated_as_income(api_client: TestClient) -> None:
     """Spec 5.5 — withdrawing from an investment account boosts RTA when categorized as income."""
 
-    cash_account = "domain5_cash_invest_withdraw"
-    investment_account = "domain5_invest_withdraw"
+    cash_account = "investment_withdraw_cash"
+    investment_account = "investment_withdraw_investment"
     create_account(
         api_client,
         account_id=cash_account,

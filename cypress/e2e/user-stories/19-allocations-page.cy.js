@@ -5,6 +5,7 @@ import budgetPage from "../../support/pages/BudgetPage";
 
 const FIXTURE = "tests/fixtures/e2e_manual_transaction_lifecycle.sql";
 // Fixed date: Nov 15, 2025
+const TEST_DATE = "2025-11-15";
 const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 19 - Allocations Page", () => {
@@ -13,7 +14,8 @@ describe("User Story 19 - Allocations Page", () => {
 		cy.on("window:before:load", (win) => {
 			win.localStorage.setItem("DOJO_TEST_DATE", isoDate);
 		});
-		cy.clock(FIXED_NOW);
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 	});

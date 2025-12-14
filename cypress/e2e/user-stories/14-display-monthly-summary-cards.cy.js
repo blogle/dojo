@@ -6,6 +6,7 @@ import allocationPage from "../../support/pages/AllocationPage";
 
 const FIXTURE = "tests/fixtures/e2e_monthly_summary_cards.sql";
 // Fixed date: Jan 15, 2024
+const TEST_DATE = "2024-01-15";
 const FIXED_NOW = new Date("2024-01-15T12:00:00Z").getTime();
 
 const formatBudgetMonthLabel = () => {
@@ -21,7 +22,8 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 	beforeEach(() => {
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
-		cy.clock(FIXED_NOW);
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchReady");

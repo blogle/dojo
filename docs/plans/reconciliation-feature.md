@@ -83,7 +83,7 @@ To allow users to verify that their Dojo ledger matches their real-world bank st
 *   `POST /api/accounts/{account_id}/reconciliations`: Accepts JSON `{ statement_date, statement_balance_minor }`. Calls `create_reconciliation`.
 
 #### 2.3 Integration Tests
-**Task:** Create `tests/integration/domain_reconciliation/test_reconciliation_api.py`.
+**Task:** Create `tests/integration/reconciliation/test_reconciliation_api.py`.
 *   **Flow:**
     1.  Create account & transactions (some cleared, some pending).
     2.  Call `POST` to reconcile (commit 1).

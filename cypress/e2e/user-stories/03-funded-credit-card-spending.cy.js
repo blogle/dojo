@@ -5,9 +5,13 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_funded_credit_card_spending.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 03 — Funded Credit Card Spending", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 	});
@@ -26,14 +30,11 @@ describe("User Story 03 — Funded Credit Card Spending", () => {
 		cy.wait("@fetchTransactions");
 		transactionPage.verifyError("");
 
-		transactionPage.elements
-			.transactionTableRows()
-			.first()
-			.within(() => {
-				cy.contains("td", "Visa Signature").should("exist");
-				cy.contains("td", "Gas").should("exist");
-				cy.contains("td.amount-cell", "$60.00");
-			});
+		cy.contains("#transactions-body tr", "Gas").within(() => {
+			cy.contains("td", "Visa Signature").should("exist");
+			cy.contains("td", "Gas").should("exist");
+			cy.contains("td.amount-cell", "$60.00");
+		});
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");

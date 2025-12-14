@@ -1,4 +1,4 @@
-"""Integration tests for Domain 1 account onboarding specs."""
+"""Integration tests for account onboarding specs."""
 
 from __future__ import annotations
 
@@ -72,14 +72,12 @@ def _net_worth_minor(client: TestClient) -> int:
 
 def _non_system_budget_commitment(conn: duckdb.DuckDBPyConnection) -> int:
     row = conn.execute(
-        
-            """
+        """
             SELECT COALESCE(SUM(allocated_minor + inflow_minor - activity_minor), 0)
             FROM budget_category_monthly_state s
             INNER JOIN budget_categories c ON c.category_id = s.category_id
             WHERE c.is_system IS NOT TRUE
             """
-        
     ).fetchone()
     return 0 if row is None else int(row[0])
 

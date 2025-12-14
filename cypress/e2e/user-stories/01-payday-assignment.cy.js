@@ -5,6 +5,8 @@ import allocationPage from "../../support/pages/AllocationPage";
 import budgetPage from "../../support/pages/BudgetPage";
 
 const PAYDAY_FIXTURE = "tests/fixtures/e2e_payday_assignment.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 const SYSTEM_CATEGORY_LABELS = [
 	"Opening Balance",
 	"Balance Adjustment",
@@ -14,6 +16,8 @@ const SYSTEM_CATEGORY_LABELS = [
 
 describe("User Story 01 — Payday Assignment", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(PAYDAY_FIXTURE);
 	});
@@ -59,8 +63,6 @@ describe("User Story 01 — Payday Assignment", () => {
 
 		allocationPage.visit();
 		cy.wait("@fetchAllocations");
-
-		allocationPage.elements.categorySelect().should("contain", "Rent");
 
 		allocationPage.recordAllocation("Rent", "1500");
 		cy.wait("@createAllocation").its("response.statusCode").should("eq", 201);

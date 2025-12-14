@@ -66,8 +66,8 @@ VALUES (
     300000,
     'Opening balance import',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -99,8 +99,8 @@ VALUES (
     -15000,
     'Groceries run',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -191,8 +191,8 @@ VALUES
     20000,
     'Initial budget',
     TRUE,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00'
 ),
 (
     '00000000-0000-0000-0000-0000000f1404',
@@ -204,7 +204,7 @@ VALUES
     25000,
     'Initial budget',
     TRUE,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
+    TIMESTAMP '2024-01-15 12:00:00',
+    TIMESTAMP '2024-01-15 12:00:00'
 );
 

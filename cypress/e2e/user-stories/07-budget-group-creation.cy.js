@@ -1,9 +1,13 @@
 import budgetPage from "../../support/pages/BudgetPage";
 
 const FIXTURE = "tests/fixtures/e2e_budget_group_creation.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 07 — Budget Group Creation and Assignment Flow", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/budget-category-groups").as("fetchGroups");

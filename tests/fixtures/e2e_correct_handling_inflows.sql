@@ -1,5 +1,5 @@
 -- Fixture for User Story 13: Correct Handling of Inflows in the ledger.
--- Seeds a funded checking account and a refund envelope so we can record a positive transaction.
+-- Anchored to the Cypress default test month: December 2025.
 
 -- Accounts
 INSERT INTO accounts (
@@ -34,8 +34,7 @@ ON CONFLICT (account_id) DO UPDATE
 
 -- Categories
 INSERT INTO budget_categories (category_id, name, is_active, is_system)
-VALUES
-('refunds', 'Refunds', TRUE, FALSE)
+VALUES ('refunds', 'Refunds', TRUE, FALSE)
 ON CONFLICT (category_id) DO UPDATE
     SET
         name = excluded.name,
@@ -63,12 +62,12 @@ VALUES (
     '00000000-0000-0000-0000-0000000f1301',
     'house_checking',
     'opening_balance',
-    CURRENT_DATE,
+    DATE '2025-12-15',
     100000,
     'Opening balance import',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2025-12-15 12:00:00',
+    TIMESTAMP '2025-12-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -78,14 +77,10 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 UPDATE accounts
 SET
     current_balance_minor = 100000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2025-12-15 12:00:00'
 WHERE account_id = 'house_checking';
 
 -- Monthly state for the Refunds envelope.
-WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
-)
-
 INSERT INTO budget_category_monthly_state (
     category_id,
     month_start,
@@ -94,14 +89,14 @@ INSERT INTO budget_category_monthly_state (
     activity_minor,
     available_minor
 )
-SELECT
+VALUES (
     'refunds',
-    month_start,
+    DATE '2025-12-01',
     0,
     0,
     0,
     0
-FROM month_start
+)
 ON CONFLICT (category_id, month_start) DO UPDATE
     SET
         allocated_minor = excluded.allocated_minor,

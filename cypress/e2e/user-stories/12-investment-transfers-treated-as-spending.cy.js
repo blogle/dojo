@@ -5,9 +5,13 @@ import accountPage from "../../support/pages/AccountPage";
 import transferPage from "../../support/pages/TransferPage";
 
 const FIXTURE = "tests/fixtures/e2e_investment_transfer_spending.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
@@ -29,10 +33,22 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 		cy.wait("@fetchNetWorth");
 		accountPage.verifyAccountBalance("House Checking", "$10,000.00");
 		accountPage.verifyAccountBalance("Brokerage", "$2,000.00");
-		cy.get("#net-worth").should("contain", "$").invoke("text").as("initialNetWorth");
-		cy.get("#ready-to-assign").should("contain", "$").invoke("text").as("initialReadyToAssign");
-		cy.get("#assets-total").should("contain", "$").invoke("text").as("initialAssets");
-		cy.get("#liabilities-total").should("contain", "$").invoke("text").as("initialLiabilities");
+		cy.get("#net-worth")
+			.should("contain", "$")
+			.invoke("text")
+			.as("initialNetWorth");
+		cy.get("#ready-to-assign")
+			.should("contain", "$")
+			.invoke("text")
+			.as("initialReadyToAssign");
+		cy.get("#assets-total")
+			.should("contain", "$")
+			.invoke("text")
+			.as("initialAssets");
+		cy.get("#liabilities-total")
+			.should("contain", "$")
+			.invoke("text")
+			.as("initialLiabilities");
 
 		transferPage.visit();
 		transferPage.createTransfer(

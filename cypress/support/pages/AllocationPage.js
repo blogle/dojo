@@ -18,6 +18,8 @@ class AllocationPage {
 	}
 
 	categoryTransfer(fromCategory, toCategory, amountDollars, memo) {
+		cy.get("[data-testid='open-allocation-modal']").click();
+		this.elements.allocationForm().should("be.visible");
 		this.elements.fromCategorySelect().select(fromCategory);
 		this.elements.categorySelect().select(toCategory);
 		const memoField = this.elements.memoInput();
@@ -30,6 +32,8 @@ class AllocationPage {
 	}
 
 	recordAllocation(categoryLabel, amountDollars) {
+		cy.get("[data-testid='open-allocation-modal']").click();
+		this.elements.allocationForm().should("be.visible");
 		this.elements.categorySelect().select(categoryLabel);
 		this.elements.amountInput().clear().type(amountDollars);
 		this.elements.submitButton().click();

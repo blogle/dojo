@@ -6,9 +6,13 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_covering_overspending.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 02 — Rolling with the Punches", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		// Ensure backend is ready before starting the test
@@ -35,8 +39,8 @@ describe("User Story 02 — Rolling with the Punches", () => {
 		});
 		budgetPage.verifyAvailableAmount("Dining Out", "$100.00");
 		budgetPage.verifyAvailableAmount("Groceries", "$500.00");
-        // Ensure RTA is loaded (fixture: $1000 checking - $600 allocated = $400)
-        budgetPage.verifyReadyToAssign("$400.00");
+		// Ensure RTA is loaded (fixture: $1000 checking - $600 allocated = $400)
+		budgetPage.verifyReadyToAssign("$400.00");
 		budgetPage.rememberReadyToAssign();
 
 		transactionPage.visit();
@@ -50,14 +54,11 @@ describe("User Story 02 — Rolling with the Punches", () => {
 		cy.wait("@fetchTransactions");
 		transactionPage.verifyError("");
 
-		transactionPage.elements
-			.transactionTableRows()
-			.first()
-			.within(() => {
-				cy.contains("td", "House Checking").should("exist");
-				cy.contains("td", "Dining Out").should("exist");
-				cy.contains("td.amount-cell", "$120.00");
-			});
+		cy.contains("#transactions-body tr", "Dining Out").within(() => {
+			cy.contains("td", "House Checking").should("exist");
+			cy.contains("td", "Dining Out").should("exist");
+			cy.contains("td.amount-cell", "$120.00");
+		});
 
 		budgetPage.visit();
 		cy.wait("@fetchBudgets");

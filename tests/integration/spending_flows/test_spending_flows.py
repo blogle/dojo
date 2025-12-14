@@ -1,4 +1,4 @@
-"""Integration tests for Domain 4 spending flow specs."""
+"""Integration tests for spending flow specs."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def test_cash_spend_updates_category_activity_and_cash_balance(
 ) -> None:
     """Spec 4.1 — cash spending touches only the cash account and chosen envelope."""
 
-    cash_account = "domain4_cash"
+    cash_account = "cash_spend_cash"
     create_account(
         api_client,
         account_id=cash_account,
@@ -86,8 +86,8 @@ def test_credit_spend_against_funded_category_preserves_rta(
 ) -> None:
     """Spec 4.2 — credit purchases consume the funded envelope and increase liability."""
 
-    cash_account = "domain4_cash_seed"
-    credit_account = "domain4_credit"
+    cash_account = "credit_spend_cash_seed"
+    credit_account = "credit_spend_card"
     create_account(
         api_client,
         account_id=cash_account,
@@ -140,8 +140,8 @@ def test_credit_spend_against_funded_category_preserves_rta(
 def test_credit_refund_improves_liability_and_restores_envelope(api_client: TestClient) -> None:
     """Spec 4.3 — refunds lower the liability and replenish the funded category."""
 
-    cash_account = "domain4_cash_refund"
-    credit_account = "domain4_credit_refund"
+    cash_account = "credit_refund_cash_seed"
+    credit_account = "credit_refund_card"
     create_account(
         api_client,
         account_id=cash_account,
@@ -197,7 +197,7 @@ def test_split_transaction_apportions_amounts_by_category(
 ) -> None:
     """Spec 4.4 — split spending keeps each envelope's share and maintains a single concept."""
 
-    cash_account = "domain4_cash_split"
+    cash_account = "split_spend_cash"
     create_account(
         api_client,
         account_id=cash_account,
@@ -254,8 +254,8 @@ def test_credit_overspend_tracks_unfunded_portion(
 ) -> None:
     """Spec 4.5 — overspending on credit isolates the unfunded portion as uncovered debt."""
 
-    cash_account = "domain4_cash_overspend"
-    credit_account = "domain4_credit_overspend"
+    cash_account = "credit_overspend_cash_seed"
+    credit_account = "credit_overspend_card"
     create_account(
         api_client,
         account_id=cash_account,

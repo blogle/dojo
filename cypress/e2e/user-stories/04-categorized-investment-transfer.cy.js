@@ -5,9 +5,13 @@ import accountPage from "../../support/pages/AccountPage";
 import transferPage from "../../support/pages/TransferPage";
 
 const FIXTURE = "tests/fixtures/e2e_categorized_investment_transfer.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 04 — Categorized Investment Transfer", () => {
 	beforeEach(() => {
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 	});

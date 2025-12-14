@@ -5,13 +5,15 @@ import budgetPage from "../../support/pages/BudgetPage";
 import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_credit_transaction_correction_workflow.sql";
+const TEST_DATE = "2024-01-15";
 const FIXED_NOW = new Date("2024-01-15T12:00:00Z").getTime();
 
 describe("User Story 16 — Credit Transaction Correction Workflow", () => {
 	beforeEach(() => {
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
-		cy.clock(FIXED_NOW);
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.intercept("POST", "/api/transactions").as("mutateTransaction");
 		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");

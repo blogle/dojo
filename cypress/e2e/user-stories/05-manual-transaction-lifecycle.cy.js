@@ -6,6 +6,7 @@ import accountPage from "../../support/pages/AccountPage";
 
 const FIXTURE = "tests/fixtures/e2e_manual_transaction_lifecycle.sql";
 // Fixed date: Nov 15, 2025
+const TEST_DATE = "2025-11-15";
 const FIXED_NOW = new Date("2025-11-15T12:00:00Z").getTime();
 
 describe("User Story 05 — Manual Transaction Lifecycle", () => {
@@ -14,7 +15,8 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		cy.on("window:before:load", (win) => {
 			win.localStorage.setItem("DOJO_TEST_DATE", isoDate);
 		});
-		cy.clock(FIXED_NOW);
+		Cypress.env("TEST_DATE", TEST_DATE);
+		cy.clock(FIXED_NOW, ["Date"]);
 		cy.resetDatabase();
 		cy.seedDatabase(FIXTURE);
 		// Ensure backend is ready (checking Nov 2025 state)
@@ -29,7 +31,7 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 
 	it("edits a pending outflow, toggles cleared, and keeps Ready-to-Assign steady", () => {
 		cy.intercept("POST", "/api/transactions").as("createTransaction");
-        cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
+		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
 		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
 		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchRTA");
@@ -39,8 +41,8 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		cy.wait("@fetchBudgets");
 		cy.wait("@fetchRTA");
 		budgetPage.verifyAvailableAmount("Dining Out", "$200.00");
-        // Ensure RTA is loaded (fixture: $10,000 checking - $200 allocated = $9,800)
-        budgetPage.verifyReadyToAssign("$9,800.00");
+		// Ensure RTA is loaded (fixture: $10,000 checking - $200 allocated = $9,800)
+		budgetPage.verifyReadyToAssign("$9,800.00");
 		budgetPage.rememberReadyToAssign();
 
 		accountPage.visit();
@@ -82,22 +84,26 @@ describe("User Story 05 — Manual Transaction Lifecycle", () => {
 		accountPage.verifyAccountBalance("House Checking", "$9,950.00");
 
 		transactionPage.visit();
-        // Clean up legacy artifacts (if any) when returning from legacy routes
-        cy.reload();
+		// Clean up legacy artifacts (if any) when returning from legacy routes
+		cy.reload();
 		cy.wait("@fetchTransactions");
 		transactionPage.editTransaction(0);
 		transactionPage.editOutflowAmount("62");
 		transactionPage.toggleTransactionStatus();
-        
-        // Verify UI updated before saving
-        cy.get("[data-inline-status-toggle]").should("have.attr", "data-state", "cleared");
+
+		// Verify UI updated before saving
+		cy.get("[data-inline-status-toggle]").should(
+			"have.attr",
+			"data-state",
+			"cleared",
+		);
 
 		transactionPage.saveInlineEdit();
 		cy.wait("@updateTransaction").then((interception) => {
-            // Verify payload
-            expect(interception.request.body.status).to.eq('cleared');
-            expect(interception.response.statusCode).to.eq(200);
-        });
+			// Verify payload
+			expect(interception.request.body.status).to.eq("cleared");
+			expect(interception.response.statusCode).to.eq(200);
+		});
 		cy.wait("@fetchTransactions");
 
 		transactionPage.verifyTransactionRowAmount(0, "$62.00");

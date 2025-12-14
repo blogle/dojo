@@ -48,12 +48,12 @@ VALUES (
     '00000000-0000-0000-0000-0000000f0201',
     'house_checking',
     'opening_balance',
-    CURRENT_DATE,
+    DATE '2025-12-15',
     100000,
     'Opening balance import',
     'cleared',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP,
+    TIMESTAMP '2025-12-15 12:00:00',
+    TIMESTAMP '2025-12-15 12:00:00',
     TIMESTAMP '9999-12-31 00:00:00',
     TRUE,
     'fixture'
@@ -63,12 +63,12 @@ ON CONFLICT (transaction_version_id) DO NOTHING;
 UPDATE accounts
 SET
     current_balance_minor = 100000,
-    updated_at = NOW()
+    updated_at = TIMESTAMP '2025-12-15 12:00:00'
 WHERE account_id = 'house_checking';
 
 -- Monthly state for Dining Out ($100) and Groceries ($500).
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2025-12-01' AS month_start
 )
 
 INSERT INTO budget_category_monthly_state (
@@ -95,7 +95,7 @@ ON CONFLICT (category_id, month_start) DO UPDATE
         available_minor = excluded.available_minor;
 
 WITH month_start AS (
-    SELECT DATE_TRUNC('month', CURRENT_DATE) AS month_start
+    SELECT DATE '2025-12-01' AS month_start
 )
 
 INSERT INTO budget_category_monthly_state (

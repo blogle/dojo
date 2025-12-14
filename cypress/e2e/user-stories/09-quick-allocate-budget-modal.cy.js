@@ -4,10 +4,14 @@ const SUFFICIENT_FIXTURE =
 	"tests/fixtures/e2e_quick_allocate_budget_sufficient.sql";
 const INSUFFICIENT_FIXTURE =
 	"tests/fixtures/e2e_quick_allocate_budget_insufficient.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
 	context("Successful Allocation", () => {
 		beforeEach(() => {
+			Cypress.env("TEST_DATE", TEST_DATE);
+			cy.clock(FIXED_NOW, ["Date"]);
 			cy.resetDatabase();
 			cy.seedDatabase(SUFFICIENT_FIXTURE);
 			cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
@@ -44,6 +48,8 @@ describe("User Story 09 — Quick Allocate Actions from Budget Modal", () => {
 
 		beforeEach(() => {
 			allocationCalled = false;
+			Cypress.env("TEST_DATE", TEST_DATE);
+			cy.clock(FIXED_NOW, ["Date"]);
 			cy.resetDatabase();
 			cy.seedDatabase(INSUFFICIENT_FIXTURE);
 			cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");

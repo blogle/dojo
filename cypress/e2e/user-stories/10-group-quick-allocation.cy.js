@@ -6,10 +6,14 @@ const INSUFFICIENT_FIXTURE =
 	"tests/fixtures/e2e_group_quick_allocate_insufficient.sql";
 const SUFFICIENT_FIXTURE =
 	"tests/fixtures/e2e_group_quick_allocate_sufficient.sql";
+const TEST_DATE = "2025-12-15";
+const FIXED_NOW = new Date("2025-12-15T12:00:00Z").getTime();
 
 describe("User Story 10 — Group-Level Quick Allocation", () => {
 	context("Insufficient Ready-to-Assign", () => {
 		beforeEach(() => {
+			Cypress.env("TEST_DATE", TEST_DATE);
+			cy.clock(FIXED_NOW, ["Date"]);
 			cy.resetDatabase();
 			cy.seedDatabase(INSUFFICIENT_FIXTURE);
 			cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
@@ -38,6 +42,8 @@ describe("User Story 10 — Group-Level Quick Allocation", () => {
 
 	context("Sufficient Ready-to-Assign", () => {
 		beforeEach(() => {
+			Cypress.env("TEST_DATE", TEST_DATE);
+			cy.clock(FIXED_NOW, ["Date"]);
 			cy.resetDatabase();
 			cy.seedDatabase(SUFFICIENT_FIXTURE);
 			cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
