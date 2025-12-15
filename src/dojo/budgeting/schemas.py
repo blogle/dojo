@@ -529,6 +529,7 @@ class AccountCommand(BaseModel):
         default=True,
         description="Marks whether the account can be used for new transactions.",
     )
+    institution_name: str | None = Field(default=None, description="Name of the banking institution.")
 
 
 class AccountCreateRequest(AccountCommand):
@@ -545,6 +546,21 @@ class AccountCreateRequest(AccountCommand):
     """
 
     account_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the account.")
+    
+    # Polymorphic fields for account details
+    interest_rate_apy: float | None = None
+    card_type: str | None = None
+    apr: float | None = None
+    cash_advance_apr: float | None = None
+    term_end_date: date | None = None
+    early_withdrawal_penalty: bool | None = None
+    risk_free_sweep_rate: float | None = None
+    is_self_directed: bool | None = None
+    tax_classification: str | None = None
+    initial_principal_minor: int | None = None
+    mortgage_escrow_details: str | None = None
+    asset_name: str | None = None
+    acquisition_cost_minor: int | None = None
 
 
 class AccountUpdateRequest(AccountCommand):
@@ -554,6 +570,20 @@ class AccountUpdateRequest(AccountCommand):
     Inherits all fields from `AccountCommand`, providing the mutable attributes
     for updating an account.
     """
+    # Polymorphic fields for account details
+    interest_rate_apy: float | None = None
+    card_type: str | None = None
+    apr: float | None = None
+    cash_advance_apr: float | None = None
+    term_end_date: date | None = None
+    early_withdrawal_penalty: bool | None = None
+    risk_free_sweep_rate: float | None = None
+    is_self_directed: bool | None = None
+    tax_classification: str | None = None
+    initial_principal_minor: int | None = None
+    mortgage_escrow_details: str | None = None
+    asset_name: str | None = None
+    acquisition_cost_minor: int | None = None
 
 
 class AccountDetail(AccountCommand):

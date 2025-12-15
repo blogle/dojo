@@ -232,6 +232,17 @@ ACCOUNT_DETAIL_INSERTS: dict[AccountClass, str] = {
     "tangible": "insert_tangible_asset_detail.sql",
 }
 
+# Maps account classes to the allowed field names for insertion.
+# This prevents passing excess parameters to the SQL queries.
+ACCOUNT_DETAIL_FIELDS: dict[AccountClass, set[str]] = {
+    "cash": {"interest_rate_apy"},
+    "credit": {"apr", "card_type", "cash_advance_apr"},
+    "investment": {"risk_free_sweep_rate", "is_self_directed", "tax_classification"},
+    "loan": {"initial_principal_minor", "interest_rate_apy", "mortgage_escrow_details"},
+    "accessible": {"interest_rate_apy", "term_end_date", "early_withdrawal_penalty"},
+    "tangible": {"asset_name", "acquisition_cost_minor"},
+}
+
 
 @dataclass(frozen=True)
 class CategoryRecord:
@@ -952,6 +963,7 @@ class BudgetingDAO:
         currency: str,
         is_active: bool,
         opened_on: date | None,
+        institution_name: str | None = None,
     ) -> None:
         """
         Inserts a new account into the database.
@@ -976,6 +988,8 @@ class BudgetingDAO:
             Whether the account is active.
         opened_on : date | None
             Optional date when the account was opened.
+        institution_name : str | None
+            Name of the institution.
         """
         # Load the SQL query for inserting a new account.
         sql = _sql("insert_account.sql")
@@ -992,10 +1006,16 @@ class BudgetingDAO:
                 "currency": currency,
                 "is_active": is_active,
                 "opened_on": opened_on,
+                "institution_name": institution_name,
             },
         )
 
-    def insert_account_detail(self, account_class: AccountClass, account_id: str) -> str:
+    def insert_account_detail(
+        self,
+        account_class: AccountClass,
+        account_id: str,
+        **kwargs: Any,
+    ) -> str:
         """
         Inserts a detailed record for a specific account class.
 
@@ -1008,6 +1028,8 @@ class BudgetingDAO:
             The class of the account (e.g., "cash", "credit").
         account_id : str
             The ID of the account to associate the detail with.
+        **kwargs : Any
+            Additional fields specific to the account detail type.
 
         Returns
         -------
@@ -1022,21 +1044,25 @@ class BudgetingDAO:
         try:
             # Look up the appropriate SQL file name based on the account class.
             sql_name = ACCOUNT_DETAIL_INSERTS[account_class]
+            allowed_fields = ACCOUNT_DETAIL_FIELDS[account_class]
         except KeyError as exc:
             # Raise an error if an unsupported account class is provided.
             raise ValueError(f"Unsupported account_class `{account_class}` for detail insert.") from exc
+        
+        # Filter kwargs to only allowed fields
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
         # Generate a new UUID for the account detail record.
         detail_id = str(uuid4())
         # Load the specific SQL query for inserting account details.
         sql = _sql(sql_name)
         # Execute the insert query with the detail ID and account ID.
-        self._conn.execute(
-            sql,
-            {
-                "detail_id": detail_id,
-                "account_id": account_id,
-            },
-        )
+        params = {
+            "detail_id": detail_id,
+            "account_id": account_id,
+            **filtered_kwargs,
+        }
+        self._conn.execute(sql, params)
         return detail_id
 
     def update_account(
@@ -1050,6 +1076,7 @@ class BudgetingDAO:
         currency: str,
         opened_on: date | None,
         is_active: bool,
+        institution_name: str | None = None,
     ) -> None:
         """
         Updates an existing account's details in the database.
@@ -1074,6 +1101,8 @@ class BudgetingDAO:
             New opened date for the account.
         is_active : bool
             New active status for the account.
+        institution_name : str | None
+            New institution name.
         """
         # Load the SQL query for updating an account.
         sql = _sql("update_account.sql")
@@ -1089,6 +1118,7 @@ class BudgetingDAO:
                 "currency": currency,
                 "opened_on": opened_on,
                 "is_active": is_active,
+                "institution_name": institution_name,
                 "account_id": account_id,
             },
         )

@@ -28,14 +28,30 @@ const creditAccount = {
 describe("User Story 15 — Account Onboarding Ledger Integrity", () => {
 	const addAccountThroughModal = (account) => {
 		cy.get("[data-add-account-button]").click();
-		cy.get("#account-modal")
-			.should("be.visible")
-			.within(() => {
-				cy.get("[name=type]").select(account.type);
-				cy.get("[name=name]").clear().type(account.name);
-				cy.get("[name=balance]").clear().type(account.balance);
-				cy.get("[data-add-account-submit]").click();
-			});
+		cy.get("#account-modal").should("be.visible");
+
+        // Step 1: Select Type
+        // account.type is "checking" or "credit", mapped to "Cash & Checking" or "Credit Card"
+        const typeLabel = account.type === "checking" ? "Cash & Checking" : "Credit Card";
+        cy.contains(".type-card", typeLabel).click();
+        cy.contains("button", "Next").click();
+
+        // Step 2: Details
+        // The label depends on type: "Account Nickname" or "Card Nickname"
+        const nameLabel = account.type === "checking" ? "Account Nickname" : "Card Nickname";
+        cy.contains("label", nameLabel).find("input").clear().type(account.name);
+        cy.contains("button", "Next").click();
+
+        // Step 3: Balance
+        // Label depends on type
+        const balanceLabel = account.type === "checking" ? "Current Ledger Balance" : "Current Amount Owed";
+        cy.contains("label", balanceLabel).find("input").clear().type(account.balance);
+        // Ensure date is filled (defaults to today, which is mocked, so fine)
+        cy.contains("button", "Next").click();
+
+        // Step 4: Review & Submit
+        cy.contains("button", "Create Account").click();
+
 		cy.wait("@createAccount").its("response.statusCode").should("eq", 201);
 		cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
 		cy.wait("@fetchAccounts");

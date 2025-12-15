@@ -8,5 +8,6 @@ SET
     currency = $currency,
     opened_on = $opened_on,
     is_active = $is_active,
+    institution_name = $institution_name,
     updated_at = CURRENT_TIMESTAMP
 WHERE account_id = $account_id;

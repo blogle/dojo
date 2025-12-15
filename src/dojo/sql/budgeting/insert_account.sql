@@ -8,6 +8,7 @@ INSERT INTO accounts (
     currency,
     is_active,
     opened_on,
+    institution_name,
     created_at,
     updated_at
 )
@@ -21,6 +22,7 @@ VALUES (
     $currency,
     $is_active,
     $opened_on,
+    $institution_name,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );

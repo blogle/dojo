@@ -1701,9 +1701,15 @@ class AccountAdminService:
                 currency=currency,
                 is_active=payload.is_active,
                 opened_on=payload.opened_on,
+                institution_name=payload.institution_name,
             )
             # Insert specific detail records based on the account class.
-            dao.insert_account_detail(payload.account_class, payload.account_id)
+            # Convert payload to dict to pass all fields
+            extra_data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+            # Remove arguments that are passed positionally to avoid "multiple values" error
+            extra_data.pop("account_class", None)
+            extra_data.pop("account_id", None)
+            dao.insert_account_detail(payload.account_class, payload.account_id, **extra_data)
             # If it's a credit account, ensure a corresponding payment category exists.
             if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
@@ -1768,9 +1774,14 @@ class AccountAdminService:
                 currency=currency,
                 opened_on=payload.opened_on,
                 is_active=payload.is_active,
+                institution_name=payload.institution_name,
             )
             # Update specific account detail records, if necessary.
-            dao.insert_account_detail(payload.account_class, account_id)
+            extra_data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+            # Remove arguments that are passed positionally
+            extra_data.pop("account_class", None)
+            extra_data.pop("account_id", None)
+            dao.insert_account_detail(payload.account_class, account_id, **extra_data)
             # If it's a credit account, ensure a corresponding payment category exists (or is updated).
             if self._should_create_payment_category(payload.account_type, payload.account_class):
                 self._ensure_credit_payment_category(
