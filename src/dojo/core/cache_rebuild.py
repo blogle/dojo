@@ -106,13 +106,20 @@ def _rebuild_budget_category_month_state(conn: duckdb.DuckDBPyConnection) -> Non
     for category_id, month_start in existing_pairs:
         _ensure_entry(aggregates, month_index, category_id, month_start)
 
-    allocation_rows = conn.execute(
-        """
+    # Check for is_active column existence to support running during migrations
+    # where the column might not exist yet (e.g. before 0011_ensure_scd2_columns.sql)
+    has_is_active = conn.execute(
+        "SELECT count(*) FROM pragma_table_info('budget_allocations') WHERE name = 'is_active'"
+    ).fetchone()[0] > 0
+
+    sql = """
         SELECT month_start, from_category_id, to_category_id, amount_minor
         FROM budget_allocations
-        WHERE COALESCE(is_active, TRUE) = TRUE
-        """
-    ).fetchall()
+    """
+    if has_is_active:
+        sql += " WHERE COALESCE(is_active, TRUE) = TRUE"
+
+    allocation_rows = conn.execute(sql).fetchall()
     for month_start, from_category_id, to_category_id, amount_minor in allocation_rows:
         amount = int(amount_minor)
         if to_category_id:
