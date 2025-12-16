@@ -23,7 +23,7 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		cy.wait("@fetchAllocations");
 
 		// Initial state: Groceries allocated $500.00, RTA $500.00 (from $1000 total)
-		cy.get("#allocations-ready-value").should("contain", "$500.00");
+		cy.get("#budgets-ready-value").should("contain", "$500.00");
 
 		// Find the Groceries row and click it to edit
 		cy.contains("#allocations-body tr", "Groceries").click();
@@ -50,6 +50,6 @@ describe("User Story 17 — Editable Allocation Ledger", () => {
 		cy.contains("#allocations-body tr", "Groceries").should("not.exist");
 
 		// Verify RTA increased back to $1000.00
-		cy.get("#allocations-ready-value").should("contain", "$1,000.00");
+		cy.get("#budgets-ready-value").should("contain", "$1,000.00");
 	});
 });

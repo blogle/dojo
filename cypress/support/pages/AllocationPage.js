@@ -8,8 +8,6 @@ class AllocationPage {
 		memoInput: () => cy.get("input[name='memo']"),
 		submitButton: () => cy.get("[data-allocation-submit]"),
 		errorDisplay: () => cy.get("[data-testid='allocation-error']"),
-		inflowValue: () => cy.get("#allocations-inflow-value"),
-		readyValue: () => cy.get("#allocations-ready-value"),
 		tableRows: () => cy.get("#allocations-body tr"),
 	};
 
@@ -45,23 +43,6 @@ class AllocationPage {
 
 	verifyFormError(errorMessage) {
 		this.verifyError(errorMessage);
-	}
-
-	verifyMonthInflow(amount) {
-		this.elements.inflowValue().should("contain", amount);
-	}
-
-	verifyReadyToAssign(amount) {
-		this.elements.readyValue().should("contain", amount);
-	}
-
-	getReadyToAssign() {
-		return this.elements
-			.readyValue()
-			.invoke("text")
-			.then((text) => {
-				return parseFloat(text.replace(/[^0-9.-]+/g, ""));
-			});
 	}
 
 	createAllocation(date, amount, from, to, memo) {

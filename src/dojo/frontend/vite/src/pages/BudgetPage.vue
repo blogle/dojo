@@ -110,23 +110,14 @@
       </table>
     </div>
         
-    <div class="budgets-summary" role="region" aria-label="Allocation summary">
-      <article class="summary-chip">
-        <span class="summary-chip__label">Cash inflow this month</span>
-        <strong id="allocations-inflow-value">{{ isLoadingAllocations ? "—" : formatAmount(inflowMinor) }}</strong>
-      </article>
-      <article class="summary-chip">
-        <span class="summary-chip__label">Ready to assign (allocations)</span>
-        <strong id="allocations-ready-value">{{ isLoadingAllocations ? "—" : formatAmount(readyToAssignMinor) }}</strong>
-      </article>
+    <div style="margin-top: 2rem;">
+      <AllocationTable
+        :allocations="allocations"
+        :allocationCategories="allocationCategories"
+        :isLoading="isLoadingAllocations"
+        :refreshBudgetData="invalidateAll"
+      />
     </div>
-
-    <AllocationTable
-      :allocations="allocations"
-      :allocationCategories="allocationCategories"
-      :isLoading="isLoadingAllocations"
-      :refreshBudgetData="invalidateAll"
-    />
 
     <!-- Modals -->
     <!-- Category Modal -->
@@ -379,10 +370,6 @@ const isLoadingAllocations = computed(
 
 const allocations = computed(
 	() => allocationsQuery.data.value?.allocations ?? [],
-);
-
-const inflowMinor = computed(
-	() => allocationsQuery.data.value?.inflow_minor ?? 0,
 );
 
 const readyToAssignMinor = computed(

@@ -32,9 +32,6 @@ describe("User Story 11 — Categorized Allocation Ledger Functionality", () => 
 		budgetPage.verifyReadyToAssign("$900.00");
 		budgetPage.rememberReadyToAssign();
 
-		cy.get("#allocations-inflow-value").should("contain", "$500.00");
-		cy.get("#allocations-ready-value").should("contain", "$900.00");
-
 		allocationPage.categoryTransfer(
 			"Groceries",
 			"Rent",
