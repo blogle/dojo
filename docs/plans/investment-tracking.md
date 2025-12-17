@@ -19,9 +19,10 @@ This ExecPlan includes, verbatim, the complete Investment Tracking specification
 
 ## Progress
 
-- [x] (2025-12-14) Authored initial ExecPlan (this document).
+- [x] (2025-12-14) Authored initial ExecPlan.
+- [x] (2025-12-17) Revised ExecPlan with schema fixes and optimizations.
 - [ ] Run `scripts/run-migrations-check --log-plan` after adding migration 0013 and ensure it is idempotent.
-- [ ] Implement database migration for securities, prices, corporate actions, SCD2 positions, and uninvested cash column.
+- [ ] Implement database migration for securities, prices, SCD2 positions, and uninvested cash column.
 - [ ] Implement backend investment domain models, SQL loaders, DAO helpers, and `MarketClient` wrapper.
 - [ ] Implement `InvestmentService` (portfolio state, reconcile workflow, market sync, history).
 - [ ] Implement API routes and integrate them into `dojo.core.app:create_app`.
@@ -53,6 +54,18 @@ Record unexpected behaviors, library quirks, DuckDB SQL limitations, yfinance ed
 - Decision: Make the portfolio reconciliation semantics “full state upsert”: the request body represents the complete desired set of positions for the account, and any active positions not present are closed as liquidated.
   Rationale: Matches Appendix A’s reconcile workflow, is simple to reason about, and supports idempotent retries.
   Date/Author: 2025-12-14 / Codex
+
+- Decision: Accept the "Net Worth Dip" behavior. When funds are transferred to an investment account, they effectively disappear from Net Worth (removed from Asset Cash) until the user manually reconciles the Investment Account (added to Uninvested Cash/NAV).
+  Rationale: Simplifies logic by avoiding heuristics or auto-creation of investment records. The system reflects the *tracked* reality.
+  Date/Author: 2025-12-17 / Codex
+
+- Decision: Drop the existing `positions` table in Migration 0013 and replace it with the new SCD2 schema.
+  Rationale: The existing table was a placeholder/MVP artifact. Data loss for current dev/test datasets is acceptable to ensure a clean schema going forward.
+  Date/Author: 2025-12-17 / Codex
+
+- Decision: Defer `corporate_actions` table creation.
+  Rationale: YAGNI. We are not implementing split/dividend automation yet, and the schema is modular enough to add it later without breaking `securities` or `market_prices`.
+  Date/Author: 2025-12-17 / Codex
 
 ## Outcomes & Retrospective
 
@@ -98,7 +111,7 @@ Terminology used throughout this plan (defined in plain language):
 
 Scope (what this plan delivers):
 
-- Database schema to represent securities, daily market prices, corporate actions, SCD2 positions, and uninvested cash.
+- Database schema to represent securities, daily market prices, SCD2 positions, and uninvested cash.
 - Backend services and APIs to:
   - reconcile (manually update) uninvested cash and current holdings,
   - compute current portfolio state (NAV and returns),
@@ -110,7 +123,7 @@ Scope (what this plan delivers):
 Non-goals (explicitly deferred, but must not block the core feature):
 
 - True Time-Weighted Return (TWR) calculation and benchmarking against indices; Appendix A calls this “future implementation”.
-- Automated corporate action adjustments (splits/dividends) beyond storing the table; ingestion and application logic can come later.
+- Automated corporate action adjustments (splits/dividends); ingestion and application logic can come later.
 - Fully generalized multi-currency support; Appendix A defaults currency to USD.
 - Perfect broker-grade precision for fractional shares; quantity is stored as `DOUBLE` per Appendix A, so the feature must be robust to small floating point error and must round only at I/O boundaries.
 
@@ -122,26 +135,27 @@ Goal: Create the schema required for investment tracking and adjust net worth to
 
 Work:
 
-- Add a new migration file `src/dojo/sql/migrations/0013_investment_tracking.sql` implementing the tables and columns described in Appendix A:
-  - `securities`
-  - `market_prices`
-  - `corporate_actions`
-  - refactored `positions` (SCD2, dropping the existing non-SCD2 table)
-  - add `uninvested_cash_minor` to `investment_account_details`
+- Add a new migration file `src/dojo/sql/migrations/0013_investment_tracking.sql`. This file must:
+  - **Drop the existing `positions` table** (`DROP TABLE IF EXISTS positions;`) to resolve the schema collision with `0001_core.sql`.
+  - Create tables described in Appendix A:
+    - `securities`
+    - `market_prices`
+    - `positions` (New SCD2 schema)
+  - Add `uninvested_cash_minor` column to `investment_account_details` (use `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
 
-- Update `src/dojo/sql/core/net_worth_current.sql` so that investment accounts are not treated as ordinary “ledger assets” and instead contribute via valuation:
-  - “Assets” becomes the sum of non-investment asset account balances.
-  - “Investments” becomes the sum over investment accounts of (uninvested cash + holdings market value).
-  - The net worth endpoint continues to return `positions_minor` as the investment component to avoid breaking the public API schema.
+- Update `src/dojo/sql/core/net_worth_current.sql` logic:
+  - **Assets**: `SUM(current_balance_minor)` where `account_type = 'asset'` **AND** `account_class != 'investment'`. (This prevents double counting the ledger cash).
+  - **Investments** (mapped to `positions_minor` output): `SUM(uninvested_cash_minor)` (from active investment_account_details) + `SUM(market_value_minor)` (from active positions * latest price).
+  - Ensure the output columns (`assets_minor`, `liabilities_minor`, `positions_minor`, etc.) map correctly to the `NetWorthRecord` dataclass in `dojo.core.dao`.
 
 - Add investment-domain SQL package scaffolding:
   - Create `src/dojo/sql/investments/__init__.py` (empty marker file).
-  - Create `src/dojo/sql/investments/portfolio_history.sql` placeholder if you want to land schema first; the real query is delivered in Milestone 4.
 
 Proof / acceptance:
 
 - Run `scripts/run-migrations-check --log-plan` from the repo root; it must succeed.
-- Existing test suites must still import and run (do not fix unrelated failures; record in Surprises & Discoveries if pre-existing).
+- Existing test suites must still import and run (do not fix unrelated failures).
+- Verify via a temporary test script that creating an account with `account_class='investment'` excludes it from the `assets_minor` sum in `net_worth_current`.
 
 ### Milestone 2: Backend domain models, SQL loaders, and market client
 
@@ -149,7 +163,7 @@ Goal: Create the backend building blocks (models + market fetching) without yet 
 
 Work:
 
-- Create `src/dojo/investments/domain.py` containing Pydantic models listed in Appendix A. Extend them as needed to be usable by API endpoints. At minimum, you will need request models in addition to response models:
+- Create `src/dojo/investments/domain.py` containing Pydantic models listed in Appendix A. Extend them as needed to be usable by API endpoints. At minimum:
 
   - Request models:
     - `CreatePositionRequest`: `{ ticker, quantity, avg_cost_minor }`.
@@ -234,9 +248,7 @@ Work:
 
   - `sync_market_data()`:
     - Select all distinct tickers from active positions.
-    - For each ticker, determine the earliest date to fetch:
-      - simplest: find the max `market_date` in `market_prices` for that security and fetch from the next day,
-      - if none exists, fetch from a conservative start (e.g., 2 years back) or from the earliest position `valid_from` date; document your choice in Decision Log.
+    - For each ticker, determine the earliest date to fetch (e.g., max market_date or conservative default).
     - Use MarketClient to fetch OHLC data.
     - Upsert into `market_prices` by `(security_id, market_date)` using `ON CONFLICT DO UPDATE`.
     - Always set `recorded_at` to the ingestion time.
@@ -260,7 +272,7 @@ Proof / acceptance:
 
   These should generate random but bounded inputs and assert identities exactly in minor units after rounding.
 
-- Update or remove obsolete tests that reference the old `positions` schema, notably `tests/property/investments/test_investments_properties.py` which currently inserts `instrument`/`market_value_minor` columns and asserts invariants that no longer hold.
+- Update or remove obsolete tests that reference the old `positions` schema, notably `tests/property/investments/test_investments_properties.py`.
 
 - Run `scripts/run-tests --filter unit:investments` and `scripts/run-tests --filter property:investments`, expect pass.
 
@@ -276,27 +288,29 @@ Work:
   - `start_date`
   - `end_date`
 
-  The query must output one row per day in `[start_date, end_date]` inclusive, even if prices are missing (fill with last known price when possible). Keep the query readable and sqlfluff-friendly.
+  The query must output one row per day in `[start_date, end_date]` inclusive.
 
-  Suggested structure:
+  **Implementation Detail (ASOF JOIN Optimization):**
 
   - Generate a date series:
-    - Use DuckDB’s `generate_series` to create `market_date` rows.
+    - Use DuckDB’s `generate_series` to create `daily.market_date` rows.
 
   - Ledger cash series:
     - Compute “ledger cash as of day” as the cumulative sum of all active ledger transactions for the account up to that date.
-    - Use only `transactions.is_active = TRUE`, producing a “restated” historical view reflecting corrections.
 
   - Uninvested cash series:
     - Join `investment_account_details` SCD2 rows by “as-of timestamp” at end-of-day.
-    - Convert the day to a timestamp boundary (e.g., `market_date + INTERVAL 1 DAY`) and pick the row with `valid_from <= boundary < valid_to`.
 
   - Positions series:
-    - Join SCD2 positions “as-of” the same boundary.
-    - Join prices:
-      - Prefer exact `market_date` match in `market_prices`.
-      - If missing, take the last available `market_prices.market_date <= market_date` for the security (last observation carried forward).
-      - If no price is available at all, treat the position value as null/0 and make the behavior explicit.
+    - Join SCD2 positions “as-of” the end of each day.
+    - **Crucial Optimization:** Use `ASOF LEFT JOIN` to attach the most recent market price for each position on each day.
+      ```sql
+      FROM positions_daily p
+      ASOF LEFT JOIN market_prices mp
+        ON p.security_id = mp.security_id
+        AND mp.market_date <= daily.market_date
+      ```
+    - Handle missing prices by treating value as 0 or null (explicit choice).
 
   - Compute per-day aggregates:
     - `holdings_value_minor = SUM(quantity * close_minor)` rounded to integer.
@@ -342,7 +356,7 @@ Proof / acceptance:
   - `GET /api/investments/accounts/<id>` returns 200 once account exists.
   - `POST /api/jobs/market-update` returns 202.
 
-- Add integration tests under `tests/integration/investments/` (or a single file `tests/integration/test_investments_api.py`) that follow Appendix A’s end-to-end flow (see Testing Strategy in Appendix A).
+- Add integration tests under `tests/integration/investments/` (or a single file `tests/integration/test_investments_api.py`) that follow Appendix A’s end-to-end flow.
 
 ### Milestone 6: Frontend investment account page (interactive chart + reconciliation UI)
 
@@ -355,8 +369,6 @@ Work (mapping Appendix A to this repository’s Vue/Vite structure):
   - Path: `/investments/:accountId`
   - Component: `src/dojo/frontend/vite/src/pages/InvestmentAccountPage.vue`
 
-  Note: Because the router uses hash history, the actual browser URL will look like `http://127.0.0.1:8000/#/investments/<accountId>` when served by the backend.
-
 - Add investment API helpers to `src/dojo/frontend/vite/src/services/api.js` under a new `api.investments` namespace:
 
   - `getAccount(accountId)`
@@ -364,7 +376,7 @@ Work (mapping Appendix A to this repository’s Vue/Vite structure):
   - `reconcile(accountId, payload)`
   - `triggerMarketUpdate()` (calls `/api/jobs/market-update` and then invalidates relevant queries)
 
-- Implement UI components (you can choose file boundaries, but keep responsibilities clear and reuse CSS classes):
+- Implement UI components:
 
   - `InvestmentAccountPage.vue`: orchestrates data fetching, manages view state, and composes subcomponents.
   - `PortfolioChart.vue`: implements the SVG chart, hover tooltip, drag-to-measure overlay, and time interval controls.
@@ -377,48 +389,22 @@ Work (mapping Appendix A to this repository’s Vue/Vite structure):
 
 - Navigation:
 
-  Appendix A describes a GlobalNavigation; this repo’s global navigation is in `src/dojo/frontend/vite/src/App.vue`. Do not remove existing links. Add a minimal navigation path to reach investment accounts:
-
   - In `src/dojo/frontend/vite/src/pages/AccountsPage.vue`, when the selected account’s `account_class` is `"investment"`, show a “View portfolio” button in the modal detail view that routes to `/investments/<account_id>`.
-
-  This keeps investments discoverable without adding a new top-level nav item immediately.
 
 - Interactions and behaviors to implement:
 
-  - Responsive grid layout with a fixed-width sidebar (320px) on desktop and stacked layout on mobile.
-  - Account header showing account name, NAV, and performance (delta $ and % for the selected time range) with green/red coloring.
-  - SVG chart:
-    - separate stroke and fill paths,
-    - gradient fill,
-    - hover cursor line, dot, tooltip,
-    - drag-to-measure overlay with delta calculation and temporary color change,
-    - time interval controls: 1D, 1W, 1M default, 3M, YTD, 1Y, Max.
-
-  - Sidebar:
-    - details card: NAV, cost basis (ledger cash), cash (uninvested), total return, account type,
-    - cash input: editable; on blur or Enter triggers an API update.
-
-  - Holdings:
-    - toggle add-position form,
-    - holdings table with columns and color-coded returns.
+  - Responsive grid layout.
+  - Account header showing account name, NAV, and performance.
+  - SVG chart with hover cursor, tooltip, and drag-to-measure.
+  - Sidebar with cash input (editable on blur/Enter).
+  - Holdings table with toggleable add-position form.
 
 Proof / acceptance:
 
-- Build and serve the frontend:
-
-  - For development, run `npm --prefix src/dojo/frontend/vite run dev` and open the Vite URL (it proxies `/api` to the backend).
-  - For production-like behavior, run `npm --prefix src/dojo/frontend/vite run build` and run the backend; the backend will serve the built `static/dist` assets.
-
+- Build and serve the frontend.
 - Manual UI verification:
-
   - Create an investment account, reconcile cash and at least one position, trigger market update, and confirm the page shows values and the chart updates when changing time ranges.
-
-- Add at least one Cypress test under `cypress/e2e/user-stories/` that verifies the core investment flow:
-
-  - create/seed an investment account,
-  - reconcile,
-  - trigger market update (mocked at backend level),
-  - assert UI shows expected NAV and holdings rows.
+- Add at least one Cypress test under `cypress/e2e/user-stories/` that verifies the core investment flow.
 
 ### Milestone 7: Deployment augmentation (scheduled market updates)
 
@@ -431,19 +417,14 @@ Work:
   - Runs `curl` (or `wget`) against `http://dojo/api/jobs/market-update`.
   - Uses `concurrencyPolicy: Forbid` so runs do not overlap.
   - Uses `restartPolicy: OnFailure`.
-  - Uses a conservative schedule (weekday evenings in UTC is a reasonable default). Document that clusters can override via overlay.
 
 - Update `deploy/k8s/base/kustomization.yaml` to include the CronJob manifest.
 
-- Update `docs/deploy.md` to document:
-
-  - the CronJob,
-  - required outbound network access (yfinance must reach Yahoo),
-  - operational expectations (single replica, Recreate strategy, background job behavior).
+- Update `docs/deploy.md` to document the CronJob and outbound network requirements.
 
 Proof / acceptance:
 
-- `kubectl apply -k deploy/k8s/base` in a test cluster should create the CronJob cleanly (this is a human step; document it).
+- `kubectl apply -k deploy/k8s/base` in a test cluster should create the CronJob cleanly. (this is a human step; document it).
 - In production logs, a scheduled run should show market update start/end lines and row counts.
 
 ## Concrete Steps
@@ -525,81 +506,8 @@ Testing acceptance:
 ## Idempotence and Recovery
 
 - Migrations must be idempotent (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`) so they can be applied repeatedly.
-- Reconciliation is designed to be safe to retry: sending the same full portfolio state twice should not create duplicate active positions; it should result in a no-op. If you cannot guarantee it, document why and add tests.
+- Reconciliation is designed to be safe to retry: sending the same full portfolio state twice should not create duplicate active positions; it should result in a no-op.
 - Market data ingestion must be safe to retry: upserts by `(security_id, market_date)` guarantee idempotence.
-- If yfinance fails mid-sync, log which tickers failed and continue syncing others. Do not leave the database in a partially written state for a single ticker.
-
-## Artifacts and Notes
-
-As implementation proceeds, capture short evidence snippets here:
-
-- Output of `scripts/run-migrations-check --log-plan`.
-- A sample curl session showing market update endpoint returning 202.
-- Example JSON response for `GET /api/investments/accounts/<id>` with realistic numbers.
-- A screenshot-equivalent description of the UI working (describe what you observed and the steps).
-
-Example curl payloads (example numbers only):
-
-    # Trigger market update
-    curl -sS -X POST http://127.0.0.1:8000/api/jobs/market-update
-
-    # Reconcile an account
-    curl -sS -X POST http://127.0.0.1:8000/api/investments/accounts/<account_id>/reconcile \
-      -H 'Content-Type: application/json' \
-      -d '{
-        "uninvested_cash_minor": 100000,
-        "positions": [
-          {"ticker": "AAPL", "quantity": 10.0, "avg_cost_minor": 10000}
-        ]
-      }'
-
-## Interfaces and Dependencies
-
-Backend modules to add (new files):
-
-- `src/dojo/investments/domain.py`
-- `src/dojo/investments/market_client.py`
-- `src/dojo/investments/dao.py`
-- `src/dojo/investments/service.py`
-- `src/dojo/investments/routers.py`
-- `src/dojo/investments/sql.py`
-
-Backend modules to update:
-
-- `src/dojo/core/app.py` (register router, attach service)
-- `src/dojo/sql/core/net_worth_current.sql` (investment-aware valuation)
-
-SQL package additions:
-
-- `src/dojo/sql/investments/__init__.py`
-- `src/dojo/sql/investments/portfolio_history.sql` (and any other investment SQL queries you add)
-
-Key external dependencies (already present in `pyproject.toml` but must be exercised safely):
-
-- `yfinance` (networked market data)
-- `pandas` (DataFrame manipulation)
-- Standard library `concurrent.futures.ThreadPoolExecutor`
-
-Frontend additions/updates:
-
-- Add route and new page/components in `src/dojo/frontend/vite/src/…`
-- Add `src/dojo/frontend/static/styles/components/investments.css`
-- Update `src/dojo/frontend/vite/src/main.js` to import the new CSS
-- Update `src/dojo/frontend/vite/src/services/api.js` to call the new investment endpoints
-- Update `src/dojo/frontend/vite/src/pages/AccountsPage.vue` to provide navigation into investment accounts
-
-Deployment additions/updates:
-
-- Add CronJob YAML under `deploy/k8s/base/`
-- Update `deploy/k8s/base/kustomization.yaml`
-- Update `docs/deploy.md` with the operational story
-
-Documentation that must be updated during implementation:
-
-- `CHANGELOG.md` under `[Unreleased]` (user-visible feature: investment tracking page and net worth integration).
-- `docs/architecture/net_worth.md` to reflect the new valuation pipeline and tables.
-- `docs/deploy.md` to reflect the new CronJob and outbound data dependency.
-- If any API schemas are added or changed in a user-visible way, update `README.md` or relevant architecture docs so onboarding remains accurate.
 
 ## Appendix A: Embedded Specification (complete, verbatim)
 
@@ -637,26 +545,26 @@ The system relies on a **"Dual-State Cash Model"** to reconcile ledger balances 
 
 All math must strictly adhere to `docs/rules/fin_math.md`.
 
-*   **Net Asset Value (NAV)**:
+* **Net Asset Value (NAV)**:
     $$ NAV_t = C_{uninvested, t} + \sum (Q_{i,t} \times P_{i,t}) $$
-    *   $C_{uninvested}$: Uninvested Cash (SCD2)
-    *   $Q_{i}$: Quantity of asset $i$
-    *   $P_{i}$: Closing price of asset $i$
+    * $C_{uninvested}$: Uninvested Cash (SCD2)
+    * $Q_{i}$: Quantity of asset $i$
+    * $P_{i}$: Closing price of asset $i$
 
-*   **Total Return (Money-Weighted - MWR)**:
+* **Total Return (Money-Weighted - MWR)**:
     $$ Return_{\$, MWR} = NAV_t - C_{ledger, t} $$
-    *   $C_{ledger}$: `accounts.current_balance` (Net transfers from ledger)
-    *   *Note on Dividends:* Dividends received in the brokerage account increase $C_{uninvested}$ (via the reconciliation workflow) but do *not* affect $C_{ledger}$ unless explicitly transferred out. Thus, they correctly contribute to the Investment Return.
+    * $C_{ledger}$: `accounts.current_balance` (Net transfers from ledger)
+    * *Note on Dividends:* Dividends received in the brokerage account increase $C_{uninvested}$ (via the reconciliation workflow) but do *not* affect $C_{ledger}$ unless explicitly transferred out. Thus, they correctly contribute to the Investment Return.
 
-*   **Total Return (%)**:
+* **Total Return (%)**:
     $$ Return_{\%, MWR} = \frac{Return_{\$, MWR}}{C_{ledger, t}} $$
-    *   *Edge Case:* If $C_{ledger} \le 0$, return % is undefined/null.
+    * *Edge Case:* If $C_{ledger} \le 0$, return % is undefined/null.
 
-*   **Unrealized Gain ($) - Per Position**:
+* **Unrealized Gain ($) - Per Position**:
     $$ Gain_i = (Q_i \times P_i) - (Q_i \times CostBasis_i) $$
 
-*   **Time-Weighted Return (TWR)**:
-    *   Future implementation will utilize the granular SCD2 history to compute TWR for accurate performance benchmarking against indices.
+* **Time-Weighted Return (TWR)**:
+    * Future implementation will utilize the granular SCD2 history to compute TWR for accurate performance benchmarking against indices.
 
 ---
 
@@ -685,14 +593,6 @@ Time-series pricing data.
 -   `volume` (BIGINT)
 -   `recorded_at` (TIMESTAMP)
 -   **Primary Key:** `(security_id, market_date)`
-
-#### `corporate_actions`
--   `action_id` (UUID, PK)
--   `security_id` (UUID, FK)
--   `action_date` (DATE)
--   `action_type` (TEXT) - 'DIVIDEND', 'SPLIT'
--   `value` (DECIMAL)
--   `recorded_at` (TIMESTAMP)
 
 #### `positions` (SCD2 Refactor)
 Drops existing table. Tracks holdings history.
@@ -750,7 +650,7 @@ Wrapper for `yfinance` to handle blocking I/O safely.
         -   Join `accounts` (Ledger Cash) history.
         -   Join `investment_account_details` (Uninvested Cash) history.
         -   Join `positions` (Holdings) history.
-        -   Join `market_prices` (Pricing).
+        -   Join `market_prices` (Pricing) using **ASOF JOIN**.
     -   Returns time-series of NAV and Returns.
 -   **`sync_market_data()`**:
     -   Selects all distinct tickers from active `positions`.
@@ -783,10 +683,10 @@ Update the SQL query to calculate Investment components dynamically:
 ## 6. Frontend Specification
 
 **Style:** Minimalist Earth Tones.
-*   **Background:** `#fdfcfb` (Off-white).
-*   **Surface:** `#ffffff` (White) with borders `#e0e0e0`.
-*   **Typography:** Sans-serif (`Inter`) for UI text; Monospace (`JetBrains Mono`) for financial data and headers.
-*   **Status Colors:** Success (`#6b8e23` - Green) and Danger (`#9c4843` - Red) used for performance metrics.
+* **Background:** `#fdfcfb` (Off-white).
+* **Surface:** `#ffffff` (White) with borders `#e0e0e0`.
+* **Typography:** Sans-serif (`Inter`) for UI text; Monospace (`JetBrains Mono`) for financial data and headers.
+* **Status Colors:** Success (`#6b8e23` - Green) and Danger (`#9c4843` - Red) used for performance metrics.
 
 ### 6.1 UI Components
 
@@ -828,7 +728,7 @@ A responsive SVG-based area chart visualizing account value over time.
 #### `SidebarDetails`
 -   **Details Card:**
     -   Key-value pairs for: NAV, Cost Basis, Cash, Total Return, and Account Type.
-    -   Total Return value is color-coded based on performance.
+    -   **Total Return** value is color-coded based on performance.
 -   **Cash Balance Card:**
     -   Input field displaying the uninvested cash amount.
     -   Right-aligned, monospace, large font weight.
@@ -847,10 +747,10 @@ A responsive SVG-based area chart visualizing account value over time.
 
 ### 6.2 Frontend Architecture (`src/dojo/frontend/static/`)
 
-*   **`components/investments/InvestmentAccountPage.js`**: Orchestrator. Fetches data, manages view state (loading/error/success).
-*   **`components/investments/PortfolioChart.js`**: D3-less SVG logic. Handles path generation, gradient definitions, and mouse event listeners (drag-to-measure logic).
-*   **`components/investments/HoldingsTable.js`**: Renders the table and the "Add Position" form.
-*   **`styles/components/investments.css`**: Scoped styles using BEM naming (e.g., `.investment-header__value`, `.chart-tooltip`).
+* **`components/investments/InvestmentAccountPage.js`**: Orchestrator. Fetches data, manages view state (loading/error/success).
+* **`components/investments/PortfolioChart.js`**: D3-less SVG logic. Handles path generation, gradient definitions, and mouse event listeners (drag-to-measure logic).
+* **`components/investments/HoldingsTable.js`**: Renders the table and the "Add Position" form.
+* **`styles/components/investments.css`**: Scoped styles using BEM naming (e.g., `.investment-header__value`, `.chart-tooltip`).
 
 ---
 
@@ -888,7 +788,3 @@ A responsive SVG-based area chart visualizing account value over time.
 5.  **Integration:** Update `net_worth_current.sql`.
 6.  **Frontend:** Build `InvestmentAccountPage`, `PortfolioChart`, `HoldingsTable`.
 7.  **Verify:** Run tests.
-
-## Revision Note
-
-Initial ExecPlan authored on 2025-12-14 to fully embed the Investment Tracking specification and expand it into an implementation-ready, milestone-driven plan with repository-specific file paths, validation steps, and deployment guidance.
