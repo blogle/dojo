@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import AccountsPage from "./pages/AccountsPage.vue";
 import BudgetPage from "./pages/BudgetPage.vue";
+import InvestmentAccountPage from "./pages/InvestmentAccountPage.vue";
 import TransactionsPage from "./pages/TransactionsPage.vue";
 import TransfersPage from "./pages/TransfersPage.vue";
 
@@ -24,6 +25,10 @@ const routes = [
 	{
 		path: "/transfers",
 		component: TransfersPage,
+	},
+	{
+		path: "/investments/:accountId",
+		component: InvestmentAccountPage,
 	},
 	{
 		path: "/:pathMatch(.*)*",

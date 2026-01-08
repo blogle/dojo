@@ -30,10 +30,62 @@ def test_current_snapshot_reflects_accounts_and_positions(
     in_memory_db : duckdb.DuckDBPyConnection
         An in-memory DuckDB connection with base fixtures applied.
     """
-    # Insert a test investment position.
+    # Insert an investment account and model its valuation via securities + prices + positions.
     in_memory_db.execute(
-        "INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor, is_active) "
-        "VALUES ('00000000-0000-0000-0000-000000000001', 'house_checking', 'SPY', 1.0, 250000, TRUE)"
+        """
+        INSERT INTO accounts (
+            account_id,
+            name,
+            account_type,
+            account_class,
+            account_role,
+            current_balance_minor,
+            currency,
+            is_active
+        )
+        VALUES ('brokerage_test', 'Brokerage Test', 'asset', 'investment', 'on_budget', 0, 'USD', TRUE)
+        """
+    )
+    in_memory_db.execute(
+        """
+        INSERT INTO investment_account_details (detail_id, account_id, uninvested_cash_minor, is_active)
+        VALUES ('00000000-0000-0000-0000-000000000010', 'brokerage_test', 0, TRUE)
+        """
+    )
+
+    in_memory_db.execute(
+        """
+        INSERT INTO securities (security_id, ticker, name, type, currency)
+        VALUES ('00000000-0000-0000-0000-000000000011', 'SPY', 'SPY', 'ETF', 'USD')
+        """
+    )
+    in_memory_db.execute(
+        """
+        INSERT INTO market_prices (security_id, market_date, close_minor, recorded_at)
+        VALUES ('00000000-0000-0000-0000-000000000011', DATE '2025-01-01', 250000, CURRENT_TIMESTAMP)
+        """
+    )
+    in_memory_db.execute(
+        """
+        INSERT INTO positions (
+            position_id,
+            concept_id,
+            account_id,
+            security_id,
+            quantity,
+            avg_cost_minor,
+            is_active
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000000012',
+            'brokerage_test',
+            '00000000-0000-0000-0000-000000000011',
+            1.0,
+            0,
+            TRUE
+        )
+        """
     )
     # Insert a test tangible asset.
     in_memory_db.execute(

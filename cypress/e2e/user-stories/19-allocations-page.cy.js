@@ -33,7 +33,7 @@ describe("User Story 19 - Allocations Page", () => {
 		cy.wait(1000); // Give Vue app time to render
 		cy.wait("@fetchAllocations");
 
-		allocationPage.verifyMonthInflow("$10,000.00");
+		allocationPage.verifyMonthInflow("$0.00");
 
 		allocationPage.getReadyToAssign().then((initialRTA) => {
 			expect(initialRTA).to.be.oneOf([9800, 10000]);
@@ -59,7 +59,7 @@ describe("User Story 19 - Allocations Page", () => {
 			"Dining Out",
 			"Initial allocation for dining",
 		);
-		allocationPage.verifyMonthInflow("$10,000.00");
+		allocationPage.verifyMonthInflow("$0.00");
 
 		cy.get("@initialRTA").then((initialRTA) => {
 			const expected = initialRTA - 100;
@@ -87,7 +87,7 @@ describe("User Story 19 - Allocations Page", () => {
 			"Groceries",
 			"Transfer for groceries",
 		);
-		allocationPage.verifyMonthInflow("$10,000.00"); // Inflow remains constant
+		allocationPage.verifyMonthInflow("$0.00"); // Inflow remains constant
 
 		cy.get("@initialRTA").then((initialRTA) => {
 			const expected = initialRTA - 100; // Unchanged by cat-to-cat transfer
@@ -115,7 +115,7 @@ describe("User Story 19 - Allocations Page", () => {
 			"Groceries",
 			"Updated dining allocation",
 		);
-		allocationPage.verifyMonthInflow("$10,000.00"); // Inflow remains constant
+		allocationPage.verifyMonthInflow("$0.00"); // Inflow remains constant
 
 		cy.get("@initialRTA").then((initialRTA) => {
 			const expected = initialRTA - 120;

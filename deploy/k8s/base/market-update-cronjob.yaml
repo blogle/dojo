@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dojo-market-update
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: market-update
+              image: curlimages/curl:8.6.0
+              imagePullPolicy: IfNotPresent
+              args:
+                - -fsS
+                - -X
+                - POST
+                - http://dojo/api/jobs/market-update

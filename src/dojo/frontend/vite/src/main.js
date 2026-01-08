@@ -13,6 +13,7 @@ import "../../static/styles/components/accounts.css";
 import "../../static/styles/components/allocations.css";
 import "../../static/styles/components/budgets.css";
 import "../../static/styles/components/transfers.css";
+import "../../static/styles/components/investments.css";
 import "../../static/styles/components/modals.css";
 import "../../static/styles/components/toast.css";
 

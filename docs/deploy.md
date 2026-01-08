@@ -97,6 +97,7 @@ Kubernetes manifests live under `deploy/k8s` in the `dojo` repository:
     └── base/
         ├── deployment.yaml
         ├── service.yaml
+        ├── market-update-cronjob.yaml
         └── kustomization.yaml
 
 - `base/` holds the canonical deployment definition (no namespaces, PVCs, or ingress).
@@ -192,6 +193,29 @@ Sensitive configuration:
   - API keys for external services.
 
 Base manifests may define ConfigMap and Secret references but should not contain actual secret values. Environment-specific manifests or external infrastructure repositories provide concrete values.
+
+---
+
+### 2.7 Base: Scheduled market updates (Investment Tracking)
+
+The investment tracking feature stores historical market prices and needs periodic refreshes.
+
+The base manifests include a `CronJob` (`deploy/k8s/base/market-update-cronjob.yaml`) that:
+
+- Runs daily at `02:00` (see `spec.schedule`).
+- Calls the internal endpoint `POST http://dojo/api/jobs/market-update`.
+- Uses `concurrencyPolicy: Forbid` so updates do not overlap.
+
+Network requirements:
+
+- The `dojo` application pod must be able to make outbound HTTPS requests to Yahoo Finance (via `yfinance`).
+- If your cluster enforces egress network policies, allow outbound internet access for the `dojo` pod.
+
+Validation (human step):
+
+- Apply the base: `kubectl apply -k deploy/k8s/base`.
+- Confirm the CronJob exists: `kubectl get cronjob dojo-market-update`.
+- Inspect job logs after a run: `kubectl logs job/<job-name>`.
 
 ---
 

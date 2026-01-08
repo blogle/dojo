@@ -39,9 +39,10 @@ const invalidateQueries = async (queryKeys = []) => {
 	}
 	try {
 		await Promise.all(
-			queryKeys.map((queryKey) =>
-				queryClient.invalidateQueries({ queryKey: [queryKey] }),
-			),
+			queryKeys.map((queryKey) => {
+				const normalized = Array.isArray(queryKey) ? queryKey : [queryKey];
+				return queryClient.invalidateQueries({ queryKey: normalized });
+			}),
 		);
 	} catch (error) {
 		console.warn("queryClient invalidation failed", error);
@@ -129,6 +130,42 @@ export const api = {
 	},
 	netWorth: {
 		current: async () => fetchJSON("/api/net-worth/current"),
+	},
+	investments: {
+		getAccount: async (accountId) =>
+			fetchJSON(`/api/investments/accounts/${accountId}`),
+		getHistory: async (accountId, startDate, endDate) =>
+			fetchJSON(
+				`/api/investments/accounts/${accountId}/history?start_date=${startDate}&end_date=${endDate}`,
+			),
+		reconcile: async (accountId, payload) => {
+			const result = await fetchJSON(
+				`/api/investments/accounts/${accountId}/reconcile`,
+				{
+					method: "POST",
+					headers: defaultHeaders,
+					body: JSON.stringify(payload),
+				},
+			);
+			await invalidateQueries([
+				["investment-account", accountId],
+				"netWorth",
+				"accounts",
+			]);
+			return result;
+		},
+		triggerMarketUpdate: async () => {
+			const result = await fetchJSON("/api/jobs/market-update", {
+				method: "POST",
+			});
+			await invalidateQueries([
+				"netWorth",
+				"accounts",
+				"investment-account",
+				"investment-history",
+			]);
+			return result;
+		},
 	},
 	readyToAssign: {
 		current: async (month) =>

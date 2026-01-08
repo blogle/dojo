@@ -91,7 +91,13 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 			.invoke("text")
 			.then((assetsAfter) => {
 				cy.get("@initialAssets").then((initialAssets) => {
-					expect(assetsAfter.trim()).to.eq(initialAssets.trim());
+					const initialValue = Number.parseFloat(
+						initialAssets.replace(/[^0-9.-]/g, ""),
+					);
+					const afterValue = Number.parseFloat(
+						assetsAfter.replace(/[^0-9.-]/g, ""),
+					);
+					expect(afterValue).to.eq(initialValue - 400);
 				});
 			});
 

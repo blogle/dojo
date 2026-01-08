@@ -92,6 +92,8 @@ def test_net_worth_matches_manual_computation(
     with ledger_connection() as conn:
         # Clear existing data to ensure a clean state for each test run.
         conn.execute("DELETE FROM positions")
+        conn.execute("DELETE FROM market_prices")
+        conn.execute("DELETE FROM securities")
         conn.execute("DELETE FROM tangible_assets")
         conn.execute("DELETE FROM cash_account_details")
         conn.execute("DELETE FROM credit_account_details")
@@ -101,33 +103,76 @@ def test_net_worth_matches_manual_computation(
         conn.execute("DELETE FROM tangible_asset_details")
         conn.execute("DELETE FROM accounts")
 
-        # Insert generated asset accounts.
+        # Insert generated asset accounts (non-investment) so they map to assets_minor.
         for idx, value in enumerate(assets):
             conn.execute(
                 """
-                INSERT INTO accounts (account_id, name, account_type, current_balance_minor, currency, is_active)
-                VALUES (?, ?, 'asset', ?, 'USD', TRUE)
+                INSERT INTO accounts (
+                    account_id, name, account_type, current_balance_minor, currency, is_active, account_class
+                )
+                VALUES (?, ?, 'asset', ?, 'USD', TRUE, 'cash')
                 """,
                 [f"asset_{idx}", f"Asset {idx}", value],
             )
+
         # Insert generated liability accounts.
         for idx, value in enumerate(liabilities):
             conn.execute(
                 """
-                INSERT INTO accounts (account_id, name, account_type, current_balance_minor, currency, is_active)
-                VALUES (?, ?, 'liability', ?, 'USD', TRUE)
+                INSERT INTO accounts (
+                    account_id, name, account_type, current_balance_minor, currency, is_active, account_class
+                )
+                VALUES (?, ?, 'liability', ?, 'USD', TRUE, 'credit')
                 """,
                 [f"liability_{idx}", f"Liability {idx}", -value],
             )
-        # Insert generated investment positions.
-        for value in positions:
-            # Assuming 'asset_0' exists from the assets loop, or create a dummy one.
+
+        # Insert a single investment account, which is excluded from assets_minor.
+        investment_account_id = "investment_0"
+        conn.execute(
+            """
+            INSERT INTO accounts (
+                account_id, name, account_type, current_balance_minor, currency, is_active, account_class
+            )
+            VALUES (?, 'Investment 0', 'asset', 0, 'USD', TRUE, 'investment')
+            """,
+            [investment_account_id],
+        )
+        conn.execute(
+            """
+            INSERT INTO investment_account_details (detail_id, account_id, uninvested_cash_minor, is_active)
+            VALUES (?, ?, 0, TRUE)
+            """,
+            [str(uuid4()), investment_account_id],
+        )
+
+        # Insert generated investment valuations via positions + latest close price.
+        # We model each generated value as quantity=1.0 at close_minor=value.
+        for idx, value in enumerate(positions):
+            security_id = str(uuid4())
+            ticker = f"TICK{idx}"
             conn.execute(
                 """
-                INSERT INTO positions (position_id, account_id, instrument, quantity, market_value_minor, is_active)
-                VALUES (?, 'asset_0', ?, 1.0, ?, TRUE)
+                INSERT INTO securities (security_id, ticker, name, type, currency)
+                VALUES (?, ?, ?, 'STOCK', 'USD')
                 """,
-                [str(uuid4()), "TICK", value],
+                [security_id, ticker, ticker],
+            )
+            conn.execute(
+                """
+                INSERT INTO market_prices (security_id, market_date, close_minor, recorded_at)
+                VALUES (?, DATE '2025-01-01', ?, CURRENT_TIMESTAMP)
+                """,
+                [security_id, value],
+            )
+            conn.execute(
+                """
+                INSERT INTO positions (
+                    position_id, concept_id, account_id, security_id, quantity, avg_cost_minor, is_active
+                )
+                VALUES (?, ?, ?, ?, 1.0, 0, TRUE)
+                """,
+                [str(uuid4()), str(uuid4()), investment_account_id, security_id],
             )
 
         # Retrieve the net worth snapshot.

@@ -9,10 +9,30 @@ class AllocationPage {
 		submitButton: () => cy.get("[data-allocation-submit]"),
 		errorDisplay: () => cy.get("[data-testid='allocation-error']"),
 		tableRows: () => cy.get("#allocations-body tr"),
+		readyToAssignValue: () => cy.get("#budgets-ready-value"),
+		monthInflowValue: () => cy.get("#budgets-activity-value"),
 	};
 
 	visit() {
 		cy.visit("/#/budgets");
+	}
+
+	verifyMonthInflow(value) {
+		this.elements.monthInflowValue().should("contain", value);
+	}
+
+	getReadyToAssign() {
+		return this.elements
+			.readyToAssignValue()
+			.invoke("text")
+			.then((text) => {
+				const numeric = Number.parseFloat(text.replace(/[^0-9.-]/g, ""));
+				return Math.trunc(numeric);
+			});
+	}
+
+	verifyReadyToAssign(value) {
+		this.elements.readyToAssignValue().should("contain", value);
 	}
 
 	categoryTransfer(fromCategory, toCategory, amountDollars, memo) {

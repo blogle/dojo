@@ -12,7 +12,7 @@ TEST_HEADERS = {"X-Test-Date": "2025-02-15"}
 
 def _create_account_extended(
     client: TestClient,
-    **kwargs,
+    **kwargs: object,
 ) -> dict:
     payload = {
         "current_balance_minor": 0,
@@ -25,9 +25,7 @@ def _create_account_extended(
     return response.json()
 
 
-def test_wizard_cash_account_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_cash_account_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Spec 1.1 variant: Verify Cash account creation with wizard fields."""
     account_id = "wizard_cash_01"
     res = _create_account_extended(
@@ -41,11 +39,9 @@ def test_wizard_cash_account_creation(
         interest_rate_apy=0.015,
     )
     assert res["account_id"] == account_id
-    
+
     # Verify main table
-    row = pristine_db.execute(
-        "SELECT institution_name FROM accounts WHERE account_id = ?", [account_id]
-    ).fetchone()
+    row = pristine_db.execute("SELECT institution_name FROM accounts WHERE account_id = ?", [account_id]).fetchone()
     assert row[0] == "Chase"
 
     # Verify detail table
@@ -57,9 +53,7 @@ def test_wizard_cash_account_creation(
     assert row_detail[0] == 0.015
 
 
-def test_wizard_credit_card_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_credit_card_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Spec 1.2 variant: Verify Credit account creation with wizard fields."""
     account_id = "wizard_credit_01"
     _create_account_extended(
@@ -90,9 +84,7 @@ def test_wizard_credit_card_creation(
     assert row_detail[2] == 29.99
 
 
-def test_wizard_loan_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_loan_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Spec 1.3 variant: Verify Loan account creation with wizard fields."""
     account_id = "wizard_loan_01"
     _create_account_extended(
@@ -123,9 +115,7 @@ def test_wizard_loan_creation(
     assert row_detail[2] == "Includes taxes"
 
 
-def test_wizard_investment_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_investment_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Spec 1.4 variant: Verify Investment account creation with wizard fields."""
     account_id = "wizard_invest_01"
     _create_account_extended(
@@ -156,9 +146,7 @@ def test_wizard_investment_creation(
     assert row_detail[2] == "Roth IRA"
 
 
-def test_wizard_accessible_asset_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_accessible_asset_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Verify Accessible Asset creation with wizard fields."""
     account_id = "wizard_accessible_01"
     term_end = date(2026, 12, 31)
@@ -191,9 +179,7 @@ def test_wizard_accessible_asset_creation(
     assert row_detail[2] is True
 
 
-def test_wizard_tangible_asset_creation(
-    api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection
-) -> None:
+def test_wizard_tangible_asset_creation(api_client: TestClient, pristine_db: duckdb.DuckDBPyConnection) -> None:
     """Verify Tangible Asset creation with wizard fields."""
     account_id = "wizard_tangible_01"
     _create_account_extended(

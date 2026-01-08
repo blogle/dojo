@@ -1014,7 +1014,7 @@ class BudgetingDAO:
         self,
         account_class: AccountClass,
         account_id: str,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> str:
         """
         Inserts a detailed record for a specific account class.
@@ -1048,7 +1048,7 @@ class BudgetingDAO:
         except KeyError as exc:
             # Raise an error if an unsupported account class is provided.
             raise ValueError(f"Unsupported account_class `{account_class}` for detail insert.") from exc
-        
+
         # Filter kwargs to only allowed fields
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in allowed_fields}
 

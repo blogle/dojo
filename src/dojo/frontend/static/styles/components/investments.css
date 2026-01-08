@@ -1,0 +1,241 @@
+.investments-page {
+	padding: 1.75rem 2rem;
+}
+
+.investments-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 1rem;
+	margin-bottom: 1.5rem;
+}
+
+.investments-header__title {
+	font-size: 1.35rem;
+	font-weight: 800;
+	margin: 0;
+}
+
+.investments-header__value {
+	font-family: var(--font-mono);
+	font-size: 2.75rem;
+	line-height: 1.05;
+}
+
+.investments-header__perf {
+	margin-top: 0.6rem;
+	font-family: var(--font-mono);
+	font-weight: 700;
+	font-size: 0.95rem;
+	display: inline-flex;
+	gap: 0.6rem;
+}
+
+.investments-header__perf--up {
+	color: var(--success);
+}
+
+.investments-header__perf--down {
+	color: var(--danger);
+}
+
+.investments-layout {
+	display: grid;
+	grid-template-columns: 1fr 320px;
+	gap: 1.5rem;
+	align-items: start;
+}
+
+@media (max-width: 960px) {
+	.investments-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+.investments-card {
+	background: var(--surface);
+	border: var(--border-thick);
+	padding: 1rem;
+}
+
+.investments-card__title {
+	font-weight: 700;
+	margin-bottom: 0.75rem;
+}
+
+.investments-kv {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 0.6rem 1rem;
+	font-size: 0.95rem;
+}
+
+.investments-kv dt {
+	color: var(--muted);
+}
+
+.investments-kv dd {
+	text-align: right;
+	font-family: var(--font-mono);
+}
+
+.investments-cash-input {
+	width: 100%;
+	text-align: right;
+	font-family: var(--font-mono);
+	font-size: 1.6rem;
+	font-weight: 700;
+	padding: 0.65rem 0.75rem;
+	border: var(--border-thick);
+	background: var(--bg);
+}
+
+.investments-chart {
+	background: var(--surface);
+	border: var(--border-thick);
+	padding: 1rem;
+}
+
+.investments-chart__frame {
+	position: relative;
+}
+
+.investments-chart__summary {
+	position: absolute;
+	left: 0.75rem;
+	top: 0.75rem;
+	padding: 0;
+	background: transparent;
+	border: none;
+	font-family: var(--font-mono);
+	pointer-events: none;
+}
+
+.investments-chart__summary-value {
+	font-size: 1.2rem;
+	font-weight: 800;
+	line-height: 1.1;
+	text-shadow: 0 1px 0 rgba(253, 252, 251, 0.8);
+}
+
+.investments-chart__summary-delta {
+	margin-top: 0.2rem;
+	font-size: 0.9rem;
+	display: inline-flex;
+	gap: 0.6rem;
+	font-weight: 700;
+	text-shadow: 0 1px 0 rgba(253, 252, 251, 0.8);
+}
+
+.investments-chart__delta--up {
+	color: var(--success);
+}
+
+.investments-chart__delta--down {
+	color: var(--danger);
+}
+
+.investments-chart__empty {
+	padding: 1rem 0;
+}
+
+.investments-chart__tabs {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-top: 0.75rem;
+}
+
+.investments-chart__tab {
+	border: var(--border-thick);
+	background: var(--bg);
+	padding: 0.4rem 0.65rem;
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+
+.investments-chart__tab--active {
+	background: var(--text);
+	color: var(--bg);
+	border-color: var(--text);
+}
+
+.investments-chart__svg {
+	width: 100%;
+	height: 260px;
+	display: block;
+}
+
+.investments-chart__tooltip {
+	pointer-events: none;
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+}
+
+.investments-holdings {
+	margin-top: 1.25rem;
+	background: var(--surface);
+	border: var(--border-thick);
+}
+
+.investments-holdings__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 1rem;
+	border-bottom: var(--border-thick);
+}
+
+.investments-holdings__title {
+	font-weight: 800;
+}
+
+/* Holdings now uses the shared ledger table styles. */
+
+.investments-holdings__row:hover {
+	background: var(--stone-50);
+}
+
+.investments-holdings__gain--up {
+	color: var(--success);
+}
+
+.investments-holdings__gain--down {
+	color: var(--danger);
+}
+
+.investments-holdings__form {
+	padding: 1rem;
+	border-bottom: var(--border-thick);
+	display: grid;
+	grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
+	gap: 0.75rem;
+	align-items: end;
+}
+
+@media (max-width: 720px) {
+	.investments-holdings__form {
+		grid-template-columns: 1fr;
+	}
+}
+
+.investments-holdings__form label {
+	font-size: 0.8rem;
+	color: var(--muted);
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.investments-holdings__form input {
+	padding: 0.55rem 0.6rem;
+	border: var(--border-thick);
+	font-family: var(--font-mono);
+	background: var(--bg);
+}
+
+.investments-holdings__form input:disabled {
+	color: var(--muted);
+	background: var(--stone-50);
+}

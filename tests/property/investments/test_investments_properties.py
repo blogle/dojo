@@ -253,33 +253,45 @@ def test_position_uniqueness_is_not_enforced(
         # Create an investment account to associate positions with.
         _create_account(conn, account_data)
 
-        # Insert the first position for the instrument.
+        security_id = str(uuid4())
+        concept_id = str(uuid4())
+        conn.execute(
+            """
+            INSERT INTO securities (security_id, ticker, name, type, currency)
+            VALUES (?, ?, ?, 'STOCK', 'USD')
+            """,
+            [security_id, instrument, instrument],
+        )
+
+        # Insert the first position for the security.
         conn.execute(
             (
-                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
-                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO positions (position_id, concept_id, account_id, security_id, quantity, avg_cost_minor) "
+                "VALUES (?, ?, ?, ?, ?, ?)"
             ),
             [
                 str(uuid4()),
+                concept_id,
                 account_data["account_id"],
-                instrument,
+                security_id,
                 quantity,
-                market_value,
+                0,
             ],
         )
 
-        # Insert a second, duplicate active position for the same instrument within the same account.
+        # Insert a second, duplicate active position for the same security within the same account.
         conn.execute(
             (
-                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
-                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO positions (position_id, concept_id, account_id, security_id, quantity, avg_cost_minor) "
+                "VALUES (?, ?, ?, ?, ?, ?)"
             ),
             [
                 str(uuid4()),
+                concept_id,
                 account_data["account_id"],
-                instrument,
+                security_id,
                 quantity,
-                market_value,
+                0,
             ],
         )
 
@@ -288,9 +300,9 @@ def test_position_uniqueness_is_not_enforced(
             conn,
             (
                 "SELECT COUNT(*) AS total_positions FROM positions "
-                "WHERE account_id = ? AND instrument = ? AND is_active = TRUE"
+                "WHERE account_id = ? AND security_id = ? AND is_active = TRUE"
             ),
-            [account_data["account_id"], instrument],
+            [account_data["account_id"], security_id],
         )
 
         assert count_row.total_positions == 2, "Duplicate active positions were not created, which is unexpected."
@@ -333,18 +345,28 @@ def test_account_class_is_not_enforced(
         # Create a non-investment account.
         _create_account(conn, account_data)
 
+        security_id = str(uuid4())
+        conn.execute(
+            """
+            INSERT INTO securities (security_id, ticker, name, type, currency)
+            VALUES (?, ?, ?, 'STOCK', 'USD')
+            """,
+            [security_id, instrument, instrument],
+        )
+
         # Attempt to insert an investment position for this non-investment account.
         conn.execute(
             (
-                "INSERT INTO positions (position_id, account_id, instrument, quantity, "
-                "market_value_minor) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO positions (position_id, concept_id, account_id, security_id, quantity, avg_cost_minor) "
+                "VALUES (?, ?, ?, ?, ?, ?)"
             ),
             [
                 str(uuid4()),
+                str(uuid4()),
                 account_data["account_id"],
-                instrument,
+                security_id,
                 quantity,
-                market_value,
+                0,
             ],
         )
 
