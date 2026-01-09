@@ -4,48 +4,109 @@
     data-route="account-detail"
   >
     <header class="investments-header account-detail-page__header">
-      <div>
-        <p class="page-label">
-          <router-link to="/accounts">Accounts</router-link>
-          <span v-if="accountId"> &gt; {{ accountName || accountId }}</span>
+      <div class="account-detail-page__headline">
+        <p class="page-label">{{ accountLabel }}</p>
+        <p class="investments-header__value">{{ intervalEndValueLabel }}</p>
+        <p
+          v-if="intervalDeltaLabel"
+          class="investments-header__perf"
+          :class="intervalDeltaClass"
+        >
+          <span>{{ intervalDeltaLabel }}</span>
+          <span v-if="intervalPctLabel">{{ intervalPctLabel }}</span>
         </p>
         <p v-if="accountSubtitle" class="u-muted u-small-note">
           {{ accountSubtitle }}
         </p>
       </div>
 
-      <div class="account-detail-page__header-right">
-        <div class="account-detail-page__value">
-          <span class="u-muted u-small-note">Current (incl pending)</span>
-          <span class="investments-header__value">{{ headlineValueLabel }}</span>
-        </div>
+      <div class="account-detail-page__actions">
+        <button
+          v-if="primaryAction"
+          type="button"
+          class="button button--primary"
+          @click="navigatePrimary"
+          :disabled="!accountId"
+        >
+          {{ primaryAction.label }}
+        </button>
 
-        <div class="account-detail-page__actions">
-          <button
-            v-if="primaryAction"
-            type="button"
-            class="button button--primary"
-            @click="navigatePrimary"
-            :disabled="!accountId"
-          >
-            {{ primaryAction.label }}
-          </button>
-
-          <button
-            v-if="secondaryAction"
-            type="button"
-            class="button button--secondary"
-            @click="secondaryAction.onClick"
-            :disabled="secondaryAction.disabled"
-          >
-            {{ secondaryAction.label }}
-          </button>
-        </div>
+        <button
+          v-if="secondaryAction"
+          type="button"
+          class="button button--secondary"
+          @click="secondaryAction.onClick"
+          :disabled="secondaryAction.disabled"
+        >
+          {{ secondaryAction.label }}
+        </button>
       </div>
     </header>
 
     <p v-if="pageError" class="form-panel__error" aria-live="polite">{{ pageError }}</p>
     <p v-else-if="pageLoading" class="u-muted">Loading account…</p>
+
+    <template v-else-if="isInvestment">
+      <section class="account-detail-page__hero-row">
+        <div class="account-detail-page__hero-chart">
+          <PortfolioChart
+            :series="chartSeries"
+            :interval="rangeLabel"
+            :loading="chartLoading"
+            :increaseIsGood="chartIncreaseIsGood"
+            :showPercentChange="chartShowPercentChange"
+            @change-interval="setRangeLabel"
+          />
+        </div>
+
+        <div class="account-detail-page__hero-aside">
+          <div class="investments-card">
+            <p class="investments-card__title">Details</p>
+            <dl class="investments-kv">
+              <dt>NAV</dt>
+              <dd>{{ investmentNavLabel }}</dd>
+              <dt>Cost basis</dt>
+              <dd>{{ investmentCostBasisLabel }}</dd>
+              <dt>Deposits</dt>
+              <dd :class="depositsClass">{{ investmentDepositsLabel }}</dd>
+              <dt>% of portfolio</dt>
+              <dd>{{ portfolioShareLabel }}</dd>
+              <dt>Today's return</dt>
+              <dd :class="todayReturnClass">{{ todayReturnLabel }}</dd>
+              <dt>Total return</dt>
+              <dd :class="totalReturnClass">{{ totalReturnLabel }}</dd>
+              <dt>Account type</dt>
+              <dd>{{ investmentAccountTypeLabel }}</dd>
+            </dl>
+          </div>
+
+          <div v-if="!verifyHoldingsModalOpen" class="investments-card account-detail-page__cash-card">
+            <p class="investments-card__title">Cash balance</p>
+            <input
+              class="investments-cash-input"
+              data-testid="investment-cash-input"
+              inputmode="decimal"
+              :disabled="reconcilePending"
+              v-model="cashDraft"
+              @keydown.enter.prevent="saveCash"
+              @blur="saveCash"
+            />
+            <p class="u-muted u-small-note account-detail-page__cash-help">
+              Enter cash available in your brokerage. Saves on blur / Enter.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <HoldingsTable
+        v-if="!verifyHoldingsModalOpen"
+        class="account-detail-page__holdings"
+        data-testid="investment-holdings"
+        :positions="portfolio?.positions || []"
+        :pending="reconcilePending"
+        @reconcile="handleReconcile"
+      />
+    </template>
 
     <div v-else class="investments-layout">
       <main>
@@ -60,89 +121,44 @@
           />
         </div>
 
-        <template v-if="isInvestment">
-          <template v-if="!verifyHoldingsModalOpen">
-          <HoldingsTable
-            class="investments-holdings"
-            data-testid="investment-holdings"
-            :positions="portfolio?.positions || []"
-            :pending="reconcilePending"
-            @reconcile="handleReconcile"
-          />
+        <TransactionForm
+          wrapperClass="account-detail-page__form"
+          :accounts="accounts"
+          :categories="categories"
+          :allowedFlows="transactionFormAllowedFlows"
+          :submitLabel="transactionSubmitLabel"
+          :lockedAccountId="accountId"
+          :lockedAccountName="accountName"
+          :isSubmitting="isCreatingTransaction"
+          :isLoadingReference="isLoadingReference"
+          :referenceError="referenceError"
+          @submit="handleCreateTransaction"
+        />
 
-          <div class="investments-card" style="margin-top: 1rem;">
-            <p class="investments-card__title">Cash balance</p>
-            <input
-              class="investments-cash-input"
-              data-testid="investment-cash-input"
-              inputmode="decimal"
-              :disabled="reconcilePending"
-              v-model="cashDraft"
-              @keydown.enter.prevent="saveCash"
-              @blur="saveCash"
-            />
-            <p class="u-muted" style="margin-top: 0.5rem;">
-              Enter cash available in your brokerage. Saves on blur / Enter.
-            </p>
-          </div>
-          </template>
-        </template>
-
-        <template v-else>
-          <TransactionForm
-            wrapperClass="account-detail-page__form"
+        <div class="ledger-card">
+          <TransactionTable
+            :transactions="accountTransactions"
             :accounts="accounts"
             :categories="categories"
-            :allowedFlows="transactionFormAllowedFlows"
-            :submitLabel="transactionSubmitLabel"
             :lockedAccountId="accountId"
             :lockedAccountName="accountName"
-            :isSubmitting="isCreatingTransaction"
+            :isLoading="isLoadingTransactions"
             :isLoadingReference="isLoadingReference"
             :referenceError="referenceError"
-            @submit="handleCreateTransaction"
+            :error="transactionsError"
+            emptyMessage="No transactions found."
+            loadingMessage="Loading transactions…"
+            @update="handleUpdateTransaction"
+            @delete="handleDeleteTransaction"
           />
-
-          <div class="ledger-card">
-            <TransactionTable
-              :transactions="accountTransactions"
-              :accounts="accounts"
-              :categories="categories"
-              :lockedAccountId="accountId"
-              :lockedAccountName="accountName"
-              :isLoading="isLoadingTransactions"
-              :isLoadingReference="isLoadingReference"
-              :referenceError="referenceError"
-              :error="transactionsError"
-              emptyMessage="No transactions found."
-              loadingMessage="Loading transactions…"
-              @update="handleUpdateTransaction"
-              @delete="handleDeleteTransaction"
-            />
-          </div>
-        </template>
+        </div>
       </main>
 
       <aside>
         <div class="investments-card">
           <p class="investments-card__title">Details</p>
 
-          <dl v-if="isInvestment" class="investments-kv">
-            <dt>NAV</dt>
-            <dd>{{ formatAmount(portfolio?.nav_minor) }}</dd>
-            <dt>Holdings</dt>
-            <dd>{{ formatAmount(portfolio?.holdings_value_minor) }}</dd>
-            <dt>Cash</dt>
-            <dd>{{ formatAmount(portfolio?.uninvested_cash_minor) }}</dd>
-            <dt>Cost basis</dt>
-            <dd>{{ formatAmount(portfolio?.ledger_cash_minor) }}</dd>
-            <dt>Total return</dt>
-            <dd :class="totalReturnClass">{{ formatAmount(portfolio?.total_return_minor) }}</dd>
-            <dt>Account type</dt>
-            <dd>Investment</dd>
-          </dl>
-
-          <dl v-else class="investments-kv">
+          <dl class="investments-kv">
             <dt>Account class</dt>
             <dd>{{ accountClassLabel }}</dd>
             <dt>Role</dt>
@@ -477,6 +493,14 @@ const titleCase = (value) => {
 
 const accountName = computed(() => account.value?.name || "");
 
+const accountLabel = computed(() => {
+	const base = accountName.value || accountId.value;
+	if (!base) {
+		return "";
+	}
+	return String(base).toUpperCase();
+});
+
 const accountClassLabel = computed(() =>
 	titleCase(account.value?.account_class),
 );
@@ -589,10 +613,25 @@ const investmentHistoryQuery = useQuery({
 			range.value.endDate,
 		),
 	enabled: computed(() => Boolean(accountId.value) && isInvestment.value),
+	placeholderData: (previous) => previous,
 	refetchOnWindowFocus: false,
 });
 
 const portfolio = computed(() => portfolioQuery.data.value);
+
+const investmentNavLabel = computed(() => {
+	if (!portfolio.value) {
+		return "—";
+	}
+	return formatAmount(portfolio.value.nav_minor);
+});
+
+const investmentCostBasisLabel = computed(() => {
+	if (!portfolio.value) {
+		return "—";
+	}
+	return formatAmount(portfolio.value.ledger_cash_minor);
+});
 
 const investmentChartSeries = computed(() =>
 	(investmentHistoryQuery.data.value || []).map((point) => ({
@@ -600,6 +639,150 @@ const investmentChartSeries = computed(() =>
 		value_minor: point.nav_minor,
 	})),
 );
+
+const formatSignedMoney = (minor) => {
+	if (minor === null || minor === undefined) {
+		return "—";
+	}
+	const sign = minor > 0 ? "+" : "";
+	return `${sign}${formatAmount(minor)}`;
+};
+
+const formatSignedRatioPct = (ratio) => {
+	if (ratio === null || ratio === undefined) {
+		return "";
+	}
+	const numeric = Number(ratio);
+	if (!Number.isFinite(numeric)) {
+		return "";
+	}
+	const pct = numeric * 100;
+	const sign = pct > 0 ? "+" : "";
+	return `${sign}${pct.toFixed(2)}%`;
+};
+
+const sortedInvestmentHistoryPoints = computed(() => {
+	const data = investmentHistoryQuery.data.value || [];
+	return [...data].sort((a, b) =>
+		String(a.market_date).localeCompare(String(b.market_date)),
+	);
+});
+
+const investmentDepositsMinor = computed(() => {
+	if (!sortedInvestmentHistoryPoints.value.length) {
+		return null;
+	}
+	return sortedInvestmentHistoryPoints.value.reduce(
+		(sum, point) => sum + (point.cash_flow_minor || 0),
+		0,
+	);
+});
+
+const investmentDepositsLabel = computed(() =>
+	formatSignedMoney(investmentDepositsMinor.value),
+);
+
+const depositsClass = computed(() => {
+	const value = investmentDepositsMinor.value;
+	if (value === null || value === undefined) {
+		return "";
+	}
+	return value >= 0
+		? "investments-header__perf--up"
+		: "investments-header__perf--down";
+});
+
+const latestInvestmentPoint = computed(() => {
+	const points = sortedInvestmentHistoryPoints.value;
+	return points.length ? points[points.length - 1] : null;
+});
+
+const todayReturnMinor = computed(() => {
+	if (!latestInvestmentPoint.value) {
+		return null;
+	}
+	return latestInvestmentPoint.value.return_minor;
+});
+
+const todayReturnPct = computed(() => {
+	if (!latestInvestmentPoint.value) {
+		return null;
+	}
+	const base =
+		latestInvestmentPoint.value.nav_minor -
+		latestInvestmentPoint.value.return_minor;
+	if (base === 0) {
+		return null;
+	}
+	return latestInvestmentPoint.value.return_minor / base;
+});
+
+const todayReturnLabel = computed(() => {
+	if (todayReturnMinor.value === null) {
+		return "—";
+	}
+	const pctLabel =
+		todayReturnPct.value === null
+			? ""
+			: ` (${formatSignedRatioPct(todayReturnPct.value)})`;
+	return `${formatSignedMoney(todayReturnMinor.value)}${pctLabel}`;
+});
+
+const todayReturnClass = computed(() => {
+	if (todayReturnMinor.value === null) {
+		return "";
+	}
+	return todayReturnMinor.value >= 0
+		? "investments-header__perf--up"
+		: "investments-header__perf--down";
+});
+
+const totalReturnLabel = computed(() => {
+	const minor = portfolio.value?.total_return_minor;
+	if (minor === undefined || minor === null) {
+		return "—";
+	}
+	const pct = portfolio.value?.total_return_pct;
+	const pctLabel =
+		pct === undefined || pct === null ? "" : ` (${formatSignedRatioPct(pct)})`;
+	return `${formatSignedMoney(minor)}${pctLabel}`;
+});
+
+const investmentAccountTypeLabel = computed(() => {
+	const details = account.value?.details;
+	const raw = details?.tax_classification;
+	if (raw) {
+		return titleCase(raw);
+	}
+	return "—";
+});
+
+const netWorthQuery = useQuery({
+	queryKey: ["netWorth"],
+	queryFn: api.netWorth.current,
+	enabled: computed(() => isInvestment.value),
+	refetchOnWindowFocus: false,
+});
+
+const portfolioShareRatio = computed(() => {
+	const totalHoldingsMinor = netWorthQuery.data.value?.positions_minor;
+	const holdingsMinor = portfolio.value?.holdings_value_minor;
+	if (
+		!totalHoldingsMinor ||
+		holdingsMinor === undefined ||
+		holdingsMinor === null
+	) {
+		return null;
+	}
+	return holdingsMinor / totalHoldingsMinor;
+});
+
+const portfolioShareLabel = computed(() => {
+	if (portfolioShareRatio.value === null) {
+		return "—";
+	}
+	return `${(portfolioShareRatio.value * 100).toFixed(2)}%`;
+});
 
 const accountHistoryQuery = useQuery({
 	queryKey: computed(() => [
@@ -623,6 +806,7 @@ const accountHistoryQuery = useQuery({
 			Boolean(account.value?.account_class) &&
 			!isInvestment.value,
 	),
+	placeholderData: (previous) => previous,
 	refetchOnWindowFocus: false,
 });
 
@@ -649,6 +833,7 @@ const accountTransactionsQuery = useQuery({
 			Boolean(account.value?.account_class) &&
 			!isInvestment.value,
 	),
+	placeholderData: (previous) => previous,
 	refetchOnWindowFocus: false,
 });
 
@@ -683,6 +868,93 @@ const chartIncreaseIsGood = computed(() => {
 });
 
 const chartShowPercentChange = computed(() => isInvestment.value);
+
+const sortedChartSeries = computed(() => {
+	const data = chartSeries.value ?? [];
+	return [...data]
+		.filter(
+			(point) =>
+				point &&
+				typeof point.date === "string" &&
+				Number.isFinite(point.value_minor),
+		)
+		.sort((a, b) => a.date.localeCompare(b.date));
+});
+
+const intervalStartValueMinor = computed(() => {
+	if (sortedChartSeries.value.length < 2) {
+		return null;
+	}
+	return sortedChartSeries.value[0]?.value_minor ?? null;
+});
+
+const intervalEndValueMinor = computed(() => {
+	const last = sortedChartSeries.value[sortedChartSeries.value.length - 1];
+	return last ? last.value_minor : null;
+});
+
+const intervalDeltaMinor = computed(() => {
+	if (sortedChartSeries.value.length < 2) {
+		return null;
+	}
+	if (
+		intervalStartValueMinor.value === null ||
+		intervalEndValueMinor.value === null
+	) {
+		return null;
+	}
+	return intervalEndValueMinor.value - intervalStartValueMinor.value;
+});
+
+const intervalPct = computed(() => {
+	if (!chartShowPercentChange.value) {
+		return null;
+	}
+	if (
+		intervalStartValueMinor.value === null ||
+		intervalDeltaMinor.value === null
+	) {
+		return null;
+	}
+	if (intervalStartValueMinor.value === 0) {
+		return null;
+	}
+	return intervalDeltaMinor.value / intervalStartValueMinor.value;
+});
+
+const intervalEndValueLabel = computed(() => {
+	if (intervalEndValueMinor.value === null) {
+		return headlineValueLabel.value;
+	}
+	return formatAmount(intervalEndValueMinor.value);
+});
+
+const intervalDeltaLabel = computed(() => {
+	if (intervalDeltaMinor.value === null) {
+		return "";
+	}
+	const delta = intervalDeltaMinor.value;
+	const sign = delta > 0 ? "+" : "";
+	return `${sign}${formatAmount(delta)}`;
+});
+
+const intervalPctLabel = computed(() => {
+	if (intervalPct.value === null) {
+		return "";
+	}
+	return `(${intervalPct.value >= 0 ? "+" : ""}${(intervalPct.value * 100).toFixed(2)}%)`;
+});
+
+const intervalDeltaClass = computed(() => {
+	if (intervalDeltaMinor.value === null) {
+		return "";
+	}
+	const delta = intervalDeltaMinor.value;
+	const good = chartIncreaseIsGood.value ? delta >= 0 : delta <= 0;
+	return good
+		? "investments-header__perf--up"
+		: "investments-header__perf--down";
+});
 
 const accountTransactions = computed(
 	() => accountTransactionsQuery.data.value ?? [],
@@ -1115,16 +1387,22 @@ const detailRows = computed(() => {
   align-items: flex-start;
 }
 
-.account-detail-page__header-right {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-}
-
-.account-detail-page__value {
+.account-detail-page__headline {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.account-detail-page__headline .page-label {
+  margin: 0;
+}
+
+.account-detail-page__headline .investments-header__value {
+  margin: 0;
+}
+
+.account-detail-page__headline .investments-header__perf {
+  margin: 0;
 }
 
 .account-detail-page__actions {
@@ -1133,19 +1411,44 @@ const detailRows = computed(() => {
   align-items: center;
 }
 
+.account-detail-page__hero-row {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1.5rem;
+  align-items: start;
+  margin-top: 1.25rem;
+  padding-right: 2rem;
+}
+
+.account-detail-page__hero-aside {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-detail-page__cash-card {
+  margin-top: 1rem;
+}
+
+.account-detail-page__cash-help {
+  margin-top: 0.5rem;
+}
+
+.account-detail-page__holdings {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .account-detail-page__hero-row {
+    grid-template-columns: 1fr;
+    padding-right: 0;
+  }
+}
+
 @media (max-width: 720px) {
   .account-detail-page__header {
     flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .account-detail-page__header-right {
-    width: 100%;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .account-detail-page__value {
     align-items: flex-start;
   }
 
@@ -1153,6 +1456,10 @@ const detailRows = computed(() => {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .account-detail-page__hero-row {
+    margin-top: 1rem;
   }
 }
 </style>

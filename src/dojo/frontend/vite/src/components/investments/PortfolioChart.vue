@@ -1,13 +1,6 @@
 <template>
   <div>
     <div class="investments-chart__frame">
-      <div v-if="summary" class="investments-chart__summary" aria-label="Chart summary">
-        <p class="investments-chart__summary-value">{{ summary.valueLabel }}</p>
-        <p class="investments-chart__summary-delta" :class="summary.deltaClass">
-          <span>{{ summary.deltaLabel }}</span>
-          <span v-if="summary.pctLabel">{{ summary.pctLabel }}</span>
-        </p>
-      </div>
 
       <p v-if="!points.length" class="u-muted investments-chart__empty">
         {{ loading ? "Loading history…" : "No chart data yet." }}
@@ -27,13 +20,20 @@
         <defs>
           <linearGradient :id="gradientId" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" :stop-color="themeColor" stop-opacity="0.4" />
-            <stop offset="55%" :stop-color="themeColor" stop-opacity="0.1" />
+            <stop offset="85%" :stop-color="themeColor" stop-opacity="0.4" />
             <stop offset="100%" :stop-color="themeColor" stop-opacity="0" />
           </linearGradient>
         </defs>
 
         <path :d="areaPath" :fill="`url(#${gradientId})`" />
-        <path :d="linePath" :stroke="themeColor" stroke-width="3" fill="none" />
+        <path
+          :d="linePath"
+          :stroke="themeColor"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
 
         <rect
           v-if="dragActive"
@@ -42,6 +42,17 @@
           :width="dragRect.width"
           height="260"
           fill="rgba(0,0,0,0.06)"
+        />
+
+        <line
+          v-if="dragActive"
+          :x1="scaleX(dragStart)"
+          y1="0"
+          :x2="scaleX(dragStart)"
+          y2="260"
+          stroke="rgba(0,0,0,0.25)"
+          stroke-width="1"
+          stroke-dasharray="4 4"
         />
 
         <line
@@ -73,10 +84,15 @@
           <text x="10" y="44">{{ cursor.labelValue }}</text>
         </g>
 
-        <g v-if="dragTooltip" class="investments-chart__tooltip" :transform="dragTooltipTransform">
-          <rect x="0" y="0" width="240" height="60" fill="#ffffff" stroke="#e0e0e0" />
-          <text x="10" y="22">Range</text>
-          <text x="10" y="44">{{ dragTooltip }}</text>
+        <g
+          v-if="dragTooltip"
+          class="investments-chart__tooltip"
+          :transform="dragTooltipTransform"
+        >
+          <rect x="0" y="0" width="320" height="78" fill="#ffffff" stroke="#e0e0e0" />
+          <text x="10" y="22">{{ dragTooltip.rangeLabel }}</text>
+          <text x="10" y="44">{{ dragTooltip.valuesLabel }}</text>
+          <text x="10" y="66">{{ dragTooltip.deltaLabel }}</text>
         </g>
        </svg>
 
@@ -133,7 +149,7 @@ const props = defineProps({
 
 defineEmits(["change-interval"]);
 
-const options = ["1D", "1W", "1M", "3M", "YTD", "1Y", "Max"];
+const options = ["1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "Max"];
 const gradientId = `inv-gradient-${Math.random().toString(16).slice(2)}`;
 
 const W = 1000;
@@ -157,28 +173,6 @@ const points = computed(() => {
 			date: point.date,
 			value: point.value_minor,
 		}));
-});
-
-const summary = computed(() => {
-	if (!points.value.length) {
-		return null;
-	}
-	const start = points.value[0]?.value;
-	const end = points.value[points.value.length - 1]?.value;
-	if (start === undefined || end === undefined) {
-		return null;
-	}
-	const delta = end - start;
-	const sign = delta >= 0 ? "+" : "";
-	const pct = props.showPercentChange && start !== 0 ? delta / start : null;
-	return {
-		valueLabel: formatAmount(end),
-		deltaClass: isDeltaGood(delta)
-			? "investments-chart__delta--up"
-			: "investments-chart__delta--down",
-		deltaLabel: `${sign}${formatAmount(delta)}`,
-		pctLabel: pct === null ? "" : `(${sign}${(pct * 100).toFixed(2)}%)`,
-	};
 });
 
 const minValue = computed(() => {
@@ -288,18 +282,27 @@ const dragTooltip = computed(() => {
 	if (!dragActive.value) {
 		return null;
 	}
-	const a = points.value[dragStart.value]?.value;
-	const b = points.value[dragEnd.value]?.value;
-	if (a === undefined || b === undefined) {
+	const startPoint = points.value[dragStart.value];
+	const endPoint = points.value[dragEnd.value];
+	if (!startPoint || !endPoint) {
 		return null;
 	}
-	const delta = b - a;
+	const delta = endPoint.value - startPoint.value;
 	const sign = delta >= 0 ? "+" : "";
-	if (!props.showPercentChange || a === 0) {
-		return `${sign}${formatAmount(delta)}`;
-	}
-	const pct = delta / a;
-	return `${sign}${formatAmount(delta)} (${sign}${(pct * 100).toFixed(2)}%)`;
+
+	const deltaLabelBase = `${sign}${formatAmount(delta)}`;
+	const pct =
+		props.showPercentChange && startPoint.value !== 0
+			? delta / startPoint.value
+			: null;
+	const pctLabel =
+		pct === null ? "" : ` (${pct >= 0 ? "+" : ""}${(pct * 100).toFixed(2)}%)`;
+
+	return {
+		rangeLabel: `${startPoint.date} – ${endPoint.date}`,
+		valuesLabel: `Start ${formatAmount(startPoint.value)} · End ${formatAmount(endPoint.value)}`,
+		deltaLabel: `Δ ${deltaLabelBase}${pctLabel}`,
+	};
 });
 
 const dragTooltipTransform = computed(() => {
@@ -307,7 +310,7 @@ const dragTooltipTransform = computed(() => {
 		return "translate(0,0)";
 	}
 	const rect = dragRect.value;
-	const x = Math.min(Math.max(rect.x + rect.width / 2 - 120, 12), W - 252);
+	const x = Math.min(Math.max(rect.x + rect.width / 2 - 160, 12), W - 332);
 	return `translate(${x}, 12)`;
 });
 

@@ -2,7 +2,7 @@ import { computed, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { todayISO } from "../services/format.js";
 
-export const RANGE_OPTIONS = ["1D", "1W", "1M", "3M", "YTD", "1Y", "Max"];
+export const RANGE_OPTIONS = ["1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "Max"];
 export const DEFAULT_RANGE_LABEL = "1M";
 
 export const sanitizeRangeLabel = (
@@ -39,8 +39,10 @@ export const resolveRangeFromLabel = (label) => {
 		start.setDate(1);
 	} else if (label === "1Y") {
 		start.setFullYear(end.getFullYear() - 1);
+	} else if (label === "5Y") {
+		start.setDate(end.getDate() - 1825);
 	} else if (label === "Max") {
-		start.setFullYear(end.getFullYear() - 5);
+		start.setDate(end.getDate() - 3650);
 	}
 
 	return {
