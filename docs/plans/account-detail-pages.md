@@ -19,7 +19,7 @@ Every account detail page must have an account-type-appropriate integrity action
 - [x] (2026-01-09 02:03Z) Add frontend API client methods + query key conventions for the new endpoints (shared URL-driven `?range=` utility + account history/transactions queries wired in `AccountDetailPage.vue`).
 - [x] (2026-01-09 01:38Z) Remove account detail modal; make account cards navigate to detail pages.
 - [x] (2026-01-09 02:03Z) Implement account detail pages for all account classes using shared components + shared `?range=` behavior, with liability-safe “Record payment” entry point (transfer).
-- [ ] (YYYY-MM-DD HH:MMZ) Add account-type integrity actions on every detail page using existing flows, with URL-driven modes (`/reconcile`, `/verify-holdings`, `/valuation`).
+- [x] (2026-01-09 03:43Z) Add account-type integrity actions on every detail page using existing flows, with URL-driven modes (`/reconcile`, `/verify-holdings`, `/valuation`).
 - [x] (2026-01-09 01:27Z) Add automated tests for new API endpoints and run the relevant test suite.
 - [ ] (YYYY-MM-DD HH:MMZ) Manual verification: charts + filtered ledger + integrity actions.
 
@@ -788,3 +788,4 @@ Change note (required for living ExecPlans):
 - 2026-01-09: Implemented Milestone 1 backend read APIs (`/api/accounts/{id}`, `/transactions`, `/history`), enforced `current_balance_minor` guardrails on account create/update, and added integration tests for the new endpoints.
 - 2026-01-09: Added SPA routes for `/accounts/:accountId` + mode routes and redirected `/investments/:accountId`; removed the account detail modal in `AccountsPage.vue` so cards navigate to the detail page.
 - 2026-01-09: Implemented `AccountDetailPage.vue` (chart + ledger/holdings + aside), refactored `PortfolioChart.vue` to accept normalized `series`, added shared URL-driven range handling (`?range=`), and added a liability-safe `Record payment` entry point via the transfer flow (Transfers prefills + liability charge-only form).
+- 2026-01-09: Made integrity actions route-driven: `/reconcile` opens `ReconciliationModal.vue`, `/verify-holdings` opens a holdings verification modal for investments, and `/valuation` opens a tangible valuation modal that posts a `balance_adjustment` transaction.

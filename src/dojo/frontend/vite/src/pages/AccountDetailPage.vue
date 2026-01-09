@@ -45,6 +45,7 @@
     </header>
 
     <p v-if="pageError" class="form-panel__error" aria-live="polite">{{ pageError }}</p>
+    <p v-else-if="pageLoading" class="u-muted">Loading account…</p>
 
     <div v-else class="investments-layout">
       <main>
@@ -60,6 +61,7 @@
         </div>
 
         <template v-if="isInvestment">
+          <template v-if="!verifyHoldingsModalOpen">
           <HoldingsTable
             class="investments-holdings"
             data-testid="investment-holdings"
@@ -83,6 +85,7 @@
               Enter cash available in your brokerage. Saves on blur / Enter.
             </p>
           </div>
+          </template>
         </template>
 
         <template v-else>
@@ -155,6 +158,145 @@
         </div>
       </aside>
     </div>
+
+    <ReconciliationModal
+      :open="reconcileModalOpen"
+      :account="account || null"
+      @close="handleReconcileClose"
+    />
+
+    <div
+      v-if="verifyHoldingsModalOpen"
+      class="modal-overlay is-visible"
+      style="display: flex;"
+      @click.self="handleVerifyHoldingsClose"
+    >
+      <div class="modal account-detail-page__modal">
+        <header class="modal__header">
+          <div>
+            <p class="stat-card__label">Verify holdings</p>
+            <h2>{{ accountName || "Verify holdings" }}</h2>
+            <p class="u-muted u-small-note">
+              Reconcile ticker, quantity, cost basis, and cash balance.
+            </p>
+          </div>
+          <button
+            class="modal__close"
+            type="button"
+            aria-label="Close holdings verification"
+            @click="handleVerifyHoldingsClose"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="modal__body" style="overflow: auto;">
+          <HoldingsTable
+            class="investments-holdings"
+            data-testid="investment-holdings"
+            :positions="portfolio?.positions || []"
+            :pending="reconcilePending"
+            @reconcile="handleReconcile"
+          />
+
+          <div class="investments-card" style="margin-top: 1rem;">
+            <p class="investments-card__title">Cash balance</p>
+            <input
+              class="investments-cash-input"
+              data-testid="investment-cash-input"
+              inputmode="decimal"
+              :disabled="reconcilePending"
+              v-model="cashDraft"
+              @keydown.enter.prevent="saveCash"
+              @blur="saveCash"
+            />
+            <p class="u-muted" style="margin-top: 0.5rem;">
+              Enter cash available in your brokerage. Saves on blur / Enter.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="valuationModalOpen"
+      class="modal-overlay is-visible"
+      style="display: flex;"
+      @click.self="handleValuationClose"
+    >
+      <div class="modal account-detail-page__modal account-detail-page__modal--narrow">
+        <header class="modal__header">
+          <div>
+            <p class="stat-card__label">Update valuation</p>
+            <h2>{{ accountName || "Update valuation" }}</h2>
+            <p class="u-muted u-small-note">
+              Creates a non-cash balance adjustment (does not change Ready to assign).
+            </p>
+          </div>
+          <button
+            class="modal__close"
+            type="button"
+            aria-label="Close valuation"
+            @click="handleValuationClose"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="modal__body">
+          <section class="modal-add">
+            <form class="modal-form" @submit.prevent="submitValuation">
+              <label>
+                As of date
+                <input type="date" v-model="valuationAsOf" required />
+              </label>
+              <label>
+                Target value
+                <input
+                  type="number"
+                  step="0.01"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  v-model="valuationTarget"
+                  required
+                />
+              </label>
+
+              <p class="u-muted u-small-note">
+                Current value: {{ valuationBaselineLabel }}
+                <span v-if="valuationDeltaLabel"> · Delta: {{ valuationDeltaLabel }}</span>
+              </p>
+
+              <p
+                v-if="valuationError || valuationBaselineError"
+                class="form-panel__error"
+                aria-live="polite"
+              >
+                {{ valuationError || valuationBaselineError }}
+              </p>
+
+              <div class="form-panel__actions form-panel__actions--split">
+                <button
+                  type="button"
+                  class="button button--secondary"
+                  :disabled="valuationSubmitting"
+                  @click="handleValuationClose"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="button button--primary"
+                  :disabled="valuationSubmitDisabled"
+                >
+                  {{ valuationSubmitting ? "Saving…" : "Save valuation" }}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -166,13 +308,19 @@ import HoldingsTable from "../components/investments/HoldingsTable.vue";
 import PortfolioChart from "../components/investments/PortfolioChart.vue";
 import TransactionForm from "../components/TransactionForm.vue";
 import TransactionTable from "../components/TransactionTable.vue";
+import ReconciliationModal from "../components/ReconciliationModal.vue";
 import { api } from "../services/api.js";
 import {
 	dollarsToMinor,
 	formatAmount,
 	minorToDollars,
+	todayISO,
 } from "../services/format.js";
 import { useChartRange } from "../utils/chartRange.js";
+import {
+	dollarsInputToMinor,
+	isValidDateInput,
+} from "../utils/transactions.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -186,6 +334,41 @@ const accountId = computed(() => {
 });
 
 const { rangeLabel, range, setRangeLabel } = useChartRange({ route, router });
+
+const routeRecordPath = computed(() => {
+	const last = route.matched[route.matched.length - 1];
+	return last?.path || "";
+});
+
+const routeMode = computed(() => {
+	if (routeRecordPath.value.endsWith("/reconcile")) {
+		return "reconcile";
+	}
+	if (routeRecordPath.value.endsWith("/verify-holdings")) {
+		return "verify-holdings";
+	}
+	if (routeRecordPath.value.endsWith("/valuation")) {
+		return "valuation";
+	}
+	return null;
+});
+
+const baseQuery = computed(() => {
+	const next = { ...route.query };
+	delete next.statementMonth;
+	delete next.asOf;
+	return next;
+});
+
+const navigateToBase = () => {
+	if (!accountId.value) {
+		return;
+	}
+	router.replace({
+		path: `/accounts/${accountId.value}`,
+		query: baseQuery.value,
+	});
+};
 
 const referenceQuery = useQuery({
 	queryKey: ["reference-data"],
@@ -205,7 +388,54 @@ const account = computed(() => accountQuery.data.value);
 const isInvestment = computed(
 	() => account.value?.account_class === "investment",
 );
+const isTangible = computed(() => account.value?.account_class === "tangible");
 const isLiability = computed(() => account.value?.account_type === "liability");
+
+const isLedgerAccount = computed(() => {
+	const cls = account.value?.account_class;
+	return (
+		cls === "cash" || cls === "credit" || cls === "accessible" || cls === "loan"
+	);
+});
+
+const reconcileModalOpen = computed(
+	() =>
+		routeMode.value === "reconcile" && isLedgerAccount.value && !!account.value,
+);
+const verifyHoldingsModalOpen = computed(
+	() =>
+		routeMode.value === "verify-holdings" &&
+		isInvestment.value &&
+		!!account.value,
+);
+const valuationModalOpen = computed(
+	() => routeMode.value === "valuation" && isTangible.value && !!account.value,
+);
+
+const handleReconcileClose = () => navigateToBase();
+const handleVerifyHoldingsClose = () => navigateToBase();
+const handleValuationClose = () => navigateToBase();
+
+watch(
+	() => [routeMode.value, account.value?.account_class, accountId.value],
+	() => {
+		if (!routeMode.value || !accountId.value || !account.value?.account_class) {
+			return;
+		}
+		if (routeMode.value === "reconcile" && !isLedgerAccount.value) {
+			navigateToBase();
+			return;
+		}
+		if (routeMode.value === "verify-holdings" && !isInvestment.value) {
+			navigateToBase();
+			return;
+		}
+		if (routeMode.value === "valuation" && !isTangible.value) {
+			navigateToBase();
+		}
+	},
+	{ immediate: true },
+);
 
 const transactionFormAllowedFlows = computed(() =>
 	isLiability.value ? ["outflow"] : ["outflow", "inflow"],
@@ -225,6 +455,14 @@ const accountError = computed(() => accountQuery.error.value?.message || "");
 
 const isLoadingReference = computed(
 	() => referenceQuery.isPending.value || referenceQuery.isFetching.value,
+);
+
+const accountLoading = computed(
+	() => accountQuery.isPending.value || accountQuery.isFetching.value,
+);
+
+const pageLoading = computed(
+	() => isLoadingReference.value || accountLoading.value,
 );
 
 const titleCase = (value) => {
@@ -576,6 +814,188 @@ const handleDeleteTransaction = async (tx, resolve, reject) => {
 		resolve();
 	} catch (error) {
 		reject(error);
+	}
+};
+
+const valuationAsOf = ref(todayISO());
+const valuationTarget = ref("");
+const valuationError = ref("");
+
+watch(
+	() => valuationModalOpen.value,
+	(isOpen) => {
+		if (!isOpen) {
+			valuationError.value = "";
+			return;
+		}
+
+		valuationError.value = "";
+		valuationTarget.value = "";
+
+		const asOf = route.query?.asOf;
+		const fallback = todayISO();
+		if (typeof asOf === "string" && isValidDateInput(asOf)) {
+			valuationAsOf.value = asOf;
+		} else {
+			valuationAsOf.value = fallback;
+		}
+	},
+	{ immediate: true },
+);
+
+const valuationBaselineQuery = useQuery({
+	queryKey: computed(() => [
+		"accounts",
+		accountId.value,
+		"history",
+		valuationAsOf.value,
+		valuationAsOf.value,
+		"all",
+	]),
+	queryFn: () =>
+		api.accounts.getHistory(
+			accountId.value,
+			valuationAsOf.value,
+			valuationAsOf.value,
+			"all",
+		),
+	enabled: computed(
+		() =>
+			valuationModalOpen.value &&
+			!!accountId.value &&
+			isTangible.value &&
+			isValidDateInput(valuationAsOf.value),
+	),
+	refetchOnWindowFocus: false,
+});
+
+const valuationBaselineError = computed(
+	() => valuationBaselineQuery.error.value?.message || "",
+);
+
+const valuationBaselineMinor = computed(() => {
+	const points = valuationBaselineQuery.data.value || [];
+	const first = points[0];
+	if (!first || typeof first.balance_minor !== "number") {
+		return null;
+	}
+	return first.balance_minor;
+});
+
+watch(
+	() => valuationBaselineMinor.value,
+	(value) => {
+		if (!valuationModalOpen.value) {
+			return;
+		}
+		if (value === null || value === undefined) {
+			return;
+		}
+		if (valuationTarget.value) {
+			return;
+		}
+		valuationTarget.value = minorToDollars(value);
+	},
+	{ immediate: true },
+);
+
+const valuationTargetMinor = computed(() =>
+	dollarsInputToMinor(valuationTarget.value),
+);
+
+const valuationDeltaMinor = computed(() => {
+	if (valuationBaselineMinor.value === null) {
+		return null;
+	}
+	if (valuationTargetMinor.value === null) {
+		return null;
+	}
+	return valuationTargetMinor.value - valuationBaselineMinor.value;
+});
+
+const valuationBaselineLabel = computed(() => {
+	if (valuationBaselineMinor.value === null) {
+		return "—";
+	}
+	return formatAmount(valuationBaselineMinor.value);
+});
+
+const valuationDeltaLabel = computed(() => {
+	if (valuationDeltaMinor.value === null) {
+		return "";
+	}
+	const delta = valuationDeltaMinor.value;
+	const sign = delta >= 0 ? "+" : "";
+	return `${sign}${formatAmount(delta)}`;
+});
+
+const valuationMutation = useMutation({
+	mutationFn: (payload) => api.transactions.create(payload),
+});
+
+const valuationSubmitting = computed(() => valuationMutation.isPending.value);
+
+const valuationSubmitDisabled = computed(() => {
+	if (valuationSubmitting.value) {
+		return true;
+	}
+	if (!valuationModalOpen.value) {
+		return true;
+	}
+	if (!accountId.value || !isTangible.value) {
+		return true;
+	}
+	if (!isValidDateInput(valuationAsOf.value)) {
+		return true;
+	}
+	if (valuationTargetMinor.value === null || valuationTargetMinor.value < 0) {
+		return true;
+	}
+	if (valuationBaselineMinor.value === null) {
+		return true;
+	}
+	return valuationDeltaMinor.value === 0;
+});
+
+const submitValuation = async () => {
+	valuationError.value = "";
+	if (!accountId.value) {
+		return;
+	}
+	if (!isValidDateInput(valuationAsOf.value)) {
+		valuationError.value = "Enter a valid as-of date (YYYY-MM-DD).";
+		return;
+	}
+	if (valuationTargetMinor.value === null) {
+		valuationError.value = "Enter a valid valuation amount.";
+		return;
+	}
+	if (valuationTargetMinor.value < 0) {
+		valuationError.value = "Valuation must be non-negative.";
+		return;
+	}
+	if (valuationBaselineMinor.value === null) {
+		valuationError.value = "Unable to load the current value for that date.";
+		return;
+	}
+	if (valuationDeltaMinor.value === null || valuationDeltaMinor.value === 0) {
+		valuationError.value =
+			"Valuation matches current value; no adjustment needed.";
+		return;
+	}
+
+	try {
+		await valuationMutation.mutateAsync({
+			transaction_date: valuationAsOf.value,
+			account_id: accountId.value,
+			category_id: "balance_adjustment",
+			amount_minor: valuationDeltaMinor.value,
+			memo: "Valuation update",
+			status: "cleared",
+		});
+		navigateToBase();
+	} catch (error) {
+		valuationError.value = error?.message || "Failed to update valuation.";
 	}
 };
 
