@@ -98,6 +98,7 @@
 
 .investments-chart__frame {
 	position: relative;
+	height: 260px;
 }
 
 .investments-chart__summary {
@@ -136,7 +137,28 @@
 }
 
 .investments-chart__empty {
-	padding: 1rem 0;
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.investments-chart__loading {
+	position: absolute;
+	right: 0.75rem;
+	bottom: 0.75rem;
+	margin: 0;
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	color: var(--muted);
+	pointer-events: none;
+	text-shadow: 0 1px 0 rgba(253, 252, 251, 0.8);
+}
+
+.investments-chart__svg--loading {
+	opacity: 0.65;
 }
 
 .investments-chart__tabs {

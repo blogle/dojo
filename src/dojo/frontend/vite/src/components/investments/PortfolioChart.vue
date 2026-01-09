@@ -9,12 +9,14 @@
         </p>
       </div>
 
-      <p v-if="loading" class="u-muted investments-chart__empty">Loading history…</p>
-      <p v-else-if="!points.length" class="u-muted investments-chart__empty">No chart data yet.</p>
+      <p v-if="!points.length" class="u-muted investments-chart__empty">
+        {{ loading ? "Loading history…" : "No chart data yet." }}
+      </p>
 
       <svg
         v-else
         class="investments-chart__svg"
+        :class="{ 'investments-chart__svg--loading': loading }"
         viewBox="0 0 1000 260"
         preserveAspectRatio="none"
         @mousemove="onMove"
@@ -76,10 +78,18 @@
           <text x="10" y="22">Range</text>
           <text x="10" y="44">{{ dragTooltip }}</text>
         </g>
-      </svg>
-    </div>
+       </svg>
 
-    <div class="investments-chart__tabs" role="tablist" aria-label="Time range">
+       <p
+         v-if="loading && points.length"
+         class="u-muted investments-chart__loading"
+         aria-live="polite"
+       >
+         Loading…
+       </p>
+     </div>
+
+     <div class="investments-chart__tabs" role="tablist" aria-label="Time range">
       <button
         v-for="opt in options"
         :key="opt"
