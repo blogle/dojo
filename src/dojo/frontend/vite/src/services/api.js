@@ -100,6 +100,22 @@ export const api = {
 	},
 	accounts: {
 		list: async () => fetchJSON("/api/accounts"),
+		get: async (accountId) => fetchJSON(`/api/accounts/${accountId}`),
+		getTransactions: async (accountId, params = {}) => {
+			const query = new URLSearchParams();
+			if (params.start_date) query.set("start_date", params.start_date);
+			if (params.end_date) query.set("end_date", params.end_date);
+			if (params.limit) query.set("limit", String(params.limit));
+			if (params.status) query.set("status", params.status);
+			const suffix = query.toString();
+			return fetchJSON(
+				`/api/accounts/${accountId}/transactions${suffix ? `?${suffix}` : ""}`,
+			);
+		},
+		getHistory: async (accountId, startDate, endDate, status = "all") =>
+			fetchJSON(
+				`/api/accounts/${accountId}/history?start_date=${startDate}&end_date=${endDate}&status=${status}`,
+			),
 		create: async (payload) => {
 			const result = await fetchJSON("/api/accounts", {
 				method: "POST",

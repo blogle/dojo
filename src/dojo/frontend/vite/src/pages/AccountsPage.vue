@@ -78,7 +78,7 @@
             :key="account.account_id"
             class="account-card"
             :data-account-id="account.account_id"
-            @click="openDetailModal(account)"
+            @click="openAccount(account)"
           >
             <div class="account-card__header">
               <div class="account-card__title">
@@ -106,78 +106,29 @@
       class="modal-overlay is-visible"
       id="account-modal"
       aria-hidden="false"
-      :data-view="modalView"
+      data-view="add"
       style="display: flex;"
       @click.self="closeModal"
     >
-      <div class="modal" :data-view="modalView">
+      <div class="modal" data-view="add">
         <header class="modal__header">
-          <div v-if="modalView === 'add'">
+          <div>
               <span class="page-label">Account Onboarding</span>
               <h2 id="step-title">{{ wizardStepTitle }}</h2>
           </div>
-          <div v-else>
-            <p class="stat-card__label" data-modal-label>{{ modalTitleLabel }}</p>
-            <h2 data-modal-title>{{ modalTitle }}</h2>
-            <p class="u-muted u-small-note" data-modal-subtitle>{{ modalSubtitle }}</p>
-          </div>
-          
-          <div v-if="modalView === 'add'" class="step-indicator" id="step-indicator">
+
+          <div class="step-indicator" id="step-indicator">
               <div class="step-dot" :class="{ active: wizardStep >= 1 }"></div>
               <div class="step-dot" :class="{ active: wizardStep >= 2 }"></div>
               <div class="step-dot" :class="{ active: wizardStep >= 3 }"></div>
               <div class="step-dot" :class="{ active: wizardStep >= 4 }"></div>
           </div>
-          <button v-else class="modal__close" type="button" aria-label="Close modal" data-close-modal @click="closeModal">×</button>
+
+          <button class="modal__close" type="button" aria-label="Close modal" data-close-modal @click="closeModal">×</button>
         </header>
         
         <div class="modal__body">
-          <!-- Detail View -->
-          <section v-if="modalView === 'detail'" class="modal-detail" data-modal-section="detail">
-            <div class="modal-detail__balance" data-modal-balance>
-              {{ selectedAccount ? formatAmount(selectedAccount.current_balance_minor) : "—" }}
-            </div>
-            <ul class="modal-detail__metadata" data-modal-metadata>
-              <template v-if="selectedAccount">
-                <li><strong>Type</strong><span>{{ selectedAccount.account_type === "asset" ? "Asset" : "Liability" }}</span></li>
-                <li><strong>Class</strong><span>{{ selectedAccount.account_class.replace(/_/g, " ") }}</span></li>
-                <li><strong>Role</strong><span>{{ formatRoleLabel(selectedAccount.account_role) }}</span></li>
-              </template>
-            </ul>
-            <div class="role-legend">
-              <span class="role-legend__item">
-                <span class="role-icon" data-role="on_budget" aria-hidden="true"></span>
-                <span>On-budget</span>
-              </span>
-              <span class="role-legend__item">
-                <span class="role-icon" data-role="tracking" aria-hidden="true"></span>
-                <span>Tracking</span>
-              </span>
-            </div>
-             <div class="form-panel__actions form-panel__actions--split">
-               <button
-                 type="button"
-                 class="button button--secondary"
-                 data-reconcile-button
-                 @click.stop="openReconcileModal"
-               >
-                 Reconcile
-               </button>
-               <button
-                 v-if="selectedAccount?.account_class === 'investment'"
-                 type="button"
-                 class="button button--primary"
-                 data-view-portfolio-button
-                 @click.stop="openInvestmentPortfolio"
-               >
-                 View portfolio
-               </button>
-             </div>
-
-          </section>
-
-          <!-- Add View (Wizard) -->
-          <section v-if="modalView === 'add'" class="modal-add" data-modal-section="add">
+          <section class="modal-add" data-modal-section="add">
             
             <datalist id="institutions">
                 <option v-for="inst in institutionList" :key="inst" :value="inst"></option>
@@ -275,11 +226,6 @@
       </div>
     </div>
 
-    <ReconciliationModal
-      :open="isReconciliationOpen"
-      :account="selectedAccount"
-      @close="closeReconciliationModal"
-    />
   </section>
 </template>
 
@@ -288,7 +234,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { accountGroupDefinitions, accountTypeMapping } from "../constants.js";
-import ReconciliationModal from "../components/ReconciliationModal.vue";
 import { api, postOpeningBalanceTransaction } from "../services/api.js";
 import { formatAmount } from "../services/format.js";
 import { todayISO } from "../services/format.js";
@@ -297,9 +242,6 @@ const queryClient = useQueryClient();
 const router = useRouter();
 const filter = ref("all");
 const isModalOpen = ref(false);
-const modalView = ref("add"); // 'add' | 'detail'
-const selectedAccount = ref(null);
-const isReconciliationOpen = ref(false);
 
 // Wizard State
 const wizardStep = ref(1);
@@ -668,24 +610,7 @@ const formatAccountBalance = (account) => {
 	return formatAmount(amount);
 };
 
-// Modal Logic
-const modalTitleLabel = computed(() =>
-	modalView.value === "add" ? "Add account" : "Account detail",
-);
-const modalTitle = computed(() =>
-	modalView.value === "add"
-		? "Follow the guided steps"
-		: selectedAccount.value?.name,
-);
-const modalSubtitle = computed(() =>
-	modalView.value === "add"
-		? "Create a new asset or liability"
-		: `ID • ${selectedAccount.value?.account_id}`,
-);
-
 const openAddModal = () => {
-	modalView.value = "add";
-	selectedAccount.value = null;
 	wizardStep.value = 1;
 	wizardType.value = null;
 	// Reset wizardData
@@ -695,31 +620,8 @@ const openAddModal = () => {
 	isModalOpen.value = true;
 };
 
-const openDetailModal = (account) => {
-	modalView.value = "detail";
-	selectedAccount.value = account;
-	isModalOpen.value = true;
-};
-
-const openInvestmentPortfolio = () => {
-	if (!selectedAccount.value) {
-		return;
-	}
-	const accountId = selectedAccount.value.account_id;
-	closeModal();
-	router.push(`/investments/${accountId}`);
-};
-
-const openReconcileModal = () => {
-	if (!selectedAccount.value) {
-		return;
-	}
-	isModalOpen.value = false;
-	isReconciliationOpen.value = true;
-};
-
-const closeReconciliationModal = () => {
-	isReconciliationOpen.value = false;
+const openAccount = (account) => {
+	router.push(`/accounts/${account.account_id}`);
 };
 
 const closeModal = () => {
