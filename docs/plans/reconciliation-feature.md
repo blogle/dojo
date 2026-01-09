@@ -6,6 +6,16 @@ This ExecPlan defines the roadmap for implementing the **Account Reconciliation*
 
 To allow users to verify that their Dojo ledger matches their real-world bank statements. This involves a manual "commit" process that checkpoints the ledger and a unified **Reconciliation Worksheet** that presents all transactions requiring review (new, modified, and pending).
 
+## Scope & Entry Points
+
+- This plan covers ledger statement reconciliation for `cash`, `accessible`, `credit`, and `loan` accounts.
+- Other account-type integrity actions are out of scope here:
+  - Investments: holdings/cash verification (investment workflow).
+  - Tangibles: valuation updates via `balance_adjustment`.
+- SPA entry point (bookmarkable “room”):
+  - `/#/accounts/:accountId/reconcile?statementMonth=YYYY-MM`
+  - The route should be treated as the source of truth for “am I reconciling?” (back/forward and refresh behave predictably).
+
 **Primary References:**
 -   **Spec & Architecture:** `docs/architecture/reconciliation.md` (The Source of Truth)
 -   **Engineering Rules:** `docs/rules/engineering_guide.md` (Section 4)
@@ -33,7 +43,7 @@ To allow users to verify that their Dojo ledger matches their real-world bank st
 *   [ ] **3.1 API Client:** Update frontend service to call new endpoints.
 *   [ ] **3.2 Modal Component:** Create `ReconciliationModal.vue` with 2-step wizard (Setup -> Worksheet).
 *   [ ] **3.3 Worksheet Logic:** Implement client-side matching and "Difference" calculation.
-*   [ ] **3.4 Entry Point:** Wire button into `AccountsPage.vue`.
+*   [ ] **3.4 Entry Point:** Wire a route-driven entry point from account detail pages (`/#/accounts/:accountId/reconcile`).
 
 ---
 
@@ -98,24 +108,38 @@ To allow users to verify that their Dojo ledger matches their real-world bank st
 
 #### 3.2 & 3.3 The Modal (Wizard)
 **Task:** Create `src/dojo/frontend/vite/src/components/ReconciliationModal.vue`.
+
+*   **Routing + state persistence:**
+    *   Treat reconciliation as a route-driven “room”: open when the route matches `/#/accounts/:accountId/reconcile` (see `docs/plans/account-detail-pages.md`).
+    *   MVP guardrail: warn on leaving (Back/close/refresh) if the wizard is dirty (statement inputs, matches, checked items).
+    *   Follow-up: persist a draft keyed by `(accountId, statementMonth)` so refresh/navigation does not lose in-progress work.
+
+*   **Terminology (UI + docs):**
+    *   Use **"difference"** consistently (avoid "diff").
+    *   Only label something **"Statement"** once a `statementDate` (or month) is selected; otherwise label cleared totals as "Cleared (all time)".
+
 *   **State:**
     *   `step`: 'loading' | 'setup' | 'worksheet' | 'success'.
     *   `worksheetItems`: Array.
     *   `form`: `{ statementDate, statementBalance }`.
+
 *   **Step 1 (Setup):**
     *   Input `statementDate` (default: today) and `statementBalance`.
-    *   Fetch `api.reconciliations.getWorksheet` (and optionally filter client-side by date if needed, though backend filter is better).
+    *   Fetch `api.reconciliations.getLatest` + `api.reconciliations.getWorksheet`.
+
 *   **Step 2 (Worksheet):**
-    *   Show list of items.
-    *   Computed `clearedBalance` = Sum of all `cleared` items in the list + (implicit starting cleared balance).
+    *   Show the full worksheet set (pending + new/modified since last checkpoint). Do not hide pending items by default.
+    *   Computed `clearedBalance` = Sum of all cleared items included in the reconciliation calculation (statement-aware; see `docs/architecture/reconciliation.md`).
     *   Computed `difference` = `statementBalance - clearedBalance`.
     *   **Validation:** "Finish" button disabled unless `difference == 0`.
-    *   **Action:** Click "Finish" -> `api.reconciliations.create` -> Close Modal.
+    *   **Action:** Click "Finish" -> `api.reconciliations.create` -> Close modal and navigate back to `/#/accounts/:accountId`.
 
 #### 3.4 Integration
-**Task:** Edit `src/dojo/frontend/vite/src/pages/AccountsPage.vue`.
-*   Import `ReconciliationModal`.
-*   Add "Reconcile" button.
+**Task:** Wire the entry point from account detail pages.
+
+*   In `src/dojo/frontend/vite/src/pages/AccountDetailPage.vue`, add a primary CTA “Reconcile statement” for eligible ledger accounts that navigates to `/#/accounts/:accountId/reconcile` (preserving `?range=`).
+*   Ensure the reconcile UI is opened by route match, and closing/cancel navigates back to `/#/accounts/:accountId`.
+*   Optional: keep a secondary entry point from `/#/accounts` if it does not add UI noise.
 
 ---
 
@@ -126,3 +150,4 @@ Before considering the task done:
 2.  [ ] **Query Logic:** Verify that a corrected date on a previously reconciled item causes it to reappear in the worksheet.
 3.  [ ] **Math is Correct:** The frontend allows finishing *only* when the difference is exactly 0.00.
 4.  [ ] **Linting:** `scripts/lint` passes.
+5.  [ ] **Navigation + Labels:** Refresh/back/forward behave in `/#/accounts/:accountId/reconcile`, dirty-state warns on leave, and "Statement" labels only appear once a statement date is selected.
