@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Account Onboarding Wizard: New multi-step modal for creating accounts with detailed configuration (APY, credit limits, etc.) aligned with architecture specs.
 - Backend schemas and migrations to support detailed account properties (interest rates, terms, institution names).
+- Account detail pages: dedicated per-account pages with charts, filtered ledgers/holdings, and URL-driven integrity actions (reconcile, verify holdings, valuation).
 - Account reconciliation: worksheet view + checkpoint commits from Accounts page.
 - Cache rebuild utility (`scripts/rebuild-caches`) for recomputing current balances and budgeting state.
 
