@@ -64,11 +64,24 @@ def test_investments_api_flow_end_to_end(investment_api_client: TestClient) -> N
             "account_type": "asset",
             "account_class": "cash",
             "account_role": "on_budget",
-            "current_balance_minor": 100000,
+            "current_balance_minor": 0,
             "currency": "USD",
             "opened_on": "2025-01-01",
             "is_active": True,
             "interest_rate_apy": 0.0,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+
+    resp = client.post(
+        "/api/transactions",
+        json={
+            "transaction_date": "2025-01-01",
+            "account_id": "cash_src",
+            "category_id": "opening_balance",
+            "amount_minor": 100000,
+            "memo": "Opening balance",
+            "status": "cleared",
         },
     )
     assert resp.status_code == 201, resp.text

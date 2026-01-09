@@ -1686,6 +1686,12 @@ class AccountAdminService:
         if dao.get_account_detail(payload.account_id) is not None:
             raise AccountAlreadyExistsError(f"Account `{payload.account_id}` already exists.")
 
+        if payload.current_balance_minor != 0:
+            raise BudgetingError(
+                "current_balance_minor must be 0; represent balance changes as ledger events (opening_balance or "
+                "balance_adjustment)."
+            )
+
         # Ensure currency code is uppercase for consistency.
         currency = payload.currency.upper()
         dao.begin()
@@ -1697,7 +1703,7 @@ class AccountAdminService:
                 account_type=payload.account_type,
                 account_class=payload.account_class,
                 account_role=payload.account_role,
-                current_balance_minor=payload.current_balance_minor,
+                current_balance_minor=0,
                 currency=currency,
                 is_active=payload.is_active,
                 opened_on=payload.opened_on,
@@ -1758,7 +1764,14 @@ class AccountAdminService:
         """
         dao = BudgetingDAO(conn)
         # Ensure the account exists before attempting to update.
-        self._require_account(dao, account_id)
+        existing = self._require_account(dao, account_id)
+
+        if payload.current_balance_minor != 0:
+            raise BudgetingError(
+                "current_balance_minor must be 0; represent balance changes as ledger events (opening_balance or "
+                "balance_adjustment)."
+            )
+
         # Ensure currency code is uppercase for consistency.
         currency = payload.currency.upper()
         dao.begin()
@@ -1770,7 +1783,7 @@ class AccountAdminService:
                 account_type=payload.account_type,
                 account_class=payload.account_class,
                 account_role=payload.account_role,
-                current_balance_minor=payload.current_balance_minor,
+                current_balance_minor=existing.current_balance_minor,
                 currency=currency,
                 opened_on=payload.opened_on,
                 is_active=payload.is_active,

@@ -2,7 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
-from typing import TypeVar
+from typing import Literal, TypeVar, cast
 from uuid import UUID
 
 import duckdb
@@ -20,8 +20,14 @@ from dojo.budgeting.errors import (
     InvalidTransactionError,
 )
 from dojo.budgeting.schemas import (
+    AccessibleAssetDetails,
+    AccountClass,
+    AccountClassDetails,
     AccountCreateRequest,
     AccountDetail,
+    AccountDetailResponse,
+    AccountHistoryPoint,
+    AccountRole,
     AccountState,
     AccountUpdateRequest,
     BudgetAllocationEntry,
@@ -34,12 +40,17 @@ from dojo.budgeting.schemas import (
     BudgetCategoryGroupDetail,
     BudgetCategoryGroupUpdateRequest,
     BudgetCategoryUpdateRequest,
+    CashAccountDetails,
     CategorizedTransferRequest,
     CategorizedTransferResponse,
     CategoryState,
+    CreditAccountDetails,
+    InvestmentAccountDetails,
+    LoanAccountDetails,
     NewTransactionRequest,
     ReadyToAssignResponse,
     ReferenceDataResponse,
+    TangibleAssetDetails,
     TransactionListItem,
     TransactionResponse,
     TransactionUpdateRequest,
@@ -62,6 +73,9 @@ TRANSACTION_LIMIT_MAX = 500
 ALLOCATIONS_LIMIT_DEFAULT = 100
 ALLOCATIONS_LIMIT_MAX = 500
 
+ACCOUNT_TRANSACTIONS_LIMIT_DEFAULT = 500
+MAX_ACCOUNT_HISTORY_DAYS = 3650
+
 # Type variable for FastAPI service dependencies.
 ServiceT = TypeVar("ServiceT")
 
@@ -69,6 +83,11 @@ ServiceT = TypeVar("ServiceT")
 
 # Query parameter helpers.
 _TRANSACTION_LIMIT_QUERY = Query(TRANSACTION_LIMIT_DEFAULT, ge=1, le=TRANSACTION_LIMIT_MAX)
+_ACCOUNT_TRANSACTIONS_LIMIT_QUERY = Query(
+    ACCOUNT_TRANSACTIONS_LIMIT_DEFAULT,
+    ge=1,
+    le=TRANSACTION_LIMIT_MAX,
+)
 _CATEGORY_MONTH_QUERY = Query(None, description="Month start (YYYY-MM-01) for envelope state.")
 _BUDGET_MONTH_QUERY = Query(None, description="Month start (YYYY-MM-01).")
 _ALLOCATIONS_LIMIT_QUERY = Query(ALLOCATIONS_LIMIT_DEFAULT, ge=1, le=ALLOCATIONS_LIMIT_MAX)
@@ -498,6 +517,151 @@ def list_accounts(
     """
     # Retrieve and return a list of all accounts using the service.
     return service.list_accounts(conn)
+
+
+@router.get("/accounts/{account_id}", response_model=AccountDetailResponse)
+def get_account_detail(
+    account_id: str,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+) -> AccountDetailResponse:
+    dao = BudgetingDAO(conn)
+    row = dao.get_active_account_detail_with_details(account_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account `{account_id}` was not found.",
+        )
+
+    details: AccountClassDetails | None = None
+    account_class = cast(AccountClass, str(row.account_class))
+
+    if account_class == "cash":
+        details = CashAccountDetails(
+            interest_rate_apy=row.cash_interest_rate_apy,
+        )
+    elif account_class == "accessible":
+        details = AccessibleAssetDetails(
+            interest_rate_apy=row.accessible_interest_rate_apy,
+            term_end_date=row.accessible_term_end_date,
+            early_withdrawal_penalty=row.accessible_early_withdrawal_penalty,
+        )
+    elif account_class == "credit":
+        details = CreditAccountDetails(
+            apr=row.credit_apr,
+            card_type=row.credit_card_type,
+            cash_advance_apr=row.credit_cash_advance_apr,
+        )
+    elif account_class == "loan":
+        details = LoanAccountDetails(
+            interest_rate_apy=row.loan_interest_rate_apy,
+            initial_principal_minor=row.loan_initial_principal_minor,
+            mortgage_escrow_details=row.loan_mortgage_escrow_details,
+        )
+    elif account_class == "tangible":
+        details = TangibleAssetDetails(
+            asset_name=row.tangible_asset_name,
+            acquisition_cost_minor=row.tangible_acquisition_cost_minor,
+        )
+    elif account_class == "investment":
+        details = InvestmentAccountDetails(
+            risk_free_sweep_rate=row.investment_risk_free_sweep_rate,
+            is_self_directed=row.investment_is_self_directed,
+            tax_classification=row.investment_tax_classification,
+        )
+
+    return AccountDetailResponse(
+        account_id=str(row.account_id),
+        name=str(row.name),
+        account_type=cast(Literal["asset", "liability"], str(row.account_type)),
+        account_class=account_class,
+        account_role=cast(AccountRole, str(row.account_role)),
+        current_balance_minor=int(row.current_balance_minor),
+        currency=str(row.currency),
+        institution_name=str(row.institution_name) if row.institution_name is not None else None,
+        opened_on=row.opened_on,
+        is_active=bool(row.is_active),
+        details=details,
+    )
+
+
+@router.get("/accounts/{account_id}/transactions", response_model=list[TransactionListItem])
+def list_account_transactions(
+    account_id: str,
+    start_date: date | None = Query(None, description="Filter start date (YYYY-MM-DD)."),
+    end_date: date | None = Query(None, description="Filter end date (YYYY-MM-DD)."),
+    limit: int = _ACCOUNT_TRANSACTIONS_LIMIT_QUERY,
+    status_filter: Literal["all", "cleared"] = Query("all", alias="status"),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+) -> list[TransactionListItem]:
+    dao = BudgetingDAO(conn)
+    if dao.get_active_account(account_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account `{account_id}` was not found.",
+        )
+
+    records = dao.list_account_transactions(
+        account_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        status=status_filter,
+    )
+
+    return [TransactionListItem(**record.__dict__) for record in records]
+
+
+@router.get("/accounts/{account_id}/history", response_model=list[AccountHistoryPoint])
+def get_account_balance_history(
+    account_id: str,
+    start_date: date = Query(..., description="Start date (YYYY-MM-DD)."),
+    end_date: date = Query(..., description="End date (YYYY-MM-DD)."),
+    status_filter: Literal["all", "cleared"] = Query("all", alias="status"),
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
+) -> list[AccountHistoryPoint]:
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be <= end_date",
+        )
+
+    day_count = (end_date - start_date).days + 1
+    if day_count > MAX_ACCOUNT_HISTORY_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Requested range is too large (max {MAX_ACCOUNT_HISTORY_DAYS} days).",
+        )
+
+    dao = BudgetingDAO(conn)
+    account = dao.get_active_account(account_id)
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account `{account_id}` was not found.",
+        )
+
+    records = dao.list_account_balance_history(
+        account_id,
+        start_date=start_date,
+        end_date=end_date,
+        status=status_filter,
+    )
+
+    points = [AccountHistoryPoint(as_of_date=r.as_of_date, balance_minor=r.balance_minor) for r in records]
+
+    if status_filter == "all" and end_date == system_date and points:
+        last = points[-1]
+        if last.balance_minor != account.current_balance_minor:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Account balance cache mismatch (history does not match accounts.current_balance_minor). "
+                    "Run scripts/rebuild-caches to repair derived balances before trusting charts."
+                ),
+            )
+
+    return points
 
 
 @router.post("/accounts", response_model=AccountDetail, status_code=status.HTTP_201_CREATED)

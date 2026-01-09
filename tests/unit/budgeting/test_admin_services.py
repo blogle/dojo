@@ -15,6 +15,7 @@ import pytest
 from dojo.budgeting.errors import (
     AccountAlreadyExistsError,
     AccountNotFoundError,
+    BudgetingError,
     CategoryNotFoundError,
 )
 from dojo.budgeting.schemas import (
@@ -70,7 +71,7 @@ def test_create_account_inserts_row(in_memory_db: duckdb.DuckDBPyConnection) -> 
         account_id="test_cash",
         name="Test Cash",
         account_type="asset",
-        current_balance_minor=12345,
+        current_balance_minor=0,
         currency="usd",
         opened_on=date(2024, 1, 1),
     )
@@ -80,8 +81,22 @@ def test_create_account_inserts_row(in_memory_db: duckdb.DuckDBPyConnection) -> 
     # Assert that the created account's properties match the payload and expected transformations.
     assert created.account_id == "test_cash"
     assert created.currency == "USD"
-    assert created.current_balance_minor == 12345
+    assert created.current_balance_minor == 0
     assert created.opened_on == date(2024, 1, 1)
+
+
+def test_create_account_rejects_non_zero_balance(in_memory_db: duckdb.DuckDBPyConnection) -> None:
+    service = AccountAdminService()
+    payload = AccountCreateRequest(
+        account_id="test_cash",
+        name="Test Cash",
+        account_type="asset",
+        current_balance_minor=1,
+        currency="USD",
+    )
+
+    with pytest.raises(BudgetingError):
+        service.create_account(in_memory_db, payload)
 
 
 def test_credit_account_auto_creates_payment_category(
@@ -157,7 +172,7 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
         account_id="needs_update",
         name="Needs Update",
         account_type="asset",
-        current_balance_minor=500,
+        current_balance_minor=0,
     )
     # Create an initial account to be updated and deactivated.
     service.create_account(in_memory_db, create_payload)
@@ -166,7 +181,7 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
     update_payload = AccountUpdateRequest(
         name="Updated",
         account_type="liability",
-        current_balance_minor=-750,
+        current_balance_minor=0,
         currency="usd",
         opened_on=None,
         is_active=True,
@@ -175,7 +190,21 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
     updated = service.update_account(in_memory_db, "needs_update", update_payload)
     # Assert that the account's properties have been updated correctly.
     assert updated.account_type == "liability"
-    assert updated.current_balance_minor == -750
+    assert updated.current_balance_minor == 0
+
+    with pytest.raises(BudgetingError):
+        service.update_account(
+            in_memory_db,
+            "needs_update",
+            AccountUpdateRequest(
+                name="Bad Balance",
+                account_type="liability",
+                current_balance_minor=1,
+                currency="USD",
+                opened_on=None,
+                is_active=True,
+            ),
+        )
 
     # Deactivate the account.
     service.deactivate_account(in_memory_db, "needs_update")

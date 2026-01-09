@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Maximum length for names (e.g., account names, category names).
 NAME_MAX_LENGTH = 120
@@ -65,7 +65,6 @@ class TransactionUpdateRequest(BaseModel):
     amount_minor: int
     memo: str | None = None
     status: Literal["pending", "cleared"] | None = None
-
 
 
 class CategorizedTransferRequest(BaseModel):
@@ -399,7 +398,6 @@ class BudgetAllocationUpdateRequest(BaseModel):
     memo: str | None = None
 
 
-
 # Regular expression pattern for valid slug-like identifiers (lowercase letters, numbers, underscores).
 SLUG_PATTERN = r"^[a-z0-9_]+$"
 
@@ -546,7 +544,7 @@ class AccountCreateRequest(AccountCommand):
     """
 
     account_id: str = Field(pattern=SLUG_PATTERN, description="Stable identifier for the account.")
-    
+
     # Polymorphic fields for account details
     interest_rate_apy: float | None = None
     card_type: str | None = None
@@ -570,6 +568,7 @@ class AccountUpdateRequest(AccountCommand):
     Inherits all fields from `AccountCommand`, providing the mutable attributes
     for updating an account.
     """
+
     # Polymorphic fields for account details
     interest_rate_apy: float | None = None
     card_type: str | None = None
@@ -607,6 +606,80 @@ class AccountDetail(AccountCommand):
     account_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class CashAccountDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    interest_rate_apy: float | None = None
+
+
+class AccessibleAssetDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    interest_rate_apy: float | None = None
+    term_end_date: date | None = None
+    early_withdrawal_penalty: bool | None = None
+
+
+class CreditAccountDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    apr: float | None = None
+    card_type: str | None = None
+    cash_advance_apr: float | None = None
+
+
+class LoanAccountDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    interest_rate_apy: float | None = None
+    initial_principal_minor: int | None = None
+    mortgage_escrow_details: str | None = None
+
+
+class TangibleAssetDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_name: str | None = None
+    acquisition_cost_minor: int | None = None
+
+
+class InvestmentAccountDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    risk_free_sweep_rate: float | None = None
+    is_self_directed: bool | None = None
+    tax_classification: str | None = None
+
+
+AccountClassDetails = (
+    CashAccountDetails
+    | AccessibleAssetDetails
+    | CreditAccountDetails
+    | LoanAccountDetails
+    | TangibleAssetDetails
+    | InvestmentAccountDetails
+)
+
+
+class AccountDetailResponse(BaseModel):
+    account_id: str
+    name: str
+    account_type: Literal["asset", "liability"]
+    account_class: AccountClass
+    account_role: AccountRole
+    current_balance_minor: int
+    currency: str
+    institution_name: str | None = None
+    opened_on: date | None = None
+    is_active: bool
+    details: AccountClassDetails | None = None
+
+
+class AccountHistoryPoint(BaseModel):
+    as_of_date: date
+    balance_minor: int
 
 
 class BudgetCategoryCommand(BaseModel):

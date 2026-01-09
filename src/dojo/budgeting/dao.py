@@ -669,6 +669,21 @@ class TransactionListRecord:
 
 
 @dataclass(frozen=True)
+class AccountHistoryPointRecord:
+    """Single daily account balance point for charting."""
+
+    as_of_date: date
+    balance_minor: int
+
+    @classmethod
+    def from_row(cls, row: SimpleNamespace) -> "AccountHistoryPointRecord":
+        return cls(
+            as_of_date=row.as_of_date,
+            balance_minor=int(row.balance_minor),
+        )
+
+
+@dataclass(frozen=True)
 class BudgetAllocationRecord:
     """
     Represents a record of an allocation of funds between budgeting categories.
@@ -919,6 +934,13 @@ class BudgetingDAO:
             return None
         # Convert the fetched row into an AccountRecord.
         return AccountRecord.from_row(row)
+
+    def get_active_account_detail_with_details(self, account_id: str) -> SimpleNamespace | None:
+        """Retrieve an active account and its current class-specific detail row."""
+        return self._fetchone_namespace(
+            _sql("select_account_detail_with_details.sql"),
+            {"account_id": account_id},
+        )
 
     def list_accounts(self) -> list[AccountRecord]:
         """
@@ -1887,6 +1909,48 @@ class BudgetingDAO:
         )
         # Convert each fetched row into a TransactionListRecord.
         return [TransactionListRecord.from_row(row) for row in rows]
+
+    def list_account_transactions(
+        self,
+        account_id: str,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+        limit: int,
+        status: Literal["all", "cleared"],
+    ) -> list[TransactionListRecord]:
+        sql = _sql("select_account_transactions.sql")
+        rows = self._fetchall_namespaces(
+            sql,
+            {
+                "account_id": account_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "limit_count": limit,
+                "status": status,
+            },
+        )
+        return [TransactionListRecord.from_row(row) for row in rows]
+
+    def list_account_balance_history(
+        self,
+        account_id: str,
+        *,
+        start_date: date,
+        end_date: date,
+        status: Literal["all", "cleared"],
+    ) -> list[AccountHistoryPointRecord]:
+        sql = _sql("select_account_balance_history.sql")
+        rows = self._fetchall_namespaces(
+            sql,
+            {
+                "account_id": account_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "status": status,
+            },
+        )
+        return [AccountHistoryPointRecord.from_row(row) for row in rows]
 
     def list_budget_allocations(self, month_start: date, limit: int) -> list[BudgetAllocationRecord]:
         """
