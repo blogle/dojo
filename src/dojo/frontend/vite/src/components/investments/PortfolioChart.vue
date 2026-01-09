@@ -99,7 +99,7 @@ import { computed, ref } from "vue";
 import { formatAmount } from "../../services/format.js";
 
 const props = defineProps({
-	points: {
+	series: {
 		type: Array,
 		required: true,
 	},
@@ -108,6 +108,14 @@ const props = defineProps({
 		required: true,
 	},
 	loading: {
+		type: Boolean,
+		default: false,
+	},
+	increaseIsGood: {
+		type: Boolean,
+		default: true,
+	},
+	showPercentChange: {
 		type: Boolean,
 		default: false,
 	},
@@ -121,44 +129,66 @@ const gradientId = `inv-gradient-${Math.random().toString(16).slice(2)}`;
 const W = 1000;
 const H = 260;
 
-const series = computed(() =>
-	props.points.map((p) => ({
-		date: p.market_date,
-		value: p.nav_minor,
-	})),
-);
+const isDeltaGood = (delta) => {
+	return props.increaseIsGood ? delta >= 0 : delta <= 0;
+};
+
+const points = computed(() => {
+	const data = props.series ?? [];
+	return [...data]
+		.filter(
+			(point) =>
+				point &&
+				typeof point.date === "string" &&
+				Number.isFinite(point.value_minor),
+		)
+		.sort((a, b) => a.date.localeCompare(b.date))
+		.map((point) => ({
+			date: point.date,
+			value: point.value_minor,
+		}));
+});
 
 const summary = computed(() => {
-	if (!series.value.length) {
+	if (!points.value.length) {
 		return null;
 	}
-	const start = series.value[0]?.value;
-	const end = series.value[series.value.length - 1]?.value;
+	const start = points.value[0]?.value;
+	const end = points.value[points.value.length - 1]?.value;
 	if (start === undefined || end === undefined) {
 		return null;
 	}
 	const delta = end - start;
 	const sign = delta >= 0 ? "+" : "";
-	const pct = start !== 0 ? delta / start : null;
+	const pct = props.showPercentChange && start !== 0 ? delta / start : null;
 	return {
 		valueLabel: formatAmount(end),
-		deltaClass:
-			delta >= 0
-				? "investments-chart__delta--up"
-				: "investments-chart__delta--down",
+		deltaClass: isDeltaGood(delta)
+			? "investments-chart__delta--up"
+			: "investments-chart__delta--down",
 		deltaLabel: `${sign}${formatAmount(delta)}`,
 		pctLabel: pct === null ? "" : `(${sign}${(pct * 100).toFixed(2)}%)`,
 	};
 });
 
-const minValue = computed(() => Math.min(...series.value.map((p) => p.value)));
-const maxValue = computed(() => Math.max(...series.value.map((p) => p.value)));
-
-const scaleX = (index) => {
-	if (series.value.length <= 1) {
+const minValue = computed(() => {
+	if (!points.value.length) {
 		return 0;
 	}
-	return (index / (series.value.length - 1)) * W;
+	return Math.min(...points.value.map((p) => p.value));
+});
+const maxValue = computed(() => {
+	if (!points.value.length) {
+		return 0;
+	}
+	return Math.max(...points.value.map((p) => p.value));
+});
+
+const scaleX = (index) => {
+	if (points.value.length <= 1) {
+		return 0;
+	}
+	return (index / (points.value.length - 1)) * W;
 };
 
 const scaleY = (value) => {
@@ -172,10 +202,10 @@ const scaleY = (value) => {
 };
 
 const linePath = computed(() => {
-	if (!series.value.length) {
+	if (!points.value.length) {
 		return "";
 	}
-	return series.value
+	return points.value
 		.map(
 			(p, idx) => `${idx === 0 ? "M" : "L"}${scaleX(idx)} ${scaleY(p.value)}`,
 		)
@@ -183,21 +213,21 @@ const linePath = computed(() => {
 });
 
 const areaPath = computed(() => {
-	if (!series.value.length) {
+	if (!points.value.length) {
 		return "";
 	}
 	const line = linePath.value;
-	const lastX = scaleX(series.value.length - 1);
+	const lastX = scaleX(points.value.length - 1);
 	return `${line} L${lastX} ${H} L0 ${H} Z`;
 });
 
 const defaultTheme = computed(() => {
-	if (series.value.length < 2) {
+	if (points.value.length < 2) {
 		return "var(--success)";
 	}
-	const start = series.value[0].value;
-	const end = series.value[series.value.length - 1].value;
-	return end >= start ? "var(--success)" : "var(--danger)";
+	const start = points.value[0].value;
+	const end = points.value[points.value.length - 1].value;
+	return isDeltaGood(end - start) ? "var(--success)" : "var(--danger)";
 });
 
 const cursor = ref(null);
@@ -225,12 +255,12 @@ const selectionTheme = computed(() => {
 	if (!dragActive.value) {
 		return defaultTheme.value;
 	}
-	const a = series.value[dragStart.value]?.value;
-	const b = series.value[dragEnd.value]?.value;
+	const a = points.value[dragStart.value]?.value;
+	const b = points.value[dragEnd.value]?.value;
 	if (a === undefined || b === undefined) {
 		return defaultTheme.value;
 	}
-	return b >= a ? "var(--success)" : "var(--danger)";
+	return isDeltaGood(b - a) ? "var(--success)" : "var(--danger)";
 });
 
 const themeColor = computed(() => selectionTheme.value);
@@ -248,14 +278,14 @@ const dragTooltip = computed(() => {
 	if (!dragActive.value) {
 		return null;
 	}
-	const a = series.value[dragStart.value]?.value;
-	const b = series.value[dragEnd.value]?.value;
+	const a = points.value[dragStart.value]?.value;
+	const b = points.value[dragEnd.value]?.value;
 	if (a === undefined || b === undefined) {
 		return null;
 	}
 	const delta = b - a;
 	const sign = delta >= 0 ? "+" : "";
-	if (a === 0) {
+	if (!props.showPercentChange || a === 0) {
 		return `${sign}${formatAmount(delta)}`;
 	}
 	const pct = delta / a;
@@ -277,15 +307,15 @@ const toLocalIndex = (evt) => {
 	return Math.max(
 		0,
 		Math.min(
-			series.value.length - 1,
-			Math.round(ratio * (series.value.length - 1)),
+			points.value.length - 1,
+			Math.round(ratio * (points.value.length - 1)),
 		),
 	);
 };
 
 const onMove = (evt) => {
 	const idx = toLocalIndex(evt);
-	const point = series.value[idx];
+	const point = points.value[idx];
 	if (!point) {
 		return;
 	}

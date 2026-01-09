@@ -56,11 +56,13 @@
 
 <script setup>
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { api } from "../services/api.js";
 import { dollarsToMinor, todayISO } from "../services/format.js";
 
 const queryClient = useQueryClient();
+const route = useRoute();
 
 const referenceQuery = useQuery({
 	queryKey: ["reference-data"],
@@ -78,6 +80,38 @@ const form = reactive({
 	memo: "",
 	amount: "",
 });
+
+const prefillField = (fieldName, queryName = fieldName) => {
+	const value = route.query?.[queryName];
+	if (typeof value !== "string" || !value) {
+		return;
+	}
+	if (form[fieldName]) {
+		return;
+	}
+	form[fieldName] = value;
+};
+
+watch(
+	() => route.fullPath,
+	() => {
+		prefillField("source_account_id");
+		prefillField("destination_account_id");
+		prefillField("category_id");
+		prefillField("memo");
+		prefillField("amount");
+
+		const datePrefill = route.query?.transaction_date;
+		if (
+			typeof datePrefill === "string" &&
+			datePrefill &&
+			form.transaction_date === todayISO()
+		) {
+			form.transaction_date = datePrefill;
+		}
+	},
+	{ immediate: true },
+);
 
 const formError = ref("");
 

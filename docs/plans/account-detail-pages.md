@@ -16,9 +16,9 @@ Every account detail page must have an account-type-appropriate integrity action
 
 - [x] (2026-01-09 01:38Z) Implement canonical `/accounts/:accountId` route + investments redirect alias.
 - [x] (2026-01-09 01:27Z) Add backend endpoints for account details + per-account transactions + per-account balance history (including `status` filtering and balance continuity guardrails).
-- [ ] (2026-01-09 01:38Z) Add frontend API client methods + query key conventions for the new endpoints (completed: add `api.accounts.get`, `api.accounts.getTransactions`, `api.accounts.getHistory`; remaining: shared query/range utilities + use conventions in `AccountDetailPage.vue`).
+- [x] (2026-01-09 02:03Z) Add frontend API client methods + query key conventions for the new endpoints (shared URL-driven `?range=` utility + account history/transactions queries wired in `AccountDetailPage.vue`).
 - [x] (2026-01-09 01:38Z) Remove account detail modal; make account cards navigate to detail pages.
-- [ ] (YYYY-MM-DD HH:MMZ) Implement account detail pages for all account classes using shared components + shared `?range=` behavior, with liability-safe “Record payment” actions.
+- [x] (2026-01-09 02:03Z) Implement account detail pages for all account classes using shared components + shared `?range=` behavior, with liability-safe “Record payment” entry point (transfer).
 - [ ] (YYYY-MM-DD HH:MMZ) Add account-type integrity actions on every detail page using existing flows, with URL-driven modes (`/reconcile`, `/verify-holdings`, `/valuation`).
 - [x] (2026-01-09 01:27Z) Add automated tests for new API endpoints and run the relevant test suite.
 - [ ] (YYYY-MM-DD HH:MMZ) Manual verification: charts + filtered ledger + integrity actions.
@@ -787,3 +787,4 @@ Change note (required for living ExecPlans):
 - 2026-01-09: Incorporated expert review feedback: absolute-balance history with baseline, status-filtered history/transactions for cleared-only views, canonical `/accounts/:id` routes with URL-driven modes, explicit sign conventions, ledger-derived balance continuity, and liability-safe payment entry via transfers.
 - 2026-01-09: Implemented Milestone 1 backend read APIs (`/api/accounts/{id}`, `/transactions`, `/history`), enforced `current_balance_minor` guardrails on account create/update, and added integration tests for the new endpoints.
 - 2026-01-09: Added SPA routes for `/accounts/:accountId` + mode routes and redirected `/investments/:accountId`; removed the account detail modal in `AccountsPage.vue` so cards navigate to the detail page.
+- 2026-01-09: Implemented `AccountDetailPage.vue` (chart + ledger/holdings + aside), refactored `PortfolioChart.vue` to accept normalized `series`, added shared URL-driven range handling (`?range=`), and added a liability-safe `Record payment` entry point via the transfer flow (Transfers prefills + liability charge-only form).

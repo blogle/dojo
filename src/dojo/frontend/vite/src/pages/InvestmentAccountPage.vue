@@ -23,10 +23,11 @@
         <div class="investments-chart investments-card">
           <PortfolioChart
             data-testid="investment-chart"
-            :points="historyPoints"
-            :interval="interval"
+            :series="chartSeries"
+            :interval="rangeLabel"
             :loading="historyLoading"
-            @change-interval="interval = $event"
+            :showPercentChange="true"
+            @change-interval="setRangeLabel"
           />
         </div>
 
@@ -91,45 +92,13 @@ import {
 	dollarsToMinor,
 	formatAmount,
 	minorToDollars,
-	todayISO,
 } from "../services/format.js";
+import { useChartRange } from "../utils/chartRange.js";
 
 const route = useRoute();
 const accountId = computed(() => route.params.accountId);
 
-const interval = ref("1M");
-
-const resolveRange = (label) => {
-	const end = new Date();
-	const start = new Date(end);
-
-	if (label === "1D") {
-		start.setDate(end.getDate() - 1);
-	} else if (label === "1W") {
-		start.setDate(end.getDate() - 7);
-	} else if (label === "1M") {
-		start.setMonth(end.getMonth() - 1);
-	} else if (label === "3M") {
-		start.setMonth(end.getMonth() - 3);
-	} else if (label === "YTD") {
-		start.setMonth(0);
-		start.setDate(1);
-	} else if (label === "1Y") {
-		start.setFullYear(end.getFullYear() - 1);
-	} else if (label === "Max") {
-		start.setFullYear(end.getFullYear() - 5);
-	}
-
-	const toISO = (value) =>
-		`${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-
-	return {
-		startDate: toISO(start),
-		endDate: todayISO(),
-	};
-};
-
-const range = computed(() => resolveRange(interval.value));
+const { rangeLabel, range, setRangeLabel } = useChartRange();
 
 const accountsQuery = useQuery({
 	queryKey: ["accounts"],
@@ -159,7 +128,13 @@ const historyQuery = useQuery({
 });
 
 const portfolio = computed(() => portfolioQuery.data.value);
-const historyPoints = computed(() => historyQuery.data.value || []);
+
+const chartSeries = computed(() =>
+	(historyQuery.data.value || []).map((point) => ({
+		date: point.market_date,
+		value_minor: point.nav_minor,
+	})),
+);
 
 const cashDraft = ref("0.00");
 watch(

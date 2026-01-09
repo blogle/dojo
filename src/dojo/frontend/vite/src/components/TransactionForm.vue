@@ -6,9 +6,9 @@
       aria-describedby="transaction-form-hint"
       @submit.prevent="handleSubmit"
     >
-      <div class="segmented-control" role="group" aria-label="Transaction type">
+      <div v-if="showFlowToggle" class="segmented-control" role="group" aria-label="Transaction type">
         <span class="segmented-control__label">Type</span>
-        <label class="segmented-control__option">
+        <label v-if="canSelectOutflow" class="segmented-control__option">
           <input
             type="radio"
             name="transaction-flow"
@@ -19,7 +19,7 @@
           />
           <span>Outflow</span>
         </label>
-        <label class="segmented-control__option">
+        <label v-if="canSelectInflow" class="segmented-control__option">
           <input
             type="radio"
             name="transaction-flow"
@@ -122,6 +122,7 @@ import {
 const props = defineProps({
 	accounts: { type: Array, default: () => [] },
 	categories: { type: Array, default: () => [] },
+	allowedFlows: { type: Array, default: () => ["outflow", "inflow"] },
 	lockedAccountId: { type: String, default: "" },
 	lockedAccountName: { type: String, default: "" },
 	isSubmitting: { type: Boolean, default: false },
@@ -152,6 +153,33 @@ const transactionForm = reactive({
 	amount: "",
 	flow: "outflow",
 });
+
+const resolvedFlows = computed(() => {
+	const flows = Array.isArray(props.allowedFlows) ? props.allowedFlows : [];
+	const normalized = flows.filter(
+		(flow) => flow === "outflow" || flow === "inflow",
+	);
+	if (!normalized.length) {
+		return ["outflow", "inflow"];
+	}
+	return ["outflow", "inflow"].filter((flow) => normalized.includes(flow));
+});
+
+const showFlowToggle = computed(() => resolvedFlows.value.length > 1);
+const canSelectOutflow = computed(() =>
+	resolvedFlows.value.includes("outflow"),
+);
+const canSelectInflow = computed(() => resolvedFlows.value.includes("inflow"));
+
+watch(
+	() => resolvedFlows.value.join("|"),
+	() => {
+		if (!resolvedFlows.value.includes(transactionForm.flow)) {
+			transactionForm.flow = resolvedFlows.value[0] || "outflow";
+		}
+	},
+	{ immediate: true },
+);
 
 const formError = ref("");
 
@@ -199,7 +227,7 @@ const resetForm = () => {
 	transactionForm.category_id = "";
 	transactionForm.memo = "";
 	transactionForm.amount = "";
-	transactionForm.flow = "outflow";
+	transactionForm.flow = resolvedFlows.value[0] || "outflow";
 };
 
 const handleSubmit = async () => {
