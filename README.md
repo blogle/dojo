@@ -51,7 +51,17 @@ The seed scripts insert the `house_*` accounts and baseline categories so the SP
 
 ### 4. Run the API + SPA locally
 
+For frontend development (hot reload + no manual rebuilds), run the Vite dev server + backend together:
+
 ```bash
+npm --prefix src/dojo/frontend/vite run dev
+# open http://127.0.0.1:5173/ (Vite proxies /api and /static to the backend)
+```
+
+If you want FastAPI to serve the built SPA directly (no Vite dev server), build once and then start the backend:
+
+```bash
+npm --prefix src/dojo/frontend/vite run build
 uvicorn dojo.core.app:create_app --factory --reload
 # open http://127.0.0.1:8000/ in your browser
 ```
@@ -74,8 +84,8 @@ The Cypress run spins up a dedicated DuckDB database (`data/e2e-ledger.duckdb`) 
 
 - **FastAPI Monolith**: `dojo.core.app:create_app` is the sole entry point. It wires routers from each domain package (budgeting, core, investments, etc.) and builds dependencies through `build_container` so every request receives a scoped DuckDB connection and typed services.
 - **DAO Layer**: All SQL lives under `src/dojo/sql/**` and is loaded through DAO classes (`src/dojo/*/dao.py`). Services only consume typed dataclasses returned by the DAO methods, which keeps business rules pure Python and ensures the temporal ledger constraints stay centralized.
-- **SPA Composition**: `src/dojo/frontend/static/main.js` bootstraps hash-based routing, registers each page module (`components/{transactions,accounts,budgets,allocations,transfers}/index.js`), and integrates the shared `store.js`. State updates are immutable (`store.setState`/`patchState`) and all DOM fetches go through `services/api.js` + `services/dom.js` helpers.
-- **Styles & Assets**: Styles are broken into global primitives (`styles/base.css`, `styles/forms.css`, `styles/layout.css`, `styles/ledger.css`) plus feature-scoped bundles in `styles/components/*.css` that follow the documented BEM conventions.
+- **SPA (Vue/Vite)**: Source lives under `src/dojo/frontend/vite/src/` and is built into `src/dojo/frontend/static/dist/` for the FastAPI static mount.
+- **Styles & Assets**: Shared CSS is under `src/dojo/frontend/static/styles/` and is imported by the Vite entrypoint.
 
 ## Status
 
