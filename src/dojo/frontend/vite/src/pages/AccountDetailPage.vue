@@ -47,19 +47,30 @@
     <p v-else-if="pageLoading" class="u-muted">Loading account…</p>
 
     <template v-else-if="isInvestment">
-      <section class="account-detail-page__hero-row">
-        <div class="account-detail-page__hero-chart">
-          <PortfolioChart
-            :series="chartSeries"
-            :interval="rangeLabel"
-            :loading="chartLoading"
-            :increaseIsGood="chartIncreaseIsGood"
-            :showPercentChange="chartShowPercentChange"
-            @change-interval="setRangeLabel"
-          />
-        </div>
+      <div class="investments-layout">
+        <main>
+          <div class="investments-card investments-chart">
+            <PortfolioChart
+              :series="chartSeries"
+              :interval="rangeLabel"
+              :loading="chartLoading"
+              :increaseIsGood="chartIncreaseIsGood"
+              :showPercentChange="chartShowPercentChange"
+              @change-interval="setRangeLabel"
+            />
+          </div>
 
-        <div class="account-detail-page__hero-aside">
+          <HoldingsTable
+            v-if="!verifyHoldingsModalOpen"
+            class="account-detail-page__holdings"
+            data-testid="investment-holdings"
+            :positions="portfolio?.positions || []"
+            :pending="reconcilePending"
+            @reconcile="handleReconcile"
+          />
+        </main>
+
+        <aside>
           <div class="investments-card">
             <p class="investments-card__title">Details</p>
             <dl class="investments-kv">
@@ -80,7 +91,10 @@
             </dl>
           </div>
 
-          <div v-if="!verifyHoldingsModalOpen" class="investments-card account-detail-page__cash-card">
+          <div
+            v-if="!verifyHoldingsModalOpen"
+            class="investments-card account-detail-page__cash-card"
+          >
             <p class="investments-card__title">Cash balance</p>
             <input
               class="investments-cash-input"
@@ -95,17 +109,8 @@
               Enter cash available in your brokerage. Saves on blur / Enter.
             </p>
           </div>
-        </div>
-      </section>
-
-      <HoldingsTable
-        v-if="!verifyHoldingsModalOpen"
-        class="account-detail-page__holdings"
-        data-testid="investment-holdings"
-        :positions="portfolio?.positions || []"
-        :pending="reconcilePending"
-        @reconcile="handleReconcile"
-      />
+        </aside>
+      </div>
     </template>
 
     <div v-else class="investments-layout">
@@ -1411,21 +1416,6 @@ const detailRows = computed(() => {
   align-items: center;
 }
 
-.account-detail-page__hero-row {
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 1.5rem;
-  align-items: start;
-  margin-top: 1.25rem;
-  padding-right: 2rem;
-}
-
-.account-detail-page__hero-aside {
-  display: flex;
-  flex-direction: column;
-}
 
 .account-detail-page__cash-card {
   margin-top: 1rem;
@@ -1439,13 +1429,6 @@ const detailRows = computed(() => {
   margin-top: 1.25rem;
 }
 
-@media (max-width: 960px) {
-  .account-detail-page__hero-row {
-    grid-template-columns: 1fr;
-    padding-right: 0;
-  }
-}
-
 @media (max-width: 720px) {
   .account-detail-page__header {
     flex-direction: column;
@@ -1456,10 +1439,6 @@ const detailRows = computed(() => {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
-  }
-
-  .account-detail-page__hero-row {
-    margin-top: 1rem;
   }
 }
 </style>

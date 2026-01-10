@@ -259,12 +259,17 @@ const selectionTheme = computed(() => {
 	if (!dragActive.value) {
 		return defaultTheme.value;
 	}
-	const a = points.value[dragStart.value]?.value;
-	const b = points.value[dragEnd.value]?.value;
-	if (a === undefined || b === undefined) {
+
+	const startIdx = Math.min(dragStart.value, dragEnd.value);
+	const endIdx = Math.max(dragStart.value, dragEnd.value);
+	const startValue = points.value[startIdx]?.value;
+	const endValue = points.value[endIdx]?.value;
+	if (startValue === undefined || endValue === undefined) {
 		return defaultTheme.value;
 	}
-	return isDeltaGood(b - a) ? "var(--success)" : "var(--danger)";
+	return isDeltaGood(endValue - startValue)
+		? "var(--success)"
+		: "var(--danger)";
 });
 
 const themeColor = computed(() => selectionTheme.value);
@@ -282,11 +287,15 @@ const dragTooltip = computed(() => {
 	if (!dragActive.value) {
 		return null;
 	}
-	const startPoint = points.value[dragStart.value];
-	const endPoint = points.value[dragEnd.value];
+
+	const startIdx = Math.min(dragStart.value, dragEnd.value);
+	const endIdx = Math.max(dragStart.value, dragEnd.value);
+	const startPoint = points.value[startIdx];
+	const endPoint = points.value[endIdx];
 	if (!startPoint || !endPoint) {
 		return null;
 	}
+
 	const delta = endPoint.value - startPoint.value;
 	const sign = delta >= 0 ? "+" : "";
 
