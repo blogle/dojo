@@ -49,7 +49,18 @@ If you are ever tempted to invent a new “one-off” command, first check `scri
 ### 2.2 Planning & Research (Big Levers)
 
 Use these for any non-trivial change:
-
+- **ArchMap (`.agent/ARCH_MAP.md`)
+  - Use when the work may change structure or boundaries:
+    - new modules/packages, new domain boundaries (“cities”), or new shared infrastructure (“resources”)
+    - new cross-domain APIs/contracts/events (“highways”)
+    - performance-sensitive paths, data ownership changes, persistence patterns, or observability wiring
+  - Expectations:
+    - Prefer solutions that stay within one “city” and minimize cross-map travel.
+    - Maintain a succinct **Constitution** (amendments-style technical requirements/tradeoffs) in `ARCHITECTURE.md`.
+    - No ADR directory: architectural decisions are captured as Constitution amendments in `ARCHITECTURE.md`,
+      with optional deeper notes under `docs/architecture/` or `docs/data-model/`.
+    - When architecture changes, update `ARCHITECTURE.md` and (if newcomer workflows changed) `README.md`
+      in the same change as the code.
 - **ExecPlan** (`.agent/PLANS.md` + `docs/plans/*.md`)
   - When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
   - For features, refactors, or infra changes.
@@ -78,6 +89,7 @@ Do **not** stuff all rules into this file. When you start a task, decide which o
 
 - **Architecture & Data Model**
   - `ARCHITECTURE.md` — System purpose, critical files, runtime flow, invariants, and quality attributes.
+  - `.agent/ARCH_MAP.md` — Architecture “map-making” prompt: boundaries, highways, resources, and the Constitution.
   - `docs/data-model/overview.md` — SQL schema overview and service-level docs.
 
 - **Rules & Domain Invariants** (non-linter)
@@ -156,6 +168,9 @@ For user-visible changes:
   - `ARCHITECTURE.md` for system-level changes.
   - Any relevant plan in `docs/plans/`.
 - Do **not** let `ARCHITECTURE.md` or plans drift from reality.
+- If the change alters boundaries, contracts, shared resources, or system tradeoffs,
+  apply the Cartographer prompt (`.agent/ARCH_MAP.md`) and update the Constitution section
+  in `ARCHITECTURE.md` (amendments-style, succinct).
 
 
 ## 5. Task Deferral & TODOs
