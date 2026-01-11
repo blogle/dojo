@@ -3,6 +3,11 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    beads-nix = {
+      url = "github:steveyegge/beads";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
@@ -23,7 +28,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, pyproject-nix, uv2nix, pyproject-build-systems, ... }:
+  outputs = { self, nixpkgs, beads-nix, pyproject-nix, uv2nix, pyproject-build-systems, ... }:
     let
       inherit (nixpkgs) lib;
       forAllSystems = lib.genAttrs lib.systems.flakeExposed;
@@ -108,12 +113,14 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          beads = beads-nix.packages.${system}.default;
           pythonSet = pythonSets.${system}.overrideScope editableOverlay;
           virtualenv = pythonSet.mkVirtualEnv "dojo-dev-env" workspace.deps.all;
         in
         {
           default = pkgs.mkShell {
             buildInputs = with pkgs; [
+              beads
               biome
               actionlint
               cypress
