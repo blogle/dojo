@@ -183,10 +183,13 @@
       </div>
     </div>
 
-    <ReconciliationModal
+    <ReconciliationSession
       :open="reconcileModalOpen"
       :account="account || null"
+      :accounts="accounts"
+      :categories="categories"
       @close="handleReconcileClose"
+      @commit="handleReconciliationCommit"
     />
 
     <div
@@ -332,7 +335,7 @@ import HoldingsTable from "../components/investments/HoldingsTable.vue";
 import PortfolioChart from "../components/investments/PortfolioChart.vue";
 import TransactionForm from "../components/TransactionForm.vue";
 import TransactionTable from "../components/TransactionTable.vue";
-import ReconciliationModal from "../components/ReconciliationModal.vue";
+import ReconciliationSession from "../components/ReconciliationSession.vue";
 import { api } from "../services/api.js";
 import {
 	dollarsToMinor,
@@ -565,6 +568,15 @@ const navigatePrimary = () => {
 		path: `/accounts/${accountId.value}/${primaryAction.value.mode}`,
 		query: route.query,
 	});
+};
+
+const commitReconciliationMutation = useMutation({
+	mutationFn: ({ accountId: id, payload }) =>
+		api.reconciliations.create(id, payload),
+});
+
+const handleReconciliationCommit = async ({ accountId: id, payload }) => {
+	await commitReconciliationMutation.mutateAsync({ accountId: id, payload });
 };
 
 const handleRecordPayment = () => {

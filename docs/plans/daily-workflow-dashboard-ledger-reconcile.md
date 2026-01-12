@@ -41,6 +41,12 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
 - [x] (2026-01-11) Improved reconciliation delta-finding helpers and renamed labels to cleared/pending (`dojo-cdu`).
 - [x] (2026-01-12) Persisted statement pending total in reconciliation commits (`dojo-cdu`).
 - [x] (2026-01-11) Validated via `scripts/run-tests --skip-e2e` and Cypress stories 05/06/14.
+- [x] (2026-01-12) Implemented reconciliation session framework with shell + adapter pattern (`dojo-ygs`).
+  - Created `ReconciliationSession.vue` as shared shell (header, actions, adapter host).
+  - Created `LedgerReconciliationAdapter.vue` refactoring existing cash/credit reconciliation into adapter.
+  - Created stub adapters `InvestmentReconciliationAdapter.vue` and `TangibleReconciliationAdapter.vue`.
+  - Updated `AccountDetailPage.vue` to use `ReconciliationSession` shell.
+  - All tests pass and frontend builds successfully.
 
 ## Surprises & Discoveries
 
