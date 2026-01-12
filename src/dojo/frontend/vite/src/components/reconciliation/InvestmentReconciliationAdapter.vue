@@ -15,6 +15,8 @@
 </template>
 
 <script setup>
+import { nextTick } from "vue";
+
 const props = defineProps({
 	account: { type: Object, default: null },
 	accounts: { type: Array, default: () => [] },
@@ -23,9 +25,11 @@ const props = defineProps({
 
 const emit = defineEmits(["ready", "close", "commit"]);
 
-emit("ready", {
-	commitLabel: null,
-	commitDisabled: true,
+nextTick(() => {
+	emit("ready", {
+		commitLabel: null,
+		commitDisabled: true,
+	});
 });
 </script>
 

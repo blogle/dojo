@@ -3,7 +3,7 @@
     <div class="reconciliation-adapter__placeholder">
       <p class="reconciliation-adapter__placeholder-title">Tangible asset valuation</p>
       <p class="reconciliation-adapter__placeholder-text">
-        This adapter will support updating the current value of tangible assets
+        This adapter will support updating current value of tangible assets
         (real estate, vehicles, collectibles, etc.) for net worth tracking.
       </p>
       <div class="reconciliation-adapter__placeholder-status">
@@ -15,6 +15,8 @@
 </template>
 
 <script setup>
+import { nextTick } from "vue";
+
 const props = defineProps({
 	account: { type: Object, default: null },
 	accounts: { type: Array, default: () => [] },
@@ -23,9 +25,11 @@ const props = defineProps({
 
 const emit = defineEmits(["ready", "close", "commit"]);
 
-emit("ready", {
-	commitLabel: null,
-	commitDisabled: true,
+nextTick(() => {
+	emit("ready", {
+		commitLabel: null,
+		commitDisabled: true,
+	});
 });
 </script>
 

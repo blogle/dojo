@@ -247,6 +247,41 @@ const statementForm = reactive({
 	statementPendingTotal: "",
 });
 
+function emitReady() {
+	if (step.value === "setup") {
+		emit("ready", {
+			commitLabel: null,
+			commitDisabled: true,
+		});
+		return;
+	}
+	const commitDisabled =
+		differenceClearedMinor.value === null ||
+		differencePendingMinor.value === null ||
+		differenceClearedMinor.value !== 0 ||
+		differencePendingMinor.value !== 0;
+	emit("ready", {
+		commitLabel: "Commit",
+		commitDisabled,
+		commitData: {
+			accountId: accountId.value,
+			payload: {
+				statement_date: statementForm.statementDate,
+				statement_balance_minor: statementClearedMinor.value,
+				statement_pending_total_minor: statementPendingTotalMinor.value,
+			},
+		},
+	});
+}
+
+watch(
+	() => props.account?.account_id,
+	() => {
+		resetState();
+		emitReady();
+	},
+);
+
 const referenceQuery = useQuery({
 	queryKey: ["reference-data"],
 	queryFn: api.reference.load,
@@ -559,32 +594,6 @@ async function beginWorksheet() {
 	}
 }
 
-function emitReady() {
-	const commitDisabled =
-		differenceClearedMinor.value === null ||
-		differencePendingMinor.value === null ||
-		differenceClearedMinor.value !== 0 ||
-		differencePendingMinor.value !== 0;
-	emit("ready", {
-		commitLabel: "Commit",
-		commitDisabled,
-		commitData: {
-			accountId: accountId.value,
-			payload: {
-				statement_date: statementForm.statementDate,
-				statement_balance_minor: statementClearedMinor.value,
-				statement_pending_total_minor: statementPendingTotalMinor.value,
-			},
-		},
-	});
-}
-
-watch([differenceClearedMinor, differencePendingMinor], () => {
-	if (step.value === "worksheet") {
-		emitReady();
-	}
-});
-
 function resetState() {
 	step.value = "setup";
 	error.value = "";
@@ -593,12 +602,11 @@ function resetState() {
 	statementForm.statementPendingTotal = "";
 }
 
-watch(
-	() => [props.account?.account_id],
-	() => {
-		resetState();
-	},
-);
+watch([differenceClearedMinor, differencePendingMinor], () => {
+	if (step.value === "worksheet") {
+		emitReady();
+	}
+});
 </script>
 
 <style scoped>
