@@ -144,3 +144,20 @@ def test_create_reconciliation_links_to_previous_checkpoint(
     )
 
     assert second.previous_reconciliation_id == first.reconciliation_id
+
+
+def test_create_reconciliation_persists_pending_total_minor(
+    in_memory_db: duckdb.DuckDBPyConnection,
+) -> None:
+    record = create_reconciliation(
+        in_memory_db,
+        account_id="house_checking",
+        statement_date=date(2025, 3, 31),
+        statement_balance_minor=0,
+        statement_pending_total_minor=-123,
+    )
+
+    latest = get_latest_reconciliation(in_memory_db, "house_checking")
+    assert latest is not None
+    assert latest.reconciliation_id == record.reconciliation_id
+    assert latest.statement_pending_total_minor == -123

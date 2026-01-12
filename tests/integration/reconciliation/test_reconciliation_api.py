@@ -116,16 +116,22 @@ def test_reconciliation_worksheet_includes_mutations_and_pending(
 
     commit = api_client.post(
         f"/api/accounts/{account_id}/reconciliations",
-        json={"statement_date": "2025-01-31", "statement_balance_minor": 0},
+        json={
+            "statement_date": "2025-01-31",
+            "statement_balance_minor": 0,
+            "statement_pending_total_minor": -2000,
+        },
         headers=TEST_HEADERS,
     )
     assert commit.status_code == 201, commit.text
+    assert commit.json()["statement_pending_total_minor"] == -2000
 
     latest_after = api_client.get(
         f"/api/accounts/{account_id}/reconciliations/latest",
         headers=TEST_HEADERS,
     )
     assert latest_after.status_code == 200, latest_after.text
+    assert latest_after.json()["statement_pending_total_minor"] == -2000
 
     _update_transaction(
         api_client,

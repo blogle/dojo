@@ -12,7 +12,11 @@ class ReconciliationCreateRequest(BaseModel):
     """Payload to create a reconciliation checkpoint."""
 
     statement_date: date = Field(description="Bank statement 'as of' date.")
-    statement_balance_minor: int = Field(description="Statement ending balance in minor units.")
+    statement_balance_minor: int = Field(description="Cleared statement balance in minor units (excludes pending).")
+    statement_pending_total_minor: int = Field(
+        default=0,
+        description="Institution-reported pending total in minor units.",
+    )
 
 
 class ReconciliationResponse(BaseModel):
@@ -23,4 +27,5 @@ class ReconciliationResponse(BaseModel):
     created_at: datetime
     statement_date: date
     statement_balance_minor: int
+    statement_pending_total_minor: int
     previous_reconciliation_id: UUID | None

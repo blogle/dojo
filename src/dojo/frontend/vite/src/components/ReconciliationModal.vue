@@ -101,24 +101,24 @@
               </tbody>
               <tfoot>
                 <tr>
-                  <td>Difference</td>
+                  <td>Difference (Statement - Ledger)</td>
                   <td
                     class="reconciliation-summary-table__amount"
-                    data-testid="reconcile-diff-cleared"
+                    data-testid="reconcile-delta-cleared"
                     :class="differenceCellClasses(differenceClearedMinor)"
                   >
                     {{ formatMinor(differenceClearedMinor) }}
                   </td>
                   <td
                     class="reconciliation-summary-table__amount"
-                    data-testid="reconcile-diff-pending"
+                    data-testid="reconcile-delta-pending"
                     :class="differenceCellClasses(differencePendingMinor)"
                   >
                     {{ formatMinor(differencePendingMinor) }}
                   </td>
                   <td
                     class="reconciliation-summary-table__amount"
-                    data-testid="reconcile-diff-total"
+                    data-testid="reconcile-delta-total"
                     :class="differenceCellClasses(differenceTotalMinor)"
                   >
                     {{ formatMinor(differenceTotalMinor) }}
@@ -167,7 +167,7 @@
                 <input
                   type="text"
                   placeholder="Memo, category, amount…"
-                  data-testid="reconcile-filter-search"
+                  data-testid="reconcile-filter-text"
                   v-model="deltaFinder.search"
                 />
               </label>
@@ -185,7 +185,7 @@
                   type="text"
                   inputmode="decimal"
                   placeholder="0.00"
-                  data-testid="reconcile-filter-amount"
+                  data-testid="reconcile-amount-equals-diff"
                   v-model="deltaFinder.amountEquals"
                 />
               </label>
@@ -233,7 +233,10 @@
             </div>
           </div>
 
-          <div class="ledger-card reconciliation-modal__ledger">
+          <div
+            class="ledger-card reconciliation-modal__ledger"
+            data-testid="reconcile-transaction-list"
+          >
             <TransactionTable
               :transactions="filteredWorksheetItems"
               :accounts="lockedAccounts"
@@ -563,6 +566,7 @@ const tableError = computed(() => error.value || worksheetError.value || "");
 const handleCreateTransaction = async (payload, resolve, reject) => {
 	try {
 		await createTransactionMutation.mutateAsync(payload);
+		await Promise.all([accountsQuery.refetch(), worksheetQuery.refetch()]);
 		resolve();
 	} catch (err) {
 		reject(err);
@@ -572,6 +576,7 @@ const handleCreateTransaction = async (payload, resolve, reject) => {
 const handleUpdateTransaction = async (payload, resolve, reject) => {
 	try {
 		await updateTransactionMutation.mutateAsync(payload);
+		await Promise.all([accountsQuery.refetch(), worksheetQuery.refetch()]);
 		resolve();
 	} catch (err) {
 		reject(err);
@@ -581,6 +586,7 @@ const handleUpdateTransaction = async (payload, resolve, reject) => {
 const handleDeleteTransaction = async (tx, resolve, reject) => {
 	try {
 		await deleteTransactionMutation.mutateAsync(tx.concept_id);
+		await Promise.all([accountsQuery.refetch(), worksheetQuery.refetch()]);
 		resolve();
 	} catch (err) {
 		reject(err);
@@ -637,6 +643,7 @@ async function commit() {
 			payload: {
 				statement_date: statementForm.statementDate,
 				statement_balance_minor: statementClearedMinor.value,
+				statement_pending_total_minor: statementPendingTotalMinor.value,
 			},
 		});
 		handleClose();

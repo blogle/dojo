@@ -39,6 +39,7 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
 - [x] (2026-01-11) Implemented Transactions fast-entry contract (compact form layout, keyboard focus rules) (`dojo-d5j`).
 - [x] (2026-01-11) Kept inline per-row actions (status toggle + delete in edit mode) and removed the selection toolbar pattern (`dojo-d5j`).
 - [x] (2026-01-11) Improved reconciliation delta-finding helpers and renamed labels to cleared/pending (`dojo-cdu`).
+- [x] (2026-01-12) Persisted statement pending total in reconciliation commits (`dojo-cdu`).
 - [x] (2026-01-11) Validated via `scripts/run-tests --skip-e2e` and Cypress stories 05/06/14.
 
 ## Surprises & Discoveries
@@ -49,8 +50,8 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
 - Observation: The current transactions input uses an unsigned amount + Inflow/Outflow radio toggle, while the ledger display is already split into Outflow and Inflow columns.
   Evidence: `src/dojo/frontend/vite/src/components/TransactionForm.vue`, `src/dojo/frontend/vite/src/components/TransactionTable.vue`.
 
-- Observation: Reconciliation already models “settled + pending = total” and shows three differences, but the “commit” stores only `statement_balance_minor` (the settled value).
-  Evidence: `src/dojo/frontend/vite/src/components/ReconciliationModal.vue` (payload uses `statement_balance_minor: statementSettledMinor`).
+- Observation: Reconciliation models “cleared + pending = total” and shows three differences; the commit now persists both `statement_balance_minor` (cleared) and `statement_pending_total_minor` (pending total).
+  Evidence: `src/dojo/frontend/vite/src/components/ReconciliationModal.vue` (commit payload includes both fields).
 
 ## Decision Log
 
@@ -69,6 +70,10 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
 - Decision: In reconciliation UI, use “Cleared balance” and “Pending total” as the primary labels (avoid “current”, avoid ambiguous “settled”).
   Rationale: Users reconcile against bank-provided cleared + pending figures; the UI must match that mental model.
   Date/Author: 2026-01-11 / user + agent.
+
+- Decision: Persist `statement_pending_total_minor` on reconciliation commits for ledger accounts.
+  Rationale: Makes reconciliation checkpoints auditable and unlocks future reconcile session UIs that can reload the exact statement inputs used.
+  Date/Author: 2026-01-12 / user + agent.
 
 - Decision: Keep row-level controls inside the row being edited (status toggle + delete button).
   Rationale: Avoids redundant selection UI and lets the user act where they are already focused.

@@ -68,6 +68,7 @@ class AccountReconciliation:
     created_at: datetime
     statement_date: date
     statement_balance_minor: int
+    statement_pending_total_minor: int
     previous_reconciliation_id: UUID | None
 
     @classmethod
@@ -78,6 +79,9 @@ class AccountReconciliation:
             created_at=row.created_at,
             statement_date=row.statement_date,
             statement_balance_minor=int(row.statement_balance_minor),
+            statement_pending_total_minor=(
+                int(row.statement_pending_total_minor) if row.statement_pending_total_minor is not None else 0
+            ),
             previous_reconciliation_id=(
                 UUID(str(row.previous_reconciliation_id)) if row.previous_reconciliation_id is not None else None
             ),
@@ -157,11 +161,14 @@ def create_reconciliation(
     account_id: str,
     statement_date: date,
     statement_balance_minor: int,
+    statement_pending_total_minor: int = 0,
 ) -> AccountReconciliation:
     """Insert a new reconciliation checkpoint for ``account_id``."""
 
     if statement_balance_minor is None:
         raise ValueError("statement_balance_minor is required")
+    if statement_pending_total_minor is None:
+        raise ValueError("statement_pending_total_minor is required")
 
     conn.execute("BEGIN")
     try:
@@ -185,6 +192,7 @@ def create_reconciliation(
                 "created_at": created_at,
                 "statement_date": statement_date,
                 "statement_balance_minor": statement_balance_minor,
+                "statement_pending_total_minor": statement_pending_total_minor,
                 "previous_reconciliation_id": (
                     str(previous_reconciliation_id) if previous_reconciliation_id is not None else None
                 ),
@@ -202,5 +210,6 @@ def create_reconciliation(
         created_at=created_at,
         statement_date=statement_date,
         statement_balance_minor=int(statement_balance_minor),
+        statement_pending_total_minor=int(statement_pending_total_minor),
         previous_reconciliation_id=previous_reconciliation_id,
     )

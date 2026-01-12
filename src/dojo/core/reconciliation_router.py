@@ -90,6 +90,7 @@ def commit_reconciliation(
             account_id=account_id,
             statement_date=payload.statement_date,
             statement_balance_minor=payload.statement_balance_minor,
+            statement_pending_total_minor=payload.statement_pending_total_minor,
         )
     except ValueError as exc:
         message = str(exc)
