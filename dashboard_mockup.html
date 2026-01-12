@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dojo Dashboard Mockup</title>
+    <style>
+        :root {
+            --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
+            --bg: #fdfcfb;
+            --surface: #ffffff;
+            --text: #333333;
+            --muted: #8a8a8a;
+            --border: #e0e0e0;
+            --primary: #5a6e5a;
+            --primary-hover: #4a5c4a;
+            --accent: #c7b299;
+            --danger: #9c4843;
+            --success: #6b8e23;
+            --stone-50: #fafaf9;
+            --stone-300: #d6d3d1;
+            --shadow-hard: 4px 4px 0px 0px rgba(0, 0, 0, 0.75);
+            --border-thick: 1px solid var(--text);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            padding: 0; /* Remove body padding */
+            line-height: 1.5;
+        }
+
+        /* Header Styles */
+        .main-header {
+            background-color: var(--surface);
+            border-bottom: var(--border-thick);
+            padding: 1rem 2rem; /* Add padding here instead of body */
+            margin-bottom: 2rem; /* Space between header and dashboard grid */
+            width: 100%;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: var(--font-mono);
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .main-nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            color: var(--text);
+            text-decoration: none;
+            padding: 0.5rem 0;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--primary);
+        }
+
+        /* Typography & Utils */
+        h1, h2, h3 { 
+            font-weight: 700; 
+            margin-bottom: 0.5rem; 
+            font-family: var(--font-sans); /* Explicitly set for titles */
+        }
+        .text-muted { color: var(--muted); }
+        .text-danger { color: var(--danger); }
+        .font-mono { font-family: var(--font-mono); }
+        .text-right { text-align: right; }
+        .flex { display: flex; }
+        .flex-col { display: flex; flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+
+        /* Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .col-span-12 { grid-column: span 12; }
+        .col-span-8 { grid-column: span 8; }
+        .col-span-6 { grid-column: span 6; }
+        .col-span-4 { grid-column: span 4; }
+        .col-span-3 { grid-column: span 3; }
+
+        @media (max-width: 768px) {
+            .dashboard-grid > * { grid-column: span 12 !important; }
+        }
+
+        /* Components */
+        .card {
+            background-color: var(--surface);
+            border: var(--border-thick);
+            padding: 1.5rem;
+        }
+
+        .stat-card {
+            background-color: var(--surface);
+            border: var(--border-thick);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            height: 100%;
+        }
+
+        .stat-card__label {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            color: var(--muted);
+        }
+
+        .stat-card__value {
+            font-family: var(--font-mono);
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        /* Watchlist */
+        .watchlist-item {
+            margin-bottom: 1.5rem;
+        }
+        .watchlist-item:last-child { margin-bottom: 0; }
+        
+        .progress-bar-container {
+            height: 12px;
+            background-color: var(--stone-300);
+            width: 100%;
+            margin: 0.5rem 0;
+            border: 1px solid transparent;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .watchlist-item.overspent .progress-bar-container {
+            background-color: transparent;
+            border: 1px solid var(--danger);
+        }
+        
+        .watchlist-item.overspent .progress-bar-fill {
+            background-color: transparent; /* Transparent fill */
+        }
+
+        .watchlist-footer {
+            font-size: 0.85rem;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .watchlist-item.overspent .watchlist-footer {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        /* Watchlist specific strong tags for category names */
+        .watchlist-item strong {
+            font-family: var(--font-sans);
+        }
+
+        /* Accounts Table */
+        .accounts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .accounts-table th {
+            text-align: left;
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            color: var(--muted);
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .accounts-table td {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .accounts-table tr:last-child td { border-bottom: none; }
+
+        /* Bills List */
+        .bill-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .bill-item:last-child { border-bottom: none; }
+        
+        .bill-date-badge {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            background: var(--stone-50);
+            border: 1px solid var(--border);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .icon-warning {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            background-color: currentColor;
+            -webkit-mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>') no-repeat center;
+            mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>') no-repeat center;
+        }
+
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo">DOJO</div>
+            <nav class="main-nav">
+                <a href="#" class="nav-link">Dashboard</a>
+                <a href="#" class="nav-link">Accounts</a>
+                <a href="#" class="nav-link">Budgets</a>
+                <a href="#" class="nav-link">Investments</a>
+                <a href="#" class="nav-link">Reports</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <!-- Dashboard Title -->
+        <div class="col-span-12 mb-4">
+            <h2>Dashboard Overview</h2>
+            <h3 class="text-muted">Financial Overview</h3>
+        </div>
+
+        <!-- Top Row: Watchlist (Left) + Stats (Right) -->
+        
+        <!-- Budget Watchlist (Main Focus) -->
+        <div class="col-span-8">
+            <div class="card" style="height: 100%;">
+                <h3>Budget Watchlist</h3>
+                <div id="budget-watchlist-container">
+                    <!-- Items injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side Stack: Net Worth & Spent -->
+        <div class="col-span-4 flex-col gap-4" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            
+            <!-- Net Worth -->
+            <div class="stat-card" style="flex: 1;">
+                <h3>Net Worth</h3>
+                <span class="stat-card__value" id="net-worth-value">$0.00</span>
+                <canvas id="netWorthChart" width="250" height="60" style="margin-top: auto; width: 100%;"></canvas>
+            </div>
+
+            <!-- Spent This Month -->
+            <div class="stat-card" style="flex: 1;">
+                <h3>Spent This Month</h3>
+                <span class="stat-card__value" id="spent-month-value">$0.00</span>
+                <div style="margin-top: auto; font-size: 0.9rem; color: var(--muted);">
+                    Across all accounts
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Row -->
+
+        <!-- Accounts Panel -->
+        <div class="col-span-6">
+            <div class="card">
+                <h3>Accounts</h3>
+                <table class="accounts-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th class="text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accounts-list-container">
+                        <!-- Items injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Upcoming Bills -->
+        <div class="col-span-6">
+            <div class="card">
+                <h3>Upcoming Bills</h3>
+                <div id="upcoming-bills-container">
+                    <!-- Items injected here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Data ---
+
+        const netWorthData = {
+            current: 3500000.00, // Matches the last history point
+            history: [
+                1900000, // Start at 1.9M
+                1980000, 2050000, 2120000, 2250000, 2300000,
+                2500000, 2700000, 2900000, 3100000, 3350000,
+                3500000 // End at 3.5M
+            ]
+        };
+
+        const spentThisMonth = 2345.67;
+
+        const watchlist = [
+            { name: "Groceries", allocated: 600, available: 600 },
+            { name: "Dining Out", allocated: 200, available: 45 },
+            { name: "Fuel", allocated: 150, available: 0 }, // Empty
+            { name: "Shopping", allocated: 100, available: -25.50 } // Overspent
+        ];
+
+        const accounts = [
+            { name: "Chase Checking", type: "Cash", balance: 4500.23 },
+            { name: "Amex Gold", type: "Credit", balance: -1250.00 },
+            { name: "Vanguard 401k", type: "Investment", balance: 135000.00 },
+            { name: "Ally Savings", type: "Cash", balance: 12000.50 }
+        ];
+
+        const upcomingBills = [
+            { category: "Electric Bill", amount: 145.00, dueDate: "2025-12-20", funded: true },
+            { category: "Internet", amount: 89.99, dueDate: "2025-12-22", funded: true },
+            { category: "Car Insurance", amount: 120.50, dueDate: "2025-12-25", funded: false }, // Underfunded
+            { category: "Rent", amount: 1800.00, dueDate: "2026-01-01", funded: true }
+        ];
+
+
+        // --- Render Functions ---
+
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        };
+
+        const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+
+        function renderNetWorth() {
+            document.getElementById('net-worth-value').textContent = formatCurrency(netWorthData.current);
+            
+            const canvas = document.getElementById('netWorthChart');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Layout config
+            const padding = { top: 10, right: 10, bottom: 10, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            
+            const data = netWorthData.history;
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const range = max - min;
+            
+            // Helper to map data to canvas coords
+            const getX = (index) => padding.left + (index / (data.length - 1)) * chartWidth;
+            const getY = (value) => padding.top + chartHeight - ((value - min) / range) * chartHeight;
+
+            const formatYAxisLabel = (value) => {
+                if (Math.abs(value) >= 1000000) {
+                    return (value / 1000000).toFixed(1) + 'M';
+                } else if (Math.abs(value) >= 1000) {
+                    return (value / 1000).toFixed(0) + 'k';
+                }
+                return value.toFixed(0);
+            };
+
+            // Clear
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Y Axis Labels
+            ctx.fillStyle = '#8a8a8a'; // var(--muted)
+            ctx.font = '10px "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            
+            const steps = 2; // Min, Mid, Max
+            for (let i = 0; i <= steps; i++) {
+                const val = min + (range * (i / steps));
+                const y = getY(val);
+                const label = formatYAxisLabel(val);
+                ctx.fillText(label, padding.left - 8, y);
+            }
+            
+            // Draw Y Axis Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#e0e0e0'; // var(--border)
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, height - padding.bottom);
+            ctx.stroke();
+
+            // Draw Chart Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#5a6e5a'; // var(--primary)
+            ctx.lineWidth = 2;
+
+            data.forEach((val, i) => {
+                const x = getX(i);
+                const y = getY(val);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // --- Interaction ---
+            
+            // Tooltip Element
+            let tooltip = document.getElementById('chart-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'chart-tooltip';
+                tooltip.style.position = 'absolute';
+                tooltip.style.background = 'var(--surface)';
+                tooltip.style.border = 'var(--border-thick)';
+                tooltip.style.padding = '0.5rem';
+                tooltip.style.pointerEvents = 'none';
+                tooltip.style.display = 'none';
+                tooltip.style.fontSize = '0.85rem';
+                tooltip.style.fontFamily = 'var(--font-mono)';
+                tooltip.style.zIndex = '100';
+                tooltip.style.boxShadow = 'var(--shadow-hard)';
+                document.body.appendChild(tooltip);
+            }
+
+            // Mouse handling
+            const rect = canvas.getBoundingClientRect();
+            
+            canvas.onmousemove = (e) => {
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Only interact within chart area horizontal bounds
+                if (mouseX < padding.left || mouseX > width - padding.right) {
+                    if (tooltip) tooltip.style.display = 'none'; // Hide if outside interaction area
+                    // Redraw clean chart when leaving valid hover area
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.fillStyle = '#8a8a8a';
+                    ctx.textAlign = 'right';
+                    for (let i = 0; i <= steps; i++) {
+                        const v = min + (range * (i / steps));
+                        ctx.fillText(formatYAxisLabel(v), padding.left - 8, getY(v));
+                    }
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.moveTo(padding.left, padding.top);
+                    ctx.lineTo(padding.left, height - padding.bottom);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#5a6e5a';
+                    ctx.lineWidth = 2;
+                    data.forEach((v, i) => {
+                        if (i === 0) ctx.moveTo(getX(i), getY(v));
+                        else ctx.lineTo(getX(i), getY(v));
+                    });
+                    ctx.stroke();
+                    return;
+                }
+
+                // Find closest data point
+                const index = Math.round(((mouseX - padding.left) / chartWidth) * (data.length - 1));
+                const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
+                
+                const val = data[clampedIndex];
+                const cx = getX(clampedIndex);
+                const cy = getY(val);
+
+                // Redraw chart to clear previous highlights
+                ctx.clearRect(0, 0, width, height);
+                
+                // Redraw base elements (could be optimized, but fine for mockup)
+                // Y Labels
+                ctx.fillStyle = '#8a8a8a';
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= steps; i++) {
+                    const v = min + (range * (i / steps));
+                    ctx.fillText(formatYAxisLabel(v), padding.left - 8, getY(v));
+                }
+                // Y Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.moveTo(padding.left, padding.top);
+                ctx.lineTo(padding.left, height - padding.bottom);
+                ctx.stroke();
+                // Chart Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#5a6e5a';
+                ctx.lineWidth = 2;
+                data.forEach((v, i) => {
+                    if (i === 0) ctx.moveTo(getX(i), getY(v));
+                    else ctx.lineTo(getX(i), getY(v));
+                });
+                ctx.stroke();
+
+                // Draw Highlight Dot
+                ctx.beginPath();
+                ctx.fillStyle = '#5a6e5a'; // Primary
+                ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Show Tooltip
+                tooltip.style.display = 'block';
+                // Adjust tooltip position to stay within viewport and not overlap mouse
+                let tooltipX = rect.left + cx + 10;
+                let tooltipY = rect.top + cy - 30;
+
+                // Simple boundary check
+                if (tooltipX + tooltip.offsetWidth > window.innerWidth) {
+                    tooltipX = rect.left + cx - tooltip.offsetWidth - 10;
+                }
+                if (tooltipY < 0) {
+                    tooltipY = rect.top + cy + 10;
+                }
+
+                tooltip.style.left = tooltipX + 'px';
+                tooltip.style.top = tooltipY + 'px';
+                tooltip.textContent = formatCurrency(val);
+            };
+
+            canvas.onmouseleave = () => {
+                if (tooltip) tooltip.style.display = 'none';
+                // Redraw clean chart
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#8a8a8a';
+                ctx.textAlign = 'right';
+                for (let i = 0; i <= steps; i++) {
+                    const v = min + (range * (i / steps));
+                    ctx.fillText(formatYAxisLabel(v), padding.left - 8, getY(v));
+                }
+                ctx.beginPath();
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.moveTo(padding.left, padding.top);
+                ctx.lineTo(padding.left, height - padding.bottom);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.strokeStyle = '#5a6e5a';
+                ctx.lineWidth = 2;
+                data.forEach((v, i) => {
+                    if (i === 0) ctx.moveTo(getX(i), getY(v));
+                    else ctx.lineTo(getX(i), getY(v));
+                });
+                ctx.stroke();
+            };
+        }
+
+        function renderSpent() {
+            document.getElementById('spent-month-value').textContent = formatCurrency(spentThisMonth);
+        }
+
+        function renderWatchlist() {
+            const container = document.getElementById('budget-watchlist-container');
+            container.innerHTML = watchlist.map(item => {
+                const percent = Math.min(Math.max((item.available / item.allocated) * 100, 0), 100);
+                const isOverspent = item.available < 0;
+                const isEmpty = item.available === 0 && item.allocated > 0;
+                const stateClass = (isOverspent || isEmpty) ? 'overspent' : ''; 
+                
+                // Top-right display: Amount Left/Over
+                let amountLeftText;
+                if (item.available > 0) {
+                    amountLeftText = formatCurrency(item.available) + ' left';
+                } else if (item.available < 0) {
+                    amountLeftText = formatCurrency(Math.abs(item.available)) + ' over';
+                } else {
+                    amountLeftText = formatCurrency(0) + ' left'; // Or "Empty" as per prior logic
+                }
+
+
+                let footerContent = `<span>of ${formatCurrency(item.allocated)} budgeted</span>`;
+                
+                if (isOverspent) {
+                    footerContent = `<i class="icon-warning"></i> <span>Overspent</span>`;
+                } else if (isEmpty) {
+                     footerContent = `<i class="icon-warning"></i> <span>Unfunded / Empty</span>`;
+                }
+
+                return `
+                    <div class="watchlist-item ${stateClass}">
+                        <div class="flex justify-between">
+                            <strong>${item.name}</strong>
+                            <span class="font-mono">${amountLeftText}</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${stateClass ? 0 : percent}%"></div>
+                        </div>
+                        <div class="watchlist-footer">
+                            ${footerContent}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAccounts() {
+            // Sort by balance desc
+            const sorted = [...accounts].sort((a, b) => b.balance - a.balance);
+            
+            const container = document.getElementById('accounts-list-container');
+            container.innerHTML = sorted.map(acct => `
+                <tr>
+                    <td><strong>${acct.name}</strong></td>
+                    <td class="text-muted" style="font-size: 0.9em;">${acct.type}</td>
+                    <td class="text-right font-mono" style="${acct.balance < 0 ? 'color: var(--danger);' : ''}">
+                        ${formatCurrency(acct.balance)}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderUpcomingBills() {
+            const container = document.getElementById('upcoming-bills-container');
+            // Filter for next 2 weeks logic omitted for mockup, assuming data is already filtered
+            
+            container.innerHTML = upcomingBills.map(bill => {
+                const isUnderfunded = !bill.funded;
+                return `
+                    <div class="bill-item">
+                        <div class="flex-col">
+                            <strong style="${isUnderfunded ? 'color: var(--danger);' : ''}">${bill.category}</strong>
+                            <span class="font-mono">${formatCurrency(bill.amount)}</span>
+                        </div>
+                        <div class="bill-date-badge ${isUnderfunded ? 'text-danger' : ''}" style="${isUnderfunded ? 'border-color: var(--danger); background-color: #fff5f5;' : ''}">
+                             ${isUnderfunded ? '<i class="icon-warning"></i> ' : ''} Due ${formatDate(bill.dueDate)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Init
+        renderNetWorth();
+        renderSpent();
+        renderWatchlist();
+        renderAccounts();
+        renderUpcomingBills();
+
+    </script>
+</body>
+</html>
