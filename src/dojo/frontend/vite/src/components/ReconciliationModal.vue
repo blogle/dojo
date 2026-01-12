@@ -32,27 +32,34 @@
           <form class="modal-form" @submit.prevent="beginWorksheet">
             <label>
               Statement date
-              <input type="date" v-model="statementForm.statementDate" required />
-            </label>
-            <label>
-              Settled balance
               <input
-                type="number"
-                step="0.01"
-                inputmode="decimal"
-                placeholder="0.00"
-                v-model="statementForm.statementSettled"
+                type="date"
+                data-testid="reconcile-statement-date"
+                v-model="statementForm.statementDate"
                 required
               />
             </label>
             <label>
-              Pending balance
+              Cleared balance
               <input
                 type="number"
                 step="0.01"
                 inputmode="decimal"
                 placeholder="0.00"
-                v-model="statementForm.statementPending"
+                data-testid="reconcile-cleared-balance"
+                v-model="statementForm.statementCleared"
+                required
+              />
+            </label>
+            <label>
+              Pending total
+              <input
+                type="number"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="0.00"
+                data-testid="reconcile-pending-total"
+                v-model="statementForm.statementPendingTotal"
                 required
               />
             </label>
@@ -73,21 +80,21 @@
               <thead>
                 <tr>
                   <th>Source</th>
-                  <th class="reconciliation-summary-table__amount">Settled</th>
-                  <th class="reconciliation-summary-table__amount">Pending</th>
+                  <th class="reconciliation-summary-table__amount">Cleared</th>
+                  <th class="reconciliation-summary-table__amount">Pending total</th>
                   <th class="reconciliation-summary-table__amount">Total</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>Statement</td>
-                  <td class="reconciliation-summary-table__amount">{{ formatMinor(statementSettledMinor) }}</td>
-                  <td class="reconciliation-summary-table__amount">{{ formatMinor(statementPendingMinor) }}</td>
+                  <td class="reconciliation-summary-table__amount">{{ formatMinor(statementClearedMinor) }}</td>
+                  <td class="reconciliation-summary-table__amount">{{ formatMinor(statementPendingTotalMinor) }}</td>
                   <td class="reconciliation-summary-table__amount">{{ formatMinor(statementTotalMinor) }}</td>
                 </tr>
                 <tr>
                   <td>Ledger</td>
-                  <td class="reconciliation-summary-table__amount">{{ formatMinor(ledgerSettledMinor) }}</td>
+                  <td class="reconciliation-summary-table__amount">{{ formatMinor(ledgerClearedMinor) }}</td>
                   <td class="reconciliation-summary-table__amount">{{ formatMinor(ledgerPendingMinor) }}</td>
                   <td class="reconciliation-summary-table__amount">{{ formatMinor(ledgerTotalMinor) }}</td>
                 </tr>
@@ -97,18 +104,21 @@
                   <td>Difference</td>
                   <td
                     class="reconciliation-summary-table__amount"
-                    :class="differenceCellClasses(differenceSettledMinor)"
+                    data-testid="reconcile-diff-cleared"
+                    :class="differenceCellClasses(differenceClearedMinor)"
                   >
-                    {{ formatMinor(differenceSettledMinor) }}
+                    {{ formatMinor(differenceClearedMinor) }}
                   </td>
                   <td
                     class="reconciliation-summary-table__amount"
+                    data-testid="reconcile-diff-pending"
                     :class="differenceCellClasses(differencePendingMinor)"
                   >
                     {{ formatMinor(differencePendingMinor) }}
                   </td>
                   <td
                     class="reconciliation-summary-table__amount"
+                    data-testid="reconcile-diff-total"
                     :class="differenceCellClasses(differenceTotalMinor)"
                   >
                     {{ formatMinor(differenceTotalMinor) }}
@@ -147,9 +157,85 @@
             @submit="handleCreateTransaction"
           />
 
+          <div
+            class="form-panel reconciliation-modal__delta-finder"
+            data-testid="reconcile-delta-finder"
+          >
+            <div class="form-panel__grid form-panel__grid--compact">
+              <label class="form-panel__field">
+                <span>Search</span>
+                <input
+                  type="text"
+                  placeholder="Memo, category, amount…"
+                  data-testid="reconcile-filter-search"
+                  v-model="deltaFinder.search"
+                />
+              </label>
+              <label class="form-panel__field">
+                <span>Status</span>
+                <select data-testid="reconcile-filter-status" v-model="deltaFinder.status">
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="cleared">Cleared</option>
+                </select>
+              </label>
+              <label class="form-panel__field">
+                <span>Amount equals</span>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  data-testid="reconcile-filter-amount"
+                  v-model="deltaFinder.amountEquals"
+                />
+              </label>
+            </div>
+
+            <div class="form-panel__actions form-panel__actions--split">
+              <button
+                type="button"
+                class="button button--secondary"
+                data-testid="reconcile-filter-clear"
+                @click="clearDeltaFinder"
+              >
+                Clear
+              </button>
+
+              <div class="reconciliation-modal__delta-shortcuts">
+                <button
+                  type="button"
+                  class="button button--secondary"
+                  data-testid="reconcile-find-cleared-diff"
+                  :disabled="differenceClearedMinor === null || differenceClearedMinor === 0"
+                  @click="applyAmountEqualsFromDifference('cleared')"
+                >
+                  Amount = cleared diff
+                </button>
+                <button
+                  type="button"
+                  class="button button--secondary"
+                  data-testid="reconcile-find-pending-diff"
+                  :disabled="differencePendingMinor === null || differencePendingMinor === 0"
+                  @click="applyAmountEqualsFromDifference('pending')"
+                >
+                  Amount = pending diff
+                </button>
+                <button
+                  type="button"
+                  class="button button--secondary"
+                  data-testid="reconcile-find-total-diff"
+                  :disabled="differenceTotalMinor === null || differenceTotalMinor === 0"
+                  @click="applyAmountEqualsFromDifference('total')"
+                >
+                  Amount = total diff
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="ledger-card reconciliation-modal__ledger">
             <TransactionTable
-              :transactions="worksheetItems"
+              :transactions="filteredWorksheetItems"
               :accounts="lockedAccounts"
               :categories="categories"
               :lockedAccountId="selectedAccount?.account_id || ''"
@@ -176,7 +262,7 @@ import { computed, reactive, ref, watch } from "vue";
 import TransactionForm from "./TransactionForm.vue";
 import TransactionTable from "./TransactionTable.vue";
 import { api } from "../services/api.js";
-import { dollarsToMinor, formatAmount, todayISO } from "../services/format.js";
+import { formatAmount, todayISO } from "../services/format.js";
 
 const props = defineProps({
 	open: { type: Boolean, default: false },
@@ -193,8 +279,8 @@ const error = ref("");
 
 const statementForm = reactive({
 	statementDate: todayISO(),
-	statementSettled: "",
-	statementPending: "",
+	statementCleared: "",
+	statementPendingTotal: "",
 });
 
 const referenceQuery = useQuery({
@@ -263,11 +349,95 @@ function parseMinor(value) {
 	if (value === null || value === undefined) {
 		return null;
 	}
-	if (String(value).trim() === "") {
+	const trimmed = String(value).trim();
+	if (!trimmed) {
 		return null;
 	}
-	return dollarsToMinor(value);
+	const parsed = Number.parseFloat(trimmed);
+	if (!Number.isFinite(parsed)) {
+		return null;
+	}
+	return Math.round(parsed * 100);
 }
+
+const deltaFinder = reactive({
+	search: "",
+	status: "all",
+	amountEquals: "",
+});
+
+const deltaFinderAmountEqualsMinor = computed(() => {
+	const minor = parseMinor(deltaFinder.amountEquals);
+	if (minor === null) {
+		return null;
+	}
+	const normalized = Math.abs(minor);
+	return normalized === 0 ? null : normalized;
+});
+
+const filteredWorksheetItems = computed(() => {
+	const items = worksheetItems.value ?? [];
+	const search = deltaFinder.search.trim().toLowerCase();
+	const statusFilter = deltaFinder.status;
+	const amountEqualsMinor = deltaFinderAmountEqualsMinor.value;
+
+	return items.filter((item) => {
+		if (statusFilter === "cleared" && item.status !== "cleared") {
+			return false;
+		}
+		if (statusFilter === "pending" && item.status === "cleared") {
+			return false;
+		}
+		if (
+			amountEqualsMinor !== null &&
+			Math.abs(item.amount_minor || 0) !== amountEqualsMinor
+		) {
+			return false;
+		}
+		if (search) {
+			const haystack = [
+				item.transaction_date,
+				item.category_name,
+				item.memo,
+				formatAmount(item.amount_minor || 0),
+			]
+				.filter(Boolean)
+				.join(" ")
+				.toLowerCase();
+			if (!haystack.includes(search)) {
+				return false;
+			}
+		}
+		return true;
+	});
+});
+
+const clearDeltaFinder = () => {
+	deltaFinder.search = "";
+	deltaFinder.status = "all";
+	deltaFinder.amountEquals = "";
+};
+
+const applyAmountEqualsFromDifference = (kind) => {
+	let difference = null;
+	if (kind === "cleared") {
+		difference = differenceClearedMinor.value;
+		deltaFinder.status = "cleared";
+	} else if (kind === "pending") {
+		difference = differencePendingMinor.value;
+		deltaFinder.status = "pending";
+	} else {
+		difference = differenceTotalMinor.value;
+		deltaFinder.status = "all";
+	}
+
+	if (difference === null || difference === 0) {
+		return;
+	}
+
+	deltaFinder.search = "";
+	deltaFinder.amountEquals = (Math.abs(difference) / 100).toFixed(2);
+};
 
 function formatMinor(minor) {
 	if (minor === null || minor === undefined) {
@@ -286,20 +456,20 @@ function differenceCellClasses(minor) {
 	};
 }
 
-const statementSettledMinor = computed(() =>
-	parseMinor(statementForm.statementSettled),
+const statementClearedMinor = computed(() =>
+	parseMinor(statementForm.statementCleared),
 );
-const statementPendingMinor = computed(() =>
-	parseMinor(statementForm.statementPending),
+const statementPendingTotalMinor = computed(() =>
+	parseMinor(statementForm.statementPendingTotal),
 );
 const statementTotalMinor = computed(() => {
 	if (
-		statementSettledMinor.value === null ||
-		statementPendingMinor.value === null
+		statementClearedMinor.value === null ||
+		statementPendingTotalMinor.value === null
 	) {
 		return null;
 	}
-	return statementSettledMinor.value + statementPendingMinor.value;
+	return statementClearedMinor.value + statementPendingTotalMinor.value;
 });
 
 const statementTotalLabel = computed(() =>
@@ -313,7 +483,7 @@ const pendingSumMinor = computed(() =>
 );
 
 const ledgerTotalMinor = computed(() => accountBalanceMinor.value);
-const ledgerSettledMinor = computed(() => {
+const ledgerClearedMinor = computed(() => {
 	if (ledgerTotalMinor.value === null || ledgerTotalMinor.value === undefined) {
 		return null;
 	}
@@ -321,24 +491,24 @@ const ledgerSettledMinor = computed(() => {
 });
 const ledgerPendingMinor = computed(() => pendingSumMinor.value);
 
-const differenceSettledMinor = computed(() => {
+const differenceClearedMinor = computed(() => {
 	if (
-		statementSettledMinor.value === null ||
-		ledgerSettledMinor.value === null
+		statementClearedMinor.value === null ||
+		ledgerClearedMinor.value === null
 	) {
 		return null;
 	}
-	return statementSettledMinor.value - ledgerSettledMinor.value;
+	return statementClearedMinor.value - ledgerClearedMinor.value;
 });
 
 const differencePendingMinor = computed(() => {
 	if (
-		statementPendingMinor.value === null ||
+		statementPendingTotalMinor.value === null ||
 		ledgerPendingMinor.value === null
 	) {
 		return null;
 	}
-	return statementPendingMinor.value - ledgerPendingMinor.value;
+	return statementPendingTotalMinor.value - ledgerPendingMinor.value;
 });
 
 const differenceTotalMinor = computed(() => {
@@ -378,13 +548,13 @@ const commitDisabled = computed(() => {
 		return true;
 	}
 	if (
-		differenceSettledMinor.value === null ||
+		differenceClearedMinor.value === null ||
 		differencePendingMinor.value === null
 	) {
 		return true;
 	}
 	return (
-		differenceSettledMinor.value !== 0 || differencePendingMinor.value !== 0
+		differenceClearedMinor.value !== 0 || differencePendingMinor.value !== 0
 	);
 });
 
@@ -424,12 +594,12 @@ async function beginWorksheet() {
 		error.value = "Select an account to reconcile.";
 		return;
 	}
-	if (statementSettledMinor.value === null) {
-		error.value = "Enter a settled balance.";
+	if (statementClearedMinor.value === null) {
+		error.value = "Enter a cleared balance.";
 		return;
 	}
-	if (statementPendingMinor.value === null) {
-		error.value = "Enter a pending balance.";
+	if (statementPendingTotalMinor.value === null) {
+		error.value = "Enter a pending total.";
 		return;
 	}
 
@@ -466,7 +636,7 @@ async function commit() {
 			accountId: accountId.value,
 			payload: {
 				statement_date: statementForm.statementDate,
-				statement_balance_minor: statementSettledMinor.value,
+				statement_balance_minor: statementClearedMinor.value,
 			},
 		});
 		handleClose();
@@ -480,8 +650,8 @@ function resetState() {
 	error.value = "";
 
 	statementForm.statementDate = todayISO();
-	statementForm.statementSettled = "";
-	statementForm.statementPending = "";
+	statementForm.statementCleared = "";
+	statementForm.statementPendingTotal = "";
 }
 
 watch(
@@ -625,6 +795,18 @@ function handleClose() {
 
 .reconciliation-modal__form {
   margin: 0;
+}
+
+.reconciliation-modal__delta-finder {
+  margin: 0;
+}
+
+.reconciliation-modal__delta-shortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .reconciliation-modal__ledger {

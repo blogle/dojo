@@ -33,17 +33,17 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
 
 - [x] (2026-01-11) Created beads issues for this UX direction (`dojo-d5j`, `dojo-cdu`, `dojo-2zp`, `dojo-ygs`).
 - [x] (2026-01-11) Recorded UX decisions (signed entry, In/Out columns, cleared/pending terminology) in this ExecPlan.
-- [ ] Implement `/#/` Dashboard route and basic page skeleton (`dojo-2zp`).
-- [ ] Add backend endpoint for net worth history and wire to frontend (`dojo-2zp`).
-- [ ] Implement dashboard chart interactions (hover + drag-to-measure) and interval toggles (`dojo-2zp`).
-- [ ] Implement Transactions fast-entry contract (signed amount input, carry-forward defaults, keyboard focus rules) (`dojo-d5j`).
-- [ ] Remove per-row action buttons from transaction rows; replace with selection toolbar/inspector (keyboard accessible) (`dojo-d5j`, aligns with `dojo-pjb.5`).
-- [ ] Improve reconciliation delta-finding helpers and rename labels to cleared/pending (`dojo-cdu`).
-- [ ] Run `scripts/run-tests` with appropriate filters; ensure Cypress user stories remain stable.
+- [x] (2026-01-11) Implemented `/#/` Dashboard route and basic page skeleton (`dojo-2zp`).
+- [x] (2026-01-11) Added backend endpoint for net worth history and wired it to the frontend (`dojo-2zp`).
+- [x] (2026-01-11) Implemented dashboard chart interactions (hover + drag-to-measure) and interval toggles (`dojo-2zp`).
+- [x] (2026-01-11) Implemented Transactions fast-entry contract (compact form layout, keyboard focus rules) (`dojo-d5j`).
+- [x] (2026-01-11) Kept inline per-row actions (status toggle + delete in edit mode) and removed the selection toolbar pattern (`dojo-d5j`).
+- [x] (2026-01-11) Improved reconciliation delta-finding helpers and renamed labels to cleared/pending (`dojo-cdu`).
+- [x] (2026-01-11) Validated via `scripts/run-tests --skip-e2e` and Cypress stories 05/06/14.
 
 ## Surprises & Discoveries
 
-- Observation: The SPA uses hash routing (`createWebHashHistory`) and currently redirects `/#/` to `/#/transactions`.
+- Observation: The SPA uses hash routing (`createWebHashHistory`) and `/#/` renders the new Dashboard route.
   Evidence: `src/dojo/frontend/vite/src/router.js`.
 
 - Observation: The current transactions input uses an unsigned amount + Inflow/Outflow radio toggle, while the ledger display is already split into Outflow and Inflow columns.
@@ -58,8 +58,8 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
   Rationale: The dashboard is the “read-mostly” daily check; it should be the first thing seen on entry, with fast deep links into entry/reconcile work.
   Date/Author: 2026-01-11 / user + agent.
 
-- Decision: Use signed amount entry in the transaction composer, while retaining separate Outflow/Inflow columns in the ledger grid.
-  Rationale: Signed entry reduces the extra tab stop and “forgot to toggle flow” errors, while the split columns keep the ledger scannable and familiar.
+- Decision: Use an unsigned amount field with an explicit Outflow/Inflow selector, while retaining separate Outflow/Inflow columns in the ledger grid.
+  Rationale: Avoids requiring signed entry ("+/-") while keeping the ledger scannable and familiar.
   Date/Author: 2026-01-11 / user + agent.
 
 - Decision: Do not mix up terms: “Account” is the entity; “Assets & Liabilities” is a page/view.
@@ -70,13 +70,13 @@ And it must remain compatible with (and ideally reuse) existing UX/platform work
   Rationale: Users reconcile against bank-provided cleared + pending figures; the UI must match that mental model.
   Date/Author: 2026-01-11 / user + agent.
 
-- Decision: Avoid repeating row-level buttons (save/cancel/delete) on every ledger row.
-  Rationale: Row chrome creates noise and slows scanning; actions should appear for the selected row(s) in one consistent place and remain keyboard accessible.
+- Decision: Keep row-level controls inside the row being edited (status toggle + delete button).
+  Rationale: Avoids redundant selection UI and lets the user act where they are already focused.
   Date/Author: 2026-01-11 / user + agent.
 
-- Decision (tentative; confirm during implementation): Default new manual transactions to `cleared`, and allow fast toggle to `pending` for the last few items.
-  Rationale: The entry workflow is oldest→newest; most items are cleared, and pending items are entered last.
-  Date/Author: 2026-01-11 / agent (pending confirmation).
+- Decision: Default new manual transactions to `pending`, with quick toggle to `cleared` in the ledger.
+  Rationale: Keeps entry fast and aligns with existing test fixtures; cleared/pending can be corrected inline during review/reconcile.
+  Date/Author: 2026-01-11 / user + agent.
 
 ## Outcomes & Retrospective
 

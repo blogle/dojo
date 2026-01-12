@@ -1,6 +1,7 @@
 """Net worth aggregation services."""
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, getcontext
 
 import duckdb
@@ -102,3 +103,14 @@ def current_snapshot(conn: duckdb.DuckDBPyConnection) -> NetWorthSnapshot:
         tangibles_minor=record.tangibles_minor,
         net_worth_minor=record.net_worth_minor,
     )
+
+
+def net_worth_history(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    start_date: date,
+    end_date: date,
+) -> list[tuple[date, int]]:
+    """Returns daily net worth points between start_date and end_date."""
+    dao = CoreDAO(conn)
+    return dao.net_worth_history(start_date=start_date, end_date=end_date)

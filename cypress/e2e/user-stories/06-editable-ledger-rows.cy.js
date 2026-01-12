@@ -97,17 +97,14 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		accountPage.verifyAccountBalance("House Checking", "$4,970.00");
 	});
 
-	it("removes a transaction by toggling its status to inactive", () => {
+	it("removes a transaction by deleting the inline row", () => {
 		cy.intercept("POST", "/api/transactions").as("createTransaction");
 		cy.intercept("PUT", "/api/transactions/*").as("updateTransaction");
+		cy.intercept("DELETE", "/api/transactions/*").as("deleteTransaction");
 		cy.intercept("GET", "/api/transactions*").as("fetchTransactions");
-		cy.intercept("GET", "/api/budget-categories*").as("fetchBudgets");
-		cy.intercept("GET", "/api/budget/ready-to-assign*").as("fetchRTA");
-		cy.intercept("GET", "/api/accounts").as("fetchAccounts");
 
 		const transactionMemo = "Transaction to be removed";
 
-		// Create a transaction to be removed
 		transactionPage.visit();
 		cy.wait("@fetchTransactions");
 		transactionPage.createOutflowTransaction(
@@ -117,23 +114,17 @@ describe("User Story 06 — Editable Ledger Rows", () => {
 		);
 		cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
 		cy.wait("@fetchTransactions");
-		// Verify the transaction is visible initially
-		cy.contains("#transactions-body tr", transactionMemo).should("not.exist"); // It shouldn't exist yet as we haven't set the memo.
 		transactionPage.verifyTransactionRowAmount(0, "$50.00");
 		transactionPage.verifyTransactionStatus(0, "pending");
 
-		// Edit the transaction, set memo, and toggle status to inactive
+		// Enter edit mode to set a memo and delete.
 		transactionPage.editTransaction(0);
-		transactionPage.setInlineMemo(transactionMemo); // Set the unique memo
-		transactionPage.toggleTransactionStatus(); // pending -> cleared
-		transactionPage.toggleTransactionStatus(); // cleared -> voided (assuming this is the inactive state)
-		transactionPage.saveInlineEdit();
-
-		cy.wait("@updateTransaction").its("response.statusCode").should("eq", 200);
+		transactionPage.setInlineMemo(transactionMemo);
+		transactionPage.deleteInlineTransaction();
+		cy.wait("@deleteTransaction").then(({ response }) => {
+			expect([200, 204]).to.include(response?.statusCode);
+		});
 		cy.wait("@fetchTransactions");
-
-		// Verify the transaction is no longer visible in the active list
-		// Assuming 'voided' status hides the transaction from the default view
 		cy.contains("#transactions-body tr", transactionMemo).should("not.exist");
 	});
 });

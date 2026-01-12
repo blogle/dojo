@@ -2,13 +2,18 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import AccountDetailPage from "./pages/AccountDetailPage.vue";
 import AccountsPage from "./pages/AccountsPage.vue";
 import BudgetPage from "./pages/BudgetPage.vue";
+import DashboardPage from "./pages/DashboardPage.vue";
 import TransactionsPage from "./pages/TransactionsPage.vue";
 import TransfersPage from "./pages/TransfersPage.vue";
 
 const routes = [
 	{
 		path: "/",
-		redirect: "/transactions",
+		component: DashboardPage,
+	},
+	{
+		path: "/dashboard",
+		redirect: "/",
 	},
 	{
 		path: "/transactions",
@@ -51,7 +56,7 @@ const routes = [
 	},
 	{
 		path: "/:pathMatch(.*)*",
-		redirect: "/transactions",
+		redirect: "/",
 	},
 ];
 

@@ -40,6 +40,7 @@
       :isSubmitting="isCreating"
       :isLoadingReference="isLoadingReference"
       :referenceError="referenceError"
+      resetMode="partial"
       @submit="handleCreateTransaction"
     />
 

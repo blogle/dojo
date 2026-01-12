@@ -13,5 +13,92 @@
 }
 
 .transactions-page__form {
-	margin-bottom: 2rem;
+	margin-bottom: 1rem;
+}
+
+.transaction-form {
+	padding: 1rem;
+	margin-bottom: 1rem;
+}
+
+.transaction-form__grid {
+	display: grid;
+	grid-template-columns:
+		minmax(140px, 160px)
+		minmax(0, 1.1fr)
+		minmax(0, 1.1fr)
+		minmax(0, 2fr)
+		minmax(0, 220px);
+	gap: 0.75rem;
+	align-items: end;
+	width: 100%;
+}
+
+.transaction-form__grid .form-panel__field {
+	min-width: 0;
+}
+
+.transaction-form__amount-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.transaction-form__amount-row input {
+	flex: 1;
+	min-width: 0;
+}
+
+.transaction-flow-toggle {
+	width: 44px;
+	height: 44px;
+	border: var(--border-thick);
+	border-radius: 0.4rem;
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+	font-weight: 800;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition:
+		transform 0.12s ease,
+		background-color 0.15s ease,
+		border-color 0.15s ease;
+}
+
+.transaction-flow-toggle:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.transaction-flow-toggle[data-flow="outflow"] {
+	background-color: var(--danger);
+	border-color: var(--danger);
+	color: var(--bg);
+}
+
+.transaction-flow-toggle[data-flow="inflow"] {
+	background-color: var(--success);
+	border-color: var(--success);
+	color: var(--bg);
+}
+
+.transaction-flow-toggle:hover {
+	transform: translateY(-1px);
+}
+
+.transaction-flow-toggle:disabled {
+	opacity: 0.7;
+	cursor: default;
+	transform: none;
+}
+
+.transaction-form__actions {
+	margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+	.transaction-form__grid {
+		grid-template-columns: 1fr;
+	}
 }

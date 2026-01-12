@@ -125,38 +125,6 @@
             @change-interval="setRangeLabel"
           />
         </div>
-
-        <TransactionForm
-          wrapperClass="account-detail-page__form"
-          :accounts="accounts"
-          :categories="categories"
-          :allowedFlows="transactionFormAllowedFlows"
-          :submitLabel="transactionSubmitLabel"
-          :lockedAccountId="accountId"
-          :lockedAccountName="accountName"
-          :isSubmitting="isCreatingTransaction"
-          :isLoadingReference="isLoadingReference"
-          :referenceError="referenceError"
-          @submit="handleCreateTransaction"
-        />
-
-        <div class="ledger-card">
-          <TransactionTable
-            :transactions="accountTransactions"
-            :accounts="accounts"
-            :categories="categories"
-            :lockedAccountId="accountId"
-            :lockedAccountName="accountName"
-            :isLoading="isLoadingTransactions"
-            :isLoadingReference="isLoadingReference"
-            :referenceError="referenceError"
-            :error="transactionsError"
-            emptyMessage="No transactions found."
-            loadingMessage="Loading transactions…"
-            @update="handleUpdateTransaction"
-            @delete="handleDeleteTransaction"
-          />
-        </div>
       </main>
 
       <aside>
@@ -178,6 +146,41 @@
           </dl>
         </div>
       </aside>
+
+      <div class="account-detail-page__ledger">
+        <TransactionForm
+          wrapperClass="account-detail-page__form"
+          :accounts="accounts"
+          :categories="categories"
+          :allowedFlows="transactionFormAllowedFlows"
+          :submitLabel="transactionSubmitLabel"
+          :lockedAccountId="accountId"
+          :lockedAccountName="accountName"
+          :isSubmitting="isCreatingTransaction"
+          :isLoadingReference="isLoadingReference"
+          :referenceError="referenceError"
+          resetMode="partial"
+          @submit="handleCreateTransaction"
+        />
+
+        <div class="ledger-card">
+          <TransactionTable
+            :transactions="accountTransactions"
+            :accounts="accounts"
+            :categories="categories"
+            :lockedAccountId="accountId"
+            :lockedAccountName="accountName"
+            :isLoading="isLoadingTransactions"
+            :isLoadingReference="isLoadingReference"
+            :referenceError="referenceError"
+            :error="transactionsError"
+            emptyMessage="No transactions found."
+            loadingMessage="Loading transactions…"
+            @update="handleUpdateTransaction"
+            @delete="handleDeleteTransaction"
+          />
+        </div>
+      </div>
     </div>
 
     <ReconciliationModal

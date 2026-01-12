@@ -1,5 +1,6 @@
 """Core API schemas."""
 
+from datetime import date as Date
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -35,3 +36,10 @@ class NetWorthResponse(BaseModel):
     tangibles_minor: int = Field(description="Sum of active tangible valuations.")
     net_worth_minor: int = Field(description="Assets - liabilities + positions (minor units).")
     net_worth_decimal: Decimal = Field(description="Net worth expressed in whole units (Decimal).")
+
+
+class NetWorthHistoryPoint(BaseModel):
+    """One point in the net worth time series."""
+
+    date: Date = Field(description="Point date (YYYY-MM-DD).")
+    value_minor: int = Field(description="Net worth at date (minor units).")

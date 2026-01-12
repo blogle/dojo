@@ -1,6 +1,7 @@
 """Data access helpers for core domain features."""
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 import duckdb
@@ -97,3 +98,35 @@ class CoreDAO:
             return None
         # Convert the first row of the DataFrame to a dictionary and create a NetWorthRecord.
         return NetWorthRecord.from_dict(df.iloc[0].to_dict())
+
+    def net_worth_history(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[date, int]]:
+        """
+        Retrieves a daily net worth time series between start_date and end_date.
+
+        Parameters
+        ----------
+        start_date : date
+            Inclusive start date for the series.
+        end_date : date
+            Inclusive end date for the series.
+
+        Returns
+        -------
+        list[tuple[date, int]]
+            Ordered list of (as_of_date, net_worth_minor) points.
+        """
+        sql = load_sql("net_worth_history.sql")
+        cursor = self._conn.execute(
+            sql,
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
+        rows = cursor.fetchall()
+        return [(row[0], row[1]) for row in rows]

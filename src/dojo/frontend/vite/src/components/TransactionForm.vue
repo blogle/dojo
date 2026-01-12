@@ -6,33 +6,8 @@
       aria-describedby="transaction-form-hint"
       @submit.prevent="handleSubmit"
     >
-      <div v-if="showFlowToggle" class="segmented-control" role="group" aria-label="Transaction type">
-        <span class="segmented-control__label">Type</span>
-        <label v-if="canSelectOutflow" class="segmented-control__option">
-          <input
-            type="radio"
-            name="transaction-flow"
-            value="outflow"
-            data-transaction-flow
-            v-model="transactionForm.flow"
-            :disabled="isDisabled"
-          />
-          <span>Outflow</span>
-        </label>
-        <label v-if="canSelectInflow" class="segmented-control__option">
-          <input
-            type="radio"
-            name="transaction-flow"
-            value="inflow"
-            data-transaction-flow
-            v-model="transactionForm.flow"
-            :disabled="isDisabled"
-          />
-          <span>Inflow</span>
-        </label>
-      </div>
-      <div class="form-panel__grid form-panel__grid--compact">
-        <label class="form-panel__field">
+      <div class="transaction-form__grid">
+        <label class="form-panel__field transaction-form__field--date">
           <span>Date</span>
           <input
             type="date"
@@ -42,7 +17,8 @@
             :disabled="isDisabled"
           />
         </label>
-        <label class="form-panel__field">
+
+        <label class="form-panel__field transaction-form__field--account">
           <span>Account</span>
           <select
             name="account_id"
@@ -52,12 +28,17 @@
             :disabled="isAccountDisabled"
           >
             <option value="" disabled>Select account</option>
-            <option v-for="account in accountOptions" :key="account.account_id" :value="account.account_id">
+            <option
+              v-for="account in accountOptions"
+              :key="account.account_id"
+              :value="account.account_id"
+            >
               {{ account.name }}
             </option>
           </select>
         </label>
-        <label class="form-panel__field">
+
+        <label class="form-panel__field transaction-form__field--category">
           <span>Category</span>
           <select
             name="category_id"
@@ -67,12 +48,17 @@
             :disabled="isDisabled || isLoadingReference || !!referenceError"
           >
             <option value="" disabled>Select category</option>
-            <option v-for="category in categories" :key="category.category_id" :value="category.category_id">
+            <option
+              v-for="category in categories"
+              :key="category.category_id"
+              :value="category.category_id"
+            >
               {{ category.name }}
             </option>
           </select>
         </label>
-        <label class="form-panel__field">
+
+        <label class="form-panel__field transaction-form__field--memo">
           <span>Memo</span>
           <input
             type="text"
@@ -82,21 +68,43 @@
             :disabled="isDisabled"
           />
         </label>
-        <label class="form-panel__field form-panel__field--amount">
+
+        <label
+          class="form-panel__field form-panel__field--amount transaction-form__field--amount"
+        >
           <span>Amount</span>
-          <input
-            type="number"
-            name="amount"
-            step="0.01"
-            inputmode="decimal"
-            placeholder="0.00"
-            required
-            v-model="transactionForm.amount"
-            :disabled="isDisabled"
-          />
+          <div class="transaction-form__amount-row">
+            <input
+              ref="amountInput"
+              type="number"
+              name="amount"
+              step="0.01"
+              inputmode="decimal"
+              placeholder="0.00"
+              required
+              v-model="transactionForm.amount"
+              :disabled="isDisabled"
+            />
+
+            <button
+              v-if="showFlowToggle"
+              type="button"
+              class="transaction-flow-toggle"
+              data-flow-toggle
+              :data-flow="transactionForm.flow"
+              role="switch"
+              :aria-checked="transactionForm.flow === 'inflow' ? 'true' : 'false'"
+              aria-label="Toggle inflow/outflow"
+              :disabled="isDisabled"
+              @click="toggleFlow"
+            >
+              {{ transactionForm.flow === "inflow" ? "in" : "out" }}
+            </button>
+          </div>
         </label>
       </div>
-      <div class="form-panel__actions">
+
+      <div class="form-panel__actions transaction-form__actions">
         <button
           type="submit"
           :class="submitButtonClass"
@@ -107,12 +115,14 @@
         </button>
       </div>
     </form>
-    <p class="form-panel__error" data-testid="transaction-error" aria-live="polite">{{ formError }}</p>
+    <p class="form-panel__error" data-testid="transaction-error" aria-live="polite">{{
+      formError
+    }}</p>
   </section>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { todayISO } from "../services/format.js";
 import {
 	isValidDateInput,
@@ -145,6 +155,8 @@ const emitAsync = (eventName, ...args) =>
 		emit(eventName, ...args, resolve, reject);
 	});
 
+const amountInput = ref(null);
+
 const transactionForm = reactive({
 	transaction_date: todayISO(),
 	account_id: props.lockedAccountId || "",
@@ -166,10 +178,6 @@ const resolvedFlows = computed(() => {
 });
 
 const showFlowToggle = computed(() => resolvedFlows.value.length > 1);
-const canSelectOutflow = computed(() =>
-	resolvedFlows.value.includes("outflow"),
-);
-const canSelectInflow = computed(() => resolvedFlows.value.includes("inflow"));
 
 watch(
 	() => resolvedFlows.value.join("|"),
@@ -180,6 +188,14 @@ watch(
 	},
 	{ immediate: true },
 );
+
+const toggleFlow = () => {
+	if (!showFlowToggle.value) {
+		return;
+	}
+	transactionForm.flow =
+		transactionForm.flow === "outflow" ? "inflow" : "outflow";
+};
 
 const formError = ref("");
 
@@ -193,7 +209,7 @@ const isAccountDisabled = computed(
 );
 
 const wrapperClasses = computed(() => {
-	const base = "form-panel transactions-page__form";
+	const base = "form-panel transactions-page__form transaction-form";
 	if (!props.wrapperClass) {
 		return base;
 	}
@@ -230,6 +246,11 @@ const resetForm = () => {
 	transactionForm.flow = resolvedFlows.value[0] || "outflow";
 };
 
+const focusAmount = async () => {
+	await nextTick();
+	amountInput.value?.focus?.();
+};
+
 const handleSubmit = async () => {
 	if (props.isSubmitting) {
 		return;
@@ -244,6 +265,7 @@ const handleSubmit = async () => {
 		formError.value = "Account and category are required.";
 		return;
 	}
+
 	const amountResult = resolveSignedAmountFromFlow(
 		transactionForm.amount,
 		transactionForm.flow,
@@ -252,6 +274,7 @@ const handleSubmit = async () => {
 		formError.value = amountResult.error;
 		return;
 	}
+
 	const payload = {
 		transaction_date: transactionForm.transaction_date || todayISO(),
 		account_id: transactionForm.account_id,
@@ -264,6 +287,7 @@ const handleSubmit = async () => {
 	try {
 		await emitAsync("submit", payload);
 		resetForm();
+		await focusAmount();
 	} catch (error) {
 		formError.value = error?.message || "Failed to save transaction.";
 	}

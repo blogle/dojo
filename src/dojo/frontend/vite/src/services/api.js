@@ -146,6 +146,10 @@ export const api = {
 	},
 	netWorth: {
 		current: async () => fetchJSON("/api/net-worth/current"),
+		history: async (interval) =>
+			fetchJSON(
+				`/api/net-worth/history?interval=${encodeURIComponent(interval)}`,
+			),
 	},
 	investments: {
 		getAccount: async (accountId) =>

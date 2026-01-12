@@ -51,6 +51,67 @@ export const resolveInlineSignedAmountMinor = (inflowValue, outflowValue) => {
 	return { signedAmount };
 };
 
+export const resolveSignedAmountFromInput = (
+	amountValue,
+	allowedFlows = ["outflow", "inflow"],
+) => {
+	const flows = Array.isArray(allowedFlows) ? allowedFlows : [];
+	const resolvedFlows = flows.filter(
+		(flow) => flow === "outflow" || flow === "inflow",
+	);
+	const canOutflow = !resolvedFlows.length || resolvedFlows.includes("outflow");
+	const canInflow = !resolvedFlows.length || resolvedFlows.includes("inflow");
+
+	const raw =
+		amountValue === null || amountValue === undefined
+			? ""
+			: String(amountValue);
+	const trimmed = raw.trim();
+	if (!trimmed) {
+		return { error: "Enter a valid amount." };
+	}
+
+	let flowFromSign = null;
+	let magnitudeText = trimmed;
+	if (trimmed.startsWith("+")) {
+		flowFromSign = "inflow";
+		magnitudeText = trimmed.slice(1).trim();
+	} else if (trimmed.startsWith("-")) {
+		flowFromSign = "outflow";
+		magnitudeText = trimmed.slice(1).trim();
+	}
+
+	const magnitudeMinor = dollarsInputToMinor(magnitudeText);
+	if (magnitudeMinor === null) {
+		return { error: "Enter a valid amount." };
+	}
+	const normalizedAmount = Math.abs(magnitudeMinor);
+	if (normalizedAmount === 0) {
+		return { error: "Amount must be non-zero." };
+	}
+
+	const defaultFlow =
+		canOutflow && !canInflow
+			? "outflow"
+			: canInflow && !canOutflow
+				? "inflow"
+				: "outflow";
+	const resolvedFlow = flowFromSign || defaultFlow;
+
+	if (resolvedFlow === "outflow" && !canOutflow) {
+		return { error: "Outflows are not allowed for this entry." };
+	}
+	if (resolvedFlow === "inflow" && !canInflow) {
+		return { error: "Inflows are not allowed for this entry." };
+	}
+
+	return {
+		flow: resolvedFlow,
+		signedAmount:
+			resolvedFlow === "inflow" ? normalizedAmount : -normalizedAmount,
+	};
+};
+
 export const resolveSignedAmountFromFlow = (amountValue, flow) => {
 	const amountMinor = dollarsInputToMinor(amountValue);
 	if (amountMinor === null) {

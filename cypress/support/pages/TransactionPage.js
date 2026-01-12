@@ -2,8 +2,7 @@ class TransactionPage {
 	elements = {
 		accountSelect: () => cy.get("[data-transaction-account]"),
 		categorySelect: () => cy.get("[data-transaction-category]"),
-		inflowRadio: () => cy.get('input[value="inflow"]'),
-		outflowRadio: () => cy.get('input[value="outflow"]'),
+		flowToggle: () => cy.get("[data-flow-toggle]"),
 		amountInput: () => cy.get("#transaction-form input[name='amount']"),
 		submitButton: () => cy.get("[data-transaction-submit]"),
 		errorDisplay: () => cy.get("[data-testid='transaction-error']"),
@@ -14,8 +13,24 @@ class TransactionPage {
 		cy.visit("/#/transactions");
 	}
 
+	ensureFlow(flow) {
+		cy.get("body").then(($body) => {
+			const toggle = $body.find("[data-flow-toggle]");
+			if (!toggle.length) {
+				return;
+			}
+			cy.wrap(toggle)
+				.invoke("attr", "data-flow")
+				.then((current) => {
+					if (current !== flow) {
+						cy.wrap(toggle).click({ force: true });
+					}
+				});
+		});
+	}
+
 	createOutflowTransaction(account, category, amount) {
-		this.elements.outflowRadio().check({ force: true });
+		this.ensureFlow("outflow");
 		this.elements.accountSelect().select(account);
 		this.elements.categorySelect().select(category);
 		this.elements.amountInput().clear().type(amount);
@@ -24,10 +39,9 @@ class TransactionPage {
 
 	createTransaction(type, account, category, amount) {
 		if (type === "inflow") {
-			this.elements.inflowRadio().check({ force: true });
-		} else if (type === "outflow") {
-			this.createOutflowTransaction(account, category, amount);
-			return;
+			this.ensureFlow("inflow");
+		} else {
+			this.ensureFlow("outflow");
 		}
 
 		this.elements.accountSelect().select(account);
@@ -57,13 +71,16 @@ class TransactionPage {
 					"contain",
 					category,
 				);
-				// Amount can be in outflow or inflow, check both or just contain text
 				cy.contains('[class*="amount-cell"]', amount).should("exist");
 			});
 	}
 
 	editTransaction(rowIndex) {
-		this.elements.transactionTableRows().eq(rowIndex).find('[data-testid="transaction-col-account"]').click();
+		this.elements
+			.transactionTableRows()
+			.eq(rowIndex)
+			.find('[data-testid="transaction-col-account"]')
+			.click();
 	}
 
 	setInlineDate(dateString) {
@@ -101,6 +118,10 @@ class TransactionPage {
 		cy.get("[data-inline-outflow]")
 			.should("be.enabled")
 			.type("{enter}", { force: true });
+	}
+
+	deleteInlineTransaction() {
+		cy.get("[data-inline-delete]").click({ force: true });
 	}
 
 	verifyTransactionStatus(rowIndex, status) {

@@ -3,6 +3,9 @@
     <header class="app-header">
       <RouterLink to="/" class="app-header__logo">DOJO</RouterLink>
       <nav class="app-header__nav" aria-label="Primary">
+        <RouterLink to="/" class="app-header__link" data-route-link="dashboard">
+          Dashboard
+        </RouterLink>
         <RouterLink
           to="/transactions"
           class="app-header__link"
