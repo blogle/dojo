@@ -5,214 +5,299 @@
     data-route="dashboard"
     data-testid="dashboard-page"
   >
-    <header class="dashboard-page__header">
-      <div class="dashboard-page__net-worth">
-        <span class="dashboard-page__label">NET WORTH</span>
-        <h1 class="dashboard-page__value" data-testid="dashboard-net-worth-value">
-          {{ headerValueLabel }}
-        </h1>
-        <p
-          class="dashboard-page__change"
-          :class="headerIsPositive ? 'dashboard-page__change--positive' : 'dashboard-page__change--negative'"
-          data-testid="dashboard-net-worth-change"
-        >
-          {{ headerChangeLabel }} ({{ headerChangePercentLabel }})
-        </p>
-      </div>
-    </header>
-
-    <div
-      class="dashboard-chart"
-      ref="chartRef"
-      data-testid="dashboard-net-worth-chart"
-      @pointerdown="handlePointerDown"
-      @pointermove="handlePointerMove"
-      @pointerup="handlePointerUp"
-      @pointerleave="handlePointerLeave"
-    >
-      <svg
-        class="dashboard-chart__svg"
-        :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id="dashboardGradientPositive" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="var(--success)" stop-opacity="0.4" />
-            <stop offset="70%" stop-color="var(--success)" stop-opacity="0.1" />
-            <stop offset="100%" stop-color="var(--bg)" stop-opacity="0" />
-          </linearGradient>
-          <linearGradient id="dashboardGradientNegative" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="var(--danger)" stop-opacity="0.4" />
-            <stop offset="70%" stop-color="var(--danger)" stop-opacity="0.1" />
-            <stop offset="100%" stop-color="var(--bg)" stop-opacity="0" />
-          </linearGradient>
-        </defs>
-
-        <path
-          v-if="linePath"
-          :d="areaPath"
-          class="dashboard-chart__area"
-          :style="{
-            fill: `url(#${chartStateIsPositive ? 'dashboardGradientPositive' : 'dashboardGradientNegative'})`,
-          }"
-        />
-        <path
-          v-if="linePath"
-          :d="linePath"
-          class="dashboard-chart__line"
-          :style="{ stroke: chartStateIsPositive ? 'var(--success)' : 'var(--danger)' }"
-        />
-
-        <line
-          v-if="dragStartData"
-          :x1="dragStartData.x"
-          y1="0"
-          :x2="dragStartData.x"
-          :y2="viewHeight"
-          class="dashboard-chart__drag-line"
-        />
-
-        <rect
-          v-if="dragStartData && hoverData"
-          :x="Math.min(dragStartData.x, hoverX)"
-          y="0"
-          :width="Math.abs(hoverX - dragStartData.x)"
-          :height="viewHeight"
-          class="dashboard-chart__drag-area"
-        />
-
-        <line
-          v-if="hoverData"
-          :x1="hoverX"
-          y1="0"
-          :x2="hoverX"
-          :y2="viewHeight"
-          class="dashboard-chart__cursor"
-        />
-
-        <circle
-          v-if="hoverData"
-          :cx="hoverX"
-          :cy="hoverY"
-          r="6"
-          fill="var(--surface)"
-          :stroke="chartStateIsPositive ? 'var(--success)' : 'var(--danger)'"
-          stroke-width="3"
-        />
-      </svg>
-
-      <div v-if="hoverData" class="dashboard-chart__tooltip" :style="tooltipStyle">
-        <template v-if="dragStartData">
-          <span class="dashboard-chart__tooltip-range">
-            {{ formatDateShort(dragStartData.date) }} – {{ formatDateShort(hoverData.date) }}
-          </span>
-          <div class="dashboard-chart__tooltip-rows">
-            <div class="dashboard-chart__tooltip-row">
-              <span class="u-muted">Start</span>
-              <span>{{ formatMinor(dragStartData.value_minor) }}</span>
-            </div>
-            <div class="dashboard-chart__tooltip-row">
-              <span class="u-muted">End</span>
-              <span>{{ formatMinor(hoverData.value_minor) }}</span>
-            </div>
-          </div>
-          <div
-            class="dashboard-chart__tooltip-delta"
-            :class="tooltipChangeMinor >= 0 ? 'dashboard-page__change--positive' : 'dashboard-page__change--negative'"
-          >
-            <strong>{{ formatSignedMinor(tooltipChangeMinor) }}</strong>
-            <span>({{ tooltipPercentLabel }}%)</span>
-          </div>
-        </template>
-
-        <template v-else>
-          <span class="dashboard-chart__tooltip-range">{{ formatDate(hoverData.date) }}</span>
-          <div class="dashboard-chart__tooltip-delta">
-            <strong>{{ formatMinor(hoverData.value_minor) }}</strong>
-          </div>
-        </template>
-      </div>
-
-      <div v-if="isLoadingHistory" class="dashboard-chart__loading u-muted">Loading net worth…</div>
-      <div v-else-if="historyError" class="dashboard-chart__loading form-panel__error">{{ historyError }}</div>
-    </div>
-
-    <nav class="dashboard-intervals" aria-label="Net worth interval" data-testid="dashboard-intervals">
-      <button
-        v-for="interval in intervals"
-        :key="interval"
-        type="button"
-        class="dashboard-intervals__button"
-        :class="{ 'dashboard-intervals__button--active': selectedInterval === interval }"
-        @click="changeInterval(interval)"
-        :data-testid="`dashboard-interval-${interval}`"
-      >
-        {{ interval }}
-      </button>
-    </nav>
-
-    <div class="dashboard-grid">
-      <article class="dashboard-panel" data-testid="dashboard-accounts">
-        <header class="dashboard-panel__header">
-          <h2 class="dashboard-panel__title">Accounts</h2>
-          <RouterLink to="/accounts" class="button button--tertiary">View all</RouterLink>
-        </header>
-
-        <p v-if="isLoadingAccounts" class="u-muted">Loading accounts…</p>
-        <p v-else-if="accountsError" class="form-panel__error">{{ accountsError }}</p>
-        <div v-else class="dashboard-account-list">
-          <RouterLink
-            v-for="acct in topAccounts"
-            :key="acct.account_id"
-            :to="`/accounts/${acct.account_id}`"
-            class="dashboard-account-row"
-            :data-account-id="acct.account_id"
-          >
+    <div class="dashboard-layout">
+      <div class="dashboard-column dashboard-column--stack">
+        <article class="dashboard-card dashboard-card--net-worth" data-testid="dashboard-net-worth">
+          <header class="dashboard-card__header">
+            <p class="dashboard-card__label">Net worth</p>
+          </header>
+          <div class="net-worth-card__figures">
             <div>
-              <div class="dashboard-account-row__name">{{ acct.name }}</div>
-              <div class="dashboard-account-row__meta u-muted">{{ acct.account_class.replace(/_/g, ' ') }}</div>
+              <h1 class="dashboard-card__headline">{{ headerValueLabel }}</h1>
+              <p
+                class="dashboard-card__change"
+                :class="headerIsPositive ? 'dashboard-card__change--positive' : 'dashboard-card__change--negative'"
+                data-testid="dashboard-net-worth-change"
+              >
+                {{ headerChangeLabel }} ({{ headerChangePercentLabel }})
+              </p>
             </div>
-            <div class="dashboard-account-row__balance">{{ formatMinor(acct.current_balance_minor || 0) }}</div>
-          </RouterLink>
-        </div>
-      </article>
+            <p class="dashboard-card__as-of">Range: {{ selectedInterval }}</p>
+          </div>
 
-      <article class="dashboard-panel" data-testid="dashboard-budget-watchlist">
-        <header class="dashboard-panel__header">
-          <h2 class="dashboard-panel__title">Budget Watchlist</h2>
-          <RouterLink to="/budgets" class="button button--tertiary">Edit list</RouterLink>
-        </header>
+          <div class="net-worth-chart">
+            <div
+              class="net-worth-chart__surface"
+              ref="chartRef"
+              data-testid="dashboard-net-worth-chart"
+              @pointerdown="handlePointerDown"
+              @pointermove="handlePointerMove"
+              @pointerup="handlePointerUp"
+              @pointerleave="handlePointerLeave"
+            >
+              <svg
+                class="net-worth-chart__svg"
+                :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <linearGradient id="netWorthGradientPositive" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="var(--success)" stop-opacity="0.4" />
+                    <stop offset="70%" stop-color="var(--success)" stop-opacity="0.1" />
+                    <stop offset="100%" stop-color="var(--bg)" stop-opacity="0" />
+                  </linearGradient>
+                  <linearGradient id="netWorthGradientNegative" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="var(--danger)" stop-opacity="0.4" />
+                    <stop offset="70%" stop-color="var(--danger)" stop-opacity="0.1" />
+                    <stop offset="100%" stop-color="var(--bg)" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
 
-        <p v-if="isLoadingBudgets" class="u-muted">Loading budgets…</p>
-        <p v-else-if="budgetsError" class="form-panel__error">{{ budgetsError }}</p>
-        <div v-else class="dashboard-budget-list">
-          <div
-            v-for="cat in watchlistCategories"
-            :key="cat.category_id"
-            class="dashboard-budget-item"
-            :class="{ 'dashboard-budget-item--empty': isWatchlistEmpty(cat) }"
-          >
-            <div class="dashboard-budget-item__header">
-              <span>{{ cat.name }}</span>
-            </div>
-            <div class="dashboard-budget-item__track">
-              <div
-                class="dashboard-budget-item__fill"
-                :style="{ width: `${watchlistProgress(cat)}%` }"
-              ></div>
-            </div>
-            <div class="dashboard-budget-item__footer">
-              <template v-if="isWatchlistEmpty(cat)">
-                <span class="dashboard-budget-item__warning">Unfunded / Overspent</span>
-              </template>
-              <template v-else>
-                <strong>{{ formatMinor(cat.available_minor) }}</strong>
-                <span class="u-muted">of {{ formatMinor(cat.allocated_minor) }} budgeted</span>
-              </template>
+                <path
+                  v-if="linePath"
+                  :d="areaPath"
+                  class="net-worth-chart__area"
+                  :style="{
+                    fill: `url(#${chartStateIsPositive ? 'netWorthGradientPositive' : 'netWorthGradientNegative'})`,
+                  }"
+                />
+                <path
+                  v-if="linePath"
+                  :d="linePath"
+                  class="net-worth-chart__line"
+                  :style="{ stroke: chartStateIsPositive ? 'var(--success)' : 'var(--danger)' }"
+                />
+
+                <line
+                  v-if="dragStartData"
+                  :x1="dragStartData.x"
+                  y1="0"
+                  :x2="dragStartData.x"
+                  :y2="viewHeight"
+                  class="net-worth-chart__drag-line"
+                />
+
+                <rect
+                  v-if="dragStartData && hoverData"
+                  :x="Math.min(dragStartData.x, hoverX)"
+                  y="0"
+                  :width="Math.abs(hoverX - dragStartData.x)"
+                  :height="viewHeight"
+                  class="net-worth-chart__drag-area"
+                />
+
+                <line
+                  v-if="hoverData"
+                  :x1="hoverX"
+                  y1="0"
+                  :x2="hoverX"
+                  :y2="viewHeight"
+                  class="net-worth-chart__cursor"
+                />
+
+                <circle
+                  v-if="hoverData"
+                  :cx="hoverX"
+                  :cy="hoverY"
+                  r="6"
+                  fill="var(--surface)"
+                  :stroke="chartStateIsPositive ? 'var(--success)' : 'var(--danger)'"
+                  stroke-width="3"
+                />
+              </svg>
+
+              <div v-if="hoverData" class="net-worth-chart__tooltip" :style="tooltipStyle">
+                <template v-if="dragStartData">
+                  <span class="net-worth-chart__tooltip-range">
+                    {{ formatDateShort(dragStartData.date) }} – {{ formatDateShort(hoverData.date) }}
+                  </span>
+                  <div class="net-worth-chart__tooltip-rows">
+                    <div class="net-worth-chart__tooltip-row">
+                      <span class="u-muted">Start</span>
+                      <span>{{ formatMinor(dragStartData.value_minor) }}</span>
+                    </div>
+                    <div class="net-worth-chart__tooltip-row">
+                      <span class="u-muted">End</span>
+                      <span>{{ formatMinor(hoverData.value_minor) }}</span>
+                    </div>
+                  </div>
+                  <div
+                    class="net-worth-chart__tooltip-delta"
+                    :class="tooltipChangeMinor >= 0 ? 'dashboard-card__change--positive' : 'dashboard-card__change--negative'"
+                  >
+                    <strong>{{ formatSignedMinor(tooltipChangeMinor) }}</strong>
+                    <span>({{ tooltipPercentLabel }}%)</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <span class="net-worth-chart__tooltip-range">{{ formatDate(hoverData.date) }}</span>
+                  <strong class="net-worth-chart__tooltip-value">{{ formatMinor(hoverData.value_minor) }}</strong>
+                </template>
+              </div>
+
+              <div v-if="isLoadingHistory" class="net-worth-chart__loading u-muted">Loading net worth…</div>
+              <div v-else-if="historyError" class="net-worth-chart__loading form-panel__error">{{ historyError }}</div>
             </div>
           </div>
-        </div>
-      </article>
+
+          <nav class="dashboard-intervals" aria-label="Net worth interval" data-testid="dashboard-intervals">
+            <button
+              v-for="interval in intervals"
+              :key="interval"
+              type="button"
+              class="dashboard-intervals__button"
+              :class="{ 'dashboard-intervals__button--active': selectedInterval === interval }"
+              @click="changeInterval(interval)"
+              :data-testid="`dashboard-interval-${interval}`"
+            >
+              {{ interval }}
+            </button>
+          </nav>
+          <RouterLink to="/accounts" class="dashboard-card__footer-link">Details</RouterLink>
+        </article>
+
+        <article class="dashboard-card dashboard-card--list" data-testid="dashboard-accounts">
+          <header class="dashboard-card__header">
+            <div>
+              <p class="dashboard-card__label">Account summary</p>
+              <p class="dashboard-card__as-of">as of {{ accountSummaryDate }}</p>
+            </div>
+          </header>
+
+          <p v-if="isLoadingAccounts" class="u-muted">Loading accounts…</p>
+          <p v-else-if="accountsError" class="form-panel__error">{{ accountsError }}</p>
+          <div v-else class="dashboard-list">
+            <div
+              v-for="acct in topAccounts"
+              :key="acct.account_id"
+              class="dashboard-row"
+            >
+              <div>
+                <div class="dashboard-row__name">{{ acct.name }}</div>
+                <div class="dashboard-row__meta u-muted">{{ acct.account_class.replace(/_/g, ' ') }}</div>
+              </div>
+              <div
+                class="dashboard-row__value"
+                :class="acct.current_balance_minor < 0 ? 'dashboard-row__value--negative' : 'dashboard-row__value--positive'"
+              >
+                {{ formatMinor(acct.current_balance_minor || 0) }}
+              </div>
+            </div>
+          </div>
+          <RouterLink to="/accounts" class="dashboard-card__footer-link">All assets &amp; liabilities</RouterLink>
+        </article>
+
+        <article class="dashboard-card dashboard-card--list" data-testid="dashboard-investments">
+          <header class="dashboard-card__header">
+            <div>
+              <p class="dashboard-card__label">Investment summary</p>
+              <p class="dashboard-card__as-of">Tracked accounts</p>
+            </div>
+          </header>
+
+          <p v-if="isLoadingAccounts" class="u-muted">Loading investments…</p>
+          <p v-else-if="investmentAccounts.length === 0" class="u-muted">No investment accounts yet.</p>
+          <div v-else class="dashboard-list">
+            <div
+              v-for="acct in investmentAccounts"
+              :key="acct.account_id"
+              class="dashboard-row"
+            >
+              <div>
+                <div class="dashboard-row__name">{{ acct.name }}</div>
+                <div class="dashboard-row__meta u-muted">{{ acct.account_role === "tracking" ? "Tracking" : "On budget" }}</div>
+              </div>
+              <div class="dashboard-row__value dashboard-row__value--positive">
+                {{ formatMinor(acct.current_balance_minor || 0) }}
+              </div>
+            </div>
+          </div>
+          <RouterLink to="/accounts" class="dashboard-card__footer-link">All investments</RouterLink>
+        </article>
+      </div>
+
+      <div class="dashboard-column dashboard-column--center">
+        <article class="dashboard-card dashboard-card--watchlist" data-testid="dashboard-budget-watchlist">
+          <header class="dashboard-card__header">
+            <p class="dashboard-card__label">Budget watch list</p>
+          </header>
+
+          <p v-if="isLoadingBudgets" class="u-muted">Loading budgets…</p>
+          <p v-else-if="budgetsError" class="form-panel__error">{{ budgetsError }}</p>
+          <div v-else class="budget-watchlist">
+            <div
+              v-for="cat in watchlistCategories"
+              :key="cat.category_id"
+              class="budget-watchlist__item"
+            >
+              <div class="budget-watchlist__row">
+                <div>
+                  <p class="budget-watchlist__name">{{ cat.name }}</p>
+                  <p
+                    class="budget-watchlist__status"
+                    :class="budgetStatusClass(cat)"
+                  >
+                    {{ budgetStatusLabel(cat) }}
+                  </p>
+                </div>
+                <span class="budget-watchlist__available">{{ formatMinor(Math.max(cat.available_minor || 0, 0)) }}</span>
+              </div>
+              <div class="budget-watchlist__bar">
+                <div
+                  class="budget-watchlist__fill"
+                  :class="{ 'budget-watchlist__fill--danger': cat.available_minor < 0 }"
+                  :style="{ width: `${watchlistProgress(cat)}%` }"
+                ></div>
+              </div>
+              <div class="budget-watchlist__scale">
+                <span>0</span>
+                <span>{{ formatMinor(watchlistTarget(cat)) }}</span>
+              </div>
+            </div>
+          </div>
+          <RouterLink to="/budgets" class="dashboard-card__footer-link">All budgets</RouterLink>
+        </article>
+      </div>
+
+      <div class="dashboard-column dashboard-column--stack">
+        <article class="dashboard-card dashboard-card--bills">
+          <header class="dashboard-card__header">
+            <p class="dashboard-card__label">Bills &amp; goals</p>
+          </header>
+
+          <p v-if="isLoadingBudgets" class="u-muted">Loading bills…</p>
+          <p v-else-if="budgetsError" class="form-panel__error">{{ budgetsError }}</p>
+          <template v-else>
+            <div
+              v-for="section in billSections"
+              :key="section.id"
+              class="bills-card__section"
+            >
+              <h3 class="bills-card__title">{{ section.title }}</h3>
+              <div v-if="section.items.length === 0" class="bills-card__empty u-muted">Nothing scheduled.</div>
+              <div v-else class="bills-list">
+                <div
+                  v-for="item in section.items"
+                  :key="item.id"
+                  class="bills-row"
+                >
+                  <div class="bills-row__label">
+                    <span>{{ item.name }}</span>
+                    <small>due on {{ item.dueLabel }}</small>
+                  </div>
+                  <div class="bills-row__value">
+                    <strong>{{ item.amountLabel }}</strong>
+                    <span class="status-pill" :class="`status-pill--${item.status.variant}`">
+                      <span class="status-pill__dot"></span>
+                      {{ item.status.label }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </article>
+      </div>
     </div>
   </section>
 </template>
@@ -326,7 +411,7 @@ const dataPoints = computed(() => {
 	const padding = range * 0.15;
 
 	return data.map((d, i) => {
-		const x = (i / (data.length - 1)) * viewWidth;
+		const x = data.length === 1 ? 0 : (i / (data.length - 1)) * viewWidth;
 		const y =
 			viewHeight -
 			((d.value_minor - (minVal - padding)) / (range + padding * 2)) *
@@ -399,9 +484,9 @@ const updateHoverFromEvent = (evt) => {
 	if (rawX < 0 || rawX > rect.width) return;
 
 	const scaledX = (rawX / rect.width) * viewWidth;
-	const index = Math.round(
-		(scaledX / viewWidth) * (dataPoints.value.length - 1),
-	);
+	const maxIndex = Math.max(dataPoints.value.length - 1, 0);
+	const index =
+		maxIndex === 0 ? 0 : Math.round((scaledX / viewWidth) * maxIndex);
 	const point = dataPoints.value[index];
 	if (!point) return;
 
@@ -488,13 +573,31 @@ const isLoadingAccounts = computed(
 	() => accountsQuery.isPending.value || accountsQuery.isFetching.value,
 );
 const accountsError = computed(() => accountsQuery.error.value?.message || "");
+
 const topAccounts = computed(() => {
 	const accounts = accountsQuery.data.value ?? [];
 	return [...accounts]
 		.sort(
 			(a, b) => (b.current_balance_minor || 0) - (a.current_balance_minor || 0),
 		)
-		.slice(0, 8);
+		.slice(0, 4);
+});
+
+const investmentAccounts = computed(() => {
+	const accounts = accountsQuery.data.value ?? [];
+	return accounts
+		.filter((acct) => acct.account_class === "investment")
+		.sort(
+			(a, b) => (b.current_balance_minor || 0) - (a.current_balance_minor || 0),
+		)
+		.slice(0, 4);
+});
+
+const accountSummaryDate = computed(() => {
+	const now = new Date();
+	const mm = `${now.getMonth() + 1}`.padStart(2, "0");
+	const dd = `${now.getDate()}`.padStart(2, "0");
+	return `${mm}/${dd}`;
 });
 
 const isLoadingBudgets = computed(
@@ -506,78 +609,249 @@ const watchlistCategories = computed(() => {
 	const categories = budgetsQuery.data.value ?? [];
 	return categories
 		.filter((cat) => !systemCategoryIds.has(cat.category_id))
-		.slice(0, 6);
+		.sort((a, b) => (a.available_minor || 0) - (b.available_minor || 0))
+		.slice(0, 8);
 });
 
-const isWatchlistEmpty = (category) =>
-	(category.allocated_minor || 0) === 0 || (category.available_minor || 0) <= 0;
+const watchlistTarget = (category) =>
+	category.goal_amount_minor || category.allocated_minor || 0;
 
 const watchlistProgress = (category) => {
-	const allocated = category.allocated_minor || 0;
+	const target = watchlistTarget(category);
 	const available = category.available_minor || 0;
-	if (allocated <= 0) return 0;
-	const pct = (available / allocated) * 100;
+	if (target <= 0) {
+		return available > 0 ? 100 : 0;
+	}
+	const pct = (available / target) * 100;
 	return Math.max(0, Math.min(100, pct));
 };
+
+const budgetStatusLabel = (category) => {
+	const available = category.available_minor || 0;
+	if (available < 0) {
+		return `${formatMinor(Math.abs(available))} over budget`;
+	}
+	return `${formatMinor(available)} available`;
+};
+
+const budgetStatusClass = (category) => {
+	if ((category.available_minor || 0) < 0) {
+		return "budget-watchlist__status--danger";
+	}
+	if (watchlistTarget(category) === 0) {
+		return "budget-watchlist__status--muted";
+	}
+	return "budget-watchlist__status--positive";
+};
+
+const formatDueDate = (date) =>
+	date.toLocaleDateString(undefined, {
+		month: "long",
+		day: "numeric",
+	});
+
+const getBillAmountMinor = (category) => {
+	const target = category.goal_amount_minor || 0;
+	const allocated = category.allocated_minor || 0;
+	const available = Math.abs(category.available_minor || 0);
+	if (target > 0) return target;
+	if (allocated > 0) return allocated;
+	return available;
+};
+
+const describeBillStatus = (category) => {
+	const target = getBillAmountMinor(category);
+	const available = category.available_minor || 0;
+	if (target <= 0) {
+		return {
+			label: available > 0 ? `${formatMinor(available)} saved` : "Planning",
+			variant: "muted",
+		};
+	}
+	if (available >= target) {
+		return { label: "Fully funded", variant: "success" };
+	}
+	const shortfall = target - Math.max(available, 0);
+	return {
+		label: `${formatMinor(shortfall)} to go`,
+		variant: "warning",
+	};
+};
+
+const billSections = computed(() => {
+	const categories = budgetsQuery.data.value ?? [];
+	const today = new Date();
+	const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+	const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+	const earlyNextCutoff = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 10);
+
+	const sections = {
+		current: [],
+		next: [],
+		annual: [],
+	};
+
+	categories.forEach((cat) => {
+		if (!cat.goal_target_date) return;
+		const due = new Date(cat.goal_target_date);
+		const info = {
+			id: cat.category_id,
+			name: cat.name,
+			dueLabel: formatDueDate(due),
+			amountLabel: formatMinor(getBillAmountMinor(cat)),
+			status: describeBillStatus(cat),
+			dueDate: due,
+		};
+
+		const dueMonthStart = new Date(due.getFullYear(), due.getMonth(), 1);
+		if (
+			dueMonthStart.getFullYear() === thisMonth.getFullYear() &&
+			dueMonthStart.getMonth() === thisMonth.getMonth()
+		) {
+			sections.current.push(info);
+			return;
+		}
+
+		if (
+			dueMonthStart.getFullYear() === nextMonth.getFullYear() &&
+			dueMonthStart.getMonth() === nextMonth.getMonth() &&
+			due <= earlyNextCutoff
+		) {
+			sections.next.push(info);
+			return;
+		}
+
+		if (cat.goal_frequency === "yearly" || due > earlyNextCutoff) {
+			sections.annual.push(info);
+		}
+	});
+
+	const sortByDue = (items) =>
+		items.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+	return [
+		{ id: "current", title: "Bills this month", items: sortByDue(sections.current) },
+		{
+			id: "next",
+			title: "Bills due early next month",
+			items: sortByDue(sections.next),
+		},
+		{ id: "annual", title: "Annual bills", items: sortByDue(sections.annual) },
+	];
+});
 </script>
 
 <style scoped>
-.dashboard-page__header {
-  margin-bottom: 1rem;
-  text-align: left;
+.dashboard-page {
+  padding-bottom: 4rem;
 }
 
-.dashboard-page__label {
+.dashboard-layout {
+  display: grid;
+  gap: 20px;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 1200px) {
+  .dashboard-layout {
+    grid-template-columns: 397px minmax(0, 1fr) 397px;
+    align-items: start;
+  }
+}
+
+.dashboard-column--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dashboard-card {
+  background: var(--surface);
+  border: var(--border-thick);
+  padding: 20px;
+}
+
+.dashboard-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.dashboard-card__label {
   font-family: var(--font-mono);
-  color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.dashboard-page__value {
-  font-size: 3rem;
-  font-weight: 700;
-  line-height: 1;
-  margin: 0.5rem 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.dashboard-page__change {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
   margin: 0;
 }
 
-.dashboard-page__change--positive {
+.dashboard-card__as-of {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.dashboard-card__headline {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-card__change {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+}
+
+.dashboard-card__change--positive {
   color: var(--success);
 }
 
-.dashboard-page__change--negative {
+.dashboard-card__change--negative {
   color: var(--danger);
 }
 
-.dashboard-chart {
+.dashboard-card__footer-link {
+  display: inline-flex;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  text-decoration: underline;
+  color: var(--text);
+}
+
+.net-worth-card__figures {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.net-worth-chart {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.net-worth-chart__surface {
   position: relative;
-  width: 100vw;
-  margin-left: 50%;
-  transform: translateX(-50%);
-  height: 360px;
-  overflow: hidden;
+  height: 220px;
   cursor: crosshair;
   user-select: none;
   -webkit-user-select: none;
-  border-bottom: 1px solid var(--border);
 }
 
-.dashboard-chart__svg {
+.net-worth-chart__svg {
   width: 100%;
   height: 100%;
   display: block;
 }
 
-.dashboard-chart__line {
+.net-worth-chart__line {
   fill: none;
   stroke-width: 2.5;
   stroke-linecap: round;
@@ -585,244 +859,290 @@ const watchlistProgress = (category) => {
   vector-effect: non-scaling-stroke;
 }
 
-.dashboard-chart__area {
+.net-worth-chart__area {
   opacity: 0.6;
 }
 
-.dashboard-chart__cursor {
+.net-worth-chart__cursor {
   stroke: var(--muted);
-  stroke-width: 1;
   stroke-dasharray: 4;
+  stroke-width: 1;
 }
 
-.dashboard-chart__drag-line {
+.net-worth-chart__drag-line {
   stroke: var(--text);
   stroke-width: 1;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
-.dashboard-chart__drag-area {
+.net-worth-chart__drag-area {
   fill: var(--text);
-  opacity: 0.03;
+  opacity: 0.05;
 }
 
-.dashboard-chart__tooltip {
+.net-worth-chart__tooltip {
   position: absolute;
-  top: 20px;
+  top: 16px;
   background: var(--surface);
   border: var(--border-thick);
-  padding: 0.75rem 1rem;
+  padding: 0.75rem;
+  min-width: 180px;
   pointer-events: none;
-  z-index: 10;
+  transform: translateX(-50%);
   box-shadow: var(--shadow-hard);
-  min-width: 200px;
+  font-size: 0.85rem;
 }
 
-.dashboard-chart__tooltip-range {
+.net-worth-chart__tooltip-range {
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--muted);
   text-transform: uppercase;
-  margin-bottom: 0.5rem;
   display: block;
+  margin-bottom: 0.35rem;
 }
 
-.dashboard-chart__tooltip-rows {
+.net-worth-chart__tooltip-rows {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
-.dashboard-chart__tooltip-row {
+.net-worth-chart__tooltip-row {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
 }
 
-.dashboard-chart__tooltip-delta {
+.net-worth-chart__tooltip-delta {
   border-top: 1px solid var(--border);
-  padding-top: 0.5rem;
-  font-family: var(--font-mono);
+  padding-top: 0.35rem;
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  font-family: var(--font-mono);
 }
 
-.dashboard-chart__loading {
+.net-worth-chart__tooltip-value {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.net-worth-chart__loading {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(253, 252, 251, 0.85);
+  background: rgba(253, 251, 247, 0.85);
 }
 
 .dashboard-intervals {
   display: flex;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  margin: 1rem 0 2rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .dashboard-intervals__button {
   background: none;
   border: 1px solid transparent;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
-  padding: 0.35rem 0.75rem;
-  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
   color: var(--muted);
   border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.dashboard-intervals__button:hover {
-  color: var(--text);
-  background-color: var(--stone-50);
-  border-color: var(--border);
+  cursor: pointer;
 }
 
 .dashboard-intervals__button--active {
-  background-color: var(--text);
+  background: var(--text);
   color: var(--bg);
 }
 
-.dashboard-intervals__button--active:hover {
-  background-color: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-}
-
-@media (min-width: 900px) {
-  .dashboard-grid {
-    grid-template-columns: 3fr 2fr;
-  }
-}
-
-.dashboard-panel {
-  background: var(--surface);
-  border: var(--border-thick);
-  padding: 1.5rem;
-}
-
-.dashboard-panel__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.75rem;
-}
-
-.dashboard-panel__title {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0;
-}
-
-.dashboard-account-list {
+.dashboard-list {
   display: flex;
   flex-direction: column;
 }
 
-.dashboard-account-row {
+.dashboard-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.85rem 0;
+  padding: 0.75rem 0;
   border-bottom: 1px solid var(--border);
-  text-decoration: none;
-  color: inherit;
 }
 
-.dashboard-account-row:hover {
-  background-color: var(--stone-50);
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  margin-left: -0.5rem;
-  margin-right: -0.5rem;
-}
-
-.dashboard-account-row:last-child {
+.dashboard-row:last-child {
   border-bottom: none;
 }
 
-.dashboard-account-row__name {
+.dashboard-row__name {
   font-weight: 600;
 }
 
-.dashboard-account-row__meta {
-  font-size: 0.8rem;
+.dashboard-row__meta {
   text-transform: uppercase;
+  font-size: 0.7rem;
 }
 
-.dashboard-account-row__balance {
+.dashboard-row__value {
   font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.dashboard-budget-list {
+.dashboard-row__value--positive {
+  color: var(--text);
+}
+
+.dashboard-row__value--negative {
+  color: var(--danger);
+}
+
+.budget-watchlist__item + .budget-watchlist__item {
+  margin-top: 1.25rem;
+}
+
+.budget-watchlist__row {
   display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.dashboard-budget-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.dashboard-budget-item__header {
-  font-size: 0.95rem;
+.budget-watchlist__name {
   font-weight: 600;
+  margin: 0;
 }
 
-.dashboard-budget-item__track {
+.budget-watchlist__status {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+}
+
+.budget-watchlist__status--danger {
+  color: var(--danger);
+}
+
+.budget-watchlist__status--positive {
+  color: var(--success);
+}
+
+.budget-watchlist__status--muted {
+  color: var(--muted);
+}
+
+.budget-watchlist__available {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-watchlist__bar {
   height: 10px;
-  background-color: var(--stone-50);
   border: 1px solid var(--border);
   border-radius: 6px;
+  margin: 0.5rem 0;
+  background: var(--stone-50);
   overflow: hidden;
 }
 
-.dashboard-budget-item__fill {
+.budget-watchlist__fill {
   height: 100%;
-  background-color: var(--primary);
-  border-radius: 4px;
+  background: var(--success);
   transition: width 0.2s ease;
 }
 
-.dashboard-budget-item__footer {
+.budget-watchlist__fill--danger {
+  background: var(--danger);
+}
+
+.budget-watchlist__scale {
   display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.bills-card__section + .bills-card__section {
+  margin-top: 1.5rem;
+}
+
+.bills-card__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  margin: 0 0 0.5rem;
+}
+
+.bills-card__empty {
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+}
+
+.bills-list {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
+}
+
+.bills-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.bills-row:last-child {
+  border-bottom: none;
+}
+
+.bills-row__label span {
+  font-weight: 600;
+}
+
+.bills-row__label small {
+  display: block;
+  color: var(--muted);
+}
+
+.bills-row__value {
+  text-align: right;
   font-family: var(--font-mono);
   font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
 }
 
-.dashboard-budget-item--empty .dashboard-budget-item__track {
-  border-color: var(--danger);
-  background-color: #fff5f5;
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
 }
 
-.dashboard-budget-item--empty .dashboard-budget-item__fill {
-  width: 0 !important;
+.status-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
 }
 
-.dashboard-budget-item__warning {
+.status-pill--success {
+  color: var(--success);
+}
+
+.status-pill--warning {
   color: var(--danger);
-  font-weight: 600;
+}
+
+.status-pill--muted {
+  color: var(--muted);
 }
 </style>
