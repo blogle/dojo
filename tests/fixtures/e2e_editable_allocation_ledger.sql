@@ -56,7 +56,7 @@ INSERT INTO budget_allocations (
     uuid(),
     DATE '2025-01-15',
     DATE '2025-01-01',
-    NULL,
+    'available_to_budget',
     'groceries',
     50000,
     'Initial allocation',

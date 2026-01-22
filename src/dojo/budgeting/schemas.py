@@ -363,8 +363,8 @@ class BudgetAllocationRequest(BaseModel):
     to_category_id : str | None
         The ID of the destination category receiving funds.
     from_category_id : str | None
-        Optional ID of the source category providing funds.
-        If None, funds are assumed to come from "Ready to Assign".
+        Source category providing funds.
+        If None, it is treated as `available_to_budget` for backward compatibility.
     amount_minor : int
         Positive amount in minor units to allocate or reallocate.
     allocation_date : date | None
@@ -435,8 +435,8 @@ class BudgetAllocationEntry(BaseModel):
     concept_id: UUID
     allocation_date: date
     amount_minor: int
-    from_category_id: str | None
-    from_category_name: str | None
+    from_category_id: str
+    from_category_name: str
     to_category_id: str
     to_category_name: str
     memo: str | None

@@ -108,9 +108,12 @@ def _rebuild_budget_category_month_state(conn: duckdb.DuckDBPyConnection) -> Non
 
     # Check for is_active column existence to support running during migrations
     # where the column might not exist yet (e.g. before 0011_ensure_scd2_columns.sql)
-    has_is_active = conn.execute(
-        "SELECT count(*) FROM pragma_table_info('budget_allocations') WHERE name = 'is_active'"
-    ).fetchone()[0] > 0
+    has_is_active = (
+        conn.execute(
+            "SELECT count(*) FROM pragma_table_info('budget_allocations') WHERE name = 'is_active'"
+        ).fetchone()[0]
+        > 0
+    )
 
     sql = """
         SELECT month_start, from_category_id, to_category_id, amount_minor
@@ -125,7 +128,7 @@ def _rebuild_budget_category_month_state(conn: duckdb.DuckDBPyConnection) -> Non
         if to_category_id:
             entry = _ensure_entry(aggregates, month_index, to_category_id, month_start)
             entry.allocated += amount
-        if from_category_id:
+        if from_category_id and from_category_id != "available_to_budget":
             entry = _ensure_entry(aggregates, month_index, from_category_id, month_start)
             entry.allocated -= amount
 

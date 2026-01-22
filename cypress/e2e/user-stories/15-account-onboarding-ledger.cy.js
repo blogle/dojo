@@ -30,27 +30,35 @@ describe("User Story 15 — Account Onboarding Ledger Integrity", () => {
 		cy.get("[data-add-account-button]").click();
 		cy.get("#account-modal").should("be.visible");
 
-        // Step 1: Select Type
-        // account.type is "checking" or "credit", mapped to "Cash & Checking" or "Credit Card"
-        const typeLabel = account.type === "checking" ? "Cash & Checking" : "Credit Card";
-        cy.contains(".type-card", typeLabel).click();
-        cy.contains("button", "Next").click();
+		// Step 1: Select Type
+		// account.type is "checking" or "credit", mapped to "Cash & Checking" or "Credit Card"
+		const typeLabel =
+			account.type === "checking" ? "Cash & Checking" : "Credit Card";
+		cy.contains(".type-card", typeLabel).click();
+		cy.contains("button", "Next").click();
 
-        // Step 2: Details
-        // The label depends on type: "Account Nickname" or "Card Nickname"
-        const nameLabel = account.type === "checking" ? "Account Nickname" : "Card Nickname";
-        cy.contains("label", nameLabel).find("input").clear().type(account.name);
-        cy.contains("button", "Next").click();
+		// Step 2: Details
+		// The label depends on type: "Account Nickname" or "Card Nickname"
+		const nameLabel =
+			account.type === "checking" ? "Account Nickname" : "Card Nickname";
+		cy.contains("label", nameLabel).find("input").clear().type(account.name);
+		cy.contains("button", "Next").click();
 
-        // Step 3: Balance
-        // Label depends on type
-        const balanceLabel = account.type === "checking" ? "Current Ledger Balance" : "Current Amount Owed";
-        cy.contains("label", balanceLabel).find("input").clear().type(account.balance);
-        // Ensure date is filled (defaults to today, which is mocked, so fine)
-        cy.contains("button", "Next").click();
+		// Step 3: Balance
+		// Label depends on type
+		const balanceLabel =
+			account.type === "checking"
+				? "Current Ledger Balance"
+				: "Current Amount Owed";
+		cy.contains("label", balanceLabel)
+			.find("input")
+			.clear()
+			.type(account.balance);
+		// Ensure date is filled (defaults to today, which is mocked, so fine)
+		cy.contains("button", "Next").click();
 
-        // Step 4: Review & Submit
-        cy.contains("button", "Create Account").click();
+		// Step 4: Review & Submit
+		cy.contains("button", "Create Account").click();
 
 		cy.wait("@createAccount").its("response.statusCode").should("eq", 201);
 		cy.wait("@createTransaction").its("response.statusCode").should("eq", 201);
@@ -74,9 +82,9 @@ describe("User Story 15 — Account Onboarding Ledger Integrity", () => {
 		cy.contains(".account-card__name", account.name)
 			.closest(".account-card")
 			.click();
-		cy.get("[data-modal-label]").should("contain", "Account detail");
-		cy.get("[data-modal-balance]").should("contain", expectedBalance);
-		cy.get("[data-close-modal]").click();
+		// Account detail is now a routed page instead of a modal.
+		cy.get(".investments-header__value").should("contain", expectedBalance);
+		cy.go("back");
 	};
 
 	beforeEach(() => {

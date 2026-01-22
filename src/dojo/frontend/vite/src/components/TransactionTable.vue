@@ -63,7 +63,12 @@
                   :disabled="inlineSubmitting || isLoadingReference || !!referenceError"
                 >
                   <option value="" disabled>Select category</option>
-                  <option v-for="category in categories" :key="category.category_id" :value="category.category_id">
+                  <option
+                    v-for="category in inlineCategoryOptions"
+                    :key="category.category_id"
+                    :value="category.category_id"
+                    :disabled="category._ephemeral === true"
+                  >
                     {{ category.name }}
                   </option>
                 </select>
@@ -237,6 +242,22 @@ const accountOptions = computed(() => {
 		return [];
 	}
 	return [{ account_id: props.lockedAccountId, name: props.lockedAccountName }];
+});
+
+const inlineCategoryOptions = computed(() => {
+	const base = Array.isArray(props.categories) ? props.categories : [];
+	const currentId = inlineForm.category_id;
+	if (!currentId) {
+		return base;
+	}
+	if (base.some((c) => c?.category_id === currentId)) {
+		return base;
+	}
+	const currentTx = (props.transactions ?? []).find(
+		(tx) => tx?.transaction_version_id === editingId.value,
+	);
+	const label = currentTx?.category_name || currentId;
+	return [...base, { category_id: currentId, name: label, _ephemeral: true }];
 });
 
 const sortedTransactions = computed(() => {

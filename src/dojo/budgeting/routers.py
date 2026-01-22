@@ -396,6 +396,13 @@ def list_transactions(
 
 @router.get("/reference-data", response_model=ReferenceDataResponse)
 def get_reference_data(
+    include_payment_categories: bool = Query(
+        False,
+        description=(
+            "Include generated payment envelopes in the category list. "
+            "Use this for specialized flows like credit card payments/transfers."
+        ),
+    ),
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
 ) -> ReferenceDataResponse:
     """
@@ -431,7 +438,7 @@ def get_reference_data(
     ]
     # Retrieve reference category records.
     # Note: Category reference uses available = 0 until monthly state exists.
-    category_records = dao.list_reference_categories()
+    category_records = dao.list_reference_categories(include_payment=include_payment_categories)
     categories = [
         CategoryState(
             category_id=record.category_id,
@@ -1112,6 +1119,34 @@ def deactivate_group(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     # Return a 204 No Content response for successful deactivation.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/budget/allocation-categories", response_model=list[CategoryState])
+def list_allocation_categories(
+    month: date | None = _BUDGET_MONTH_QUERY,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
+) -> list[CategoryState]:
+    """Return categories valid for allocations (incl. Available to Budget)."""
+    month_start = (month or system_date).replace(day=1)
+    dao = BudgetingDAO(conn)
+
+    # Use the residual RTA computation for the Available-to-Budget envelope.
+    rta_minor = dao.ready_to_assign(month_start)
+
+    rows = dao.list_allocation_categories(month_start)
+    categories: list[CategoryState] = []
+    for row in rows:
+        available_minor = rta_minor if row.category_id == "available_to_budget" else row.available_minor
+        categories.append(
+            CategoryState(
+                category_id=row.category_id,
+                name=row.name,
+                available_minor=available_minor,
+                activity_minor=0,
+            )
+        )
+    return categories
 
 
 @router.get("/budget/ready-to-assign", response_model=ReadyToAssignResponse)

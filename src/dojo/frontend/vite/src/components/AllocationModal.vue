@@ -29,8 +29,12 @@
           </label>
           <label class="form-panel__field">
             <span>From category</span>
-            <select name="from_category_id" data-allocation-from v-model="allocationForm.from_category_id">
-              <option value="">Ready to Assign</option>
+            <select
+              name="from_category_id"
+              required
+              data-allocation-from
+              v-model="allocationForm.from_category_id"
+            >
               <option v-for="cat in allocationCategories" :key="cat.category_id" :value="cat.category_id">
                 {{ cat.name }}
               </option>
@@ -82,6 +86,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { api } from "../services/api.js";
+import { SPECIAL_CATEGORY_IDS } from "../constants.js";
 import { dollarsToMinor, todayISO } from "../services/format.js";
 
 const props = defineProps({
@@ -95,7 +100,7 @@ const emit = defineEmits(["close"]);
 
 const allocationForm = reactive({
 	allocation_date: todayISO(),
-	from_category_id: "",
+	from_category_id: SPECIAL_CATEGORY_IDS.availableToBudget,
 	to_category_id: "",
 	memo: "",
 	amount: "",
@@ -113,7 +118,7 @@ const isSubmitting = computed(() => createAllocationMutation.isPending.value);
 
 const resetForm = () => {
 	allocationForm.allocation_date = todayISO();
-	allocationForm.from_category_id = "";
+	allocationForm.from_category_id = SPECIAL_CATEGORY_IDS.availableToBudget;
 	allocationForm.to_category_id = "";
 	allocationForm.memo = "";
 	allocationForm.amount = "";
@@ -154,14 +159,6 @@ const submitAllocation = async () => {
 		allocationFormError.value = "Amount must be greater than zero.";
 		return;
 	}
-	if (
-		!allocationForm.from_category_id &&
-		props.readyToAssignMinor < amountMinor
-	) {
-		allocationFormError.value =
-			"Ready-to-Assign is insufficient for this allocation.";
-		return;
-	}
 
 	if (allocationForm.from_category_id) {
 		const sourceCategory = props.allocationCategories.find(
@@ -179,7 +176,7 @@ const submitAllocation = async () => {
 		await createAllocationMutation.mutateAsync({
 			allocation_date: allocationForm.allocation_date,
 			to_category_id: allocationForm.to_category_id,
-			from_category_id: allocationForm.from_category_id || null,
+			from_category_id: allocationForm.from_category_id,
 			amount_minor: amountMinor,
 			memo: allocationForm.memo || null,
 		});

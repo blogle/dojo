@@ -28,20 +28,22 @@ describe("User Story 20 — Investment Tracking", () => {
 			.parents(".account-card")
 			.click();
 
-		cy.get("[data-view-portfolio-button]").click();
+		cy.contains("button", "Verify holdings").click();
 
-		cy.location("hash").should("contain", "/investments/brokerage_account");
+		cy.location("hash").should(
+			"contain",
+			"/accounts/brokerage_account/verify-holdings",
+		);
 		cy.wait("@fetchPortfolio");
 		cy.wait("@fetchHistory");
 
-		cy.get("[data-testid=investment-nav]").should("contain", "$1,100.00");
+		cy.get(".investments-kv")
+			.should("contain", "NAV")
+			.and("contain", "$1,100.00");
 		cy.get(".investments-header__perf")
 			.should("contain", "+$50.00")
 			.and("contain", "(+4.76%)");
-		cy.contains(".investments-kv dt", "Total return")
-			.next()
-			.should("contain", "$100.00");
-		cy.get("[data-testid=investment-chart]").find("svg").should("exist");
-		cy.get("[data-testid=investment-holdings-table]").should("contain", "AAPL");
+		cy.get("[data-testid=investment-holdings]").should("contain", "AAPL");
+		cy.get("[data-testid=investment-cash-input]").should("exist");
 	});
 });

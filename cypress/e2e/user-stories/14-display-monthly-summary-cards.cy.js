@@ -82,7 +82,7 @@ describe("User Story 14 — Display of Monthly Summary Cards Across Pages", () =
 		allocationPage.visit();
 		cy.wait("@fetchAllocations");
 		allocationPage.categoryTransfer(
-			"Ready to Assign",
+			"Available to Budget",
 			"Rent",
 			"100",
 			"Monthly shift",

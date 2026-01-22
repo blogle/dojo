@@ -137,7 +137,7 @@ const deleteAllocationMutation = useMutation({
 const formatAmountDisplay = (minor) => formatAmount(minor);
 
 const getCategoryName = (id) => {
-	if (!id) return "Ready to Assign";
+	if (!id) return "—";
 	const cat = props.allocationCategories.find((c) => c.category_id === id);
 	return cat ? cat.name : id;
 };

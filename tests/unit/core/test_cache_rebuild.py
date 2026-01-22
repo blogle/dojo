@@ -88,7 +88,7 @@ def test_rebuilds_account_balances_and_category_cache() -> None:
                 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
                 DATE '2025-01-05',
                 DATE '2025-01-01',
-                NULL,
+                'available_to_budget',
                 'groceries',
                 40000,
                 NULL,

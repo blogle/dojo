@@ -136,6 +136,8 @@ class TransactionEntryService:
     SOURCE = "api"
     # Special category ID used for the transfer leg of categorized transfers.
     TRANSFER_CATEGORY_ID = "account_transfer"
+    # Aspire-aligned "Ready to Assign" envelope for allocations.
+    AVAILABLE_TO_BUDGET_CATEGORY_ID = "available_to_budget"
 
     def create(
         self,
@@ -565,46 +567,45 @@ class TransactionEntryService:
         """
         # Validate that the allocation amount is positive.
         self._validate_allocation_amount(amount_minor)
-        # Determine and validate the destination category, ensuring it's not the same as source if specified.
-        destination_category_id = self._require_allocation_destination(category_id, from_category_id)
+
+        # Aspire-aligned semantics: allocations always have an explicit from/to category.
+        # Legacy callers may still pass None; treat that as "available_to_budget".
+        source_category_id = from_category_id or self.AVAILABLE_TO_BUDGET_CATEGORY_ID
+
+        # Determine and validate the destination category, ensuring it's not the same as source.
+        destination_category_id = self._require_allocation_destination(category_id, source_category_id)
+        is_from_rta = source_category_id == self.AVAILABLE_TO_BUDGET_CATEGORY_ID
+
         today = current_date or date.today()
-        # Determine the allocation date, defaulting to today.
         allocation_day = allocation_date or today
-        # Coerce month_start to the first day of the month, defaulting to allocation_day's month if not provided.
         month = self._coerce_month_start(month_start or allocation_day, today=today)
-        # Clean up memo if provided.
         memo_value = memo.strip() if memo else None
 
         dao = BudgetingDAO(conn)
-        # Retrieve and validate the destination category.
+
         destination_category = self._require_active_category(dao, destination_category_id)
-        # Assert that the destination category can receive allocations (e.g., not a system category).
         self._assert_destination_category_can_receive_allocations(destination_category)
 
-        # Handle reallocation from a source category.
-        if from_category_id:
-            self._ensure_allocation_source_can_allocate(dao, from_category_id, month, amount_minor)
-        else:
-            # Handle allocation from "Ready to Assign".
+        if is_from_rta:
             self._ensure_ready_to_assign(dao, month, amount_minor)
+        else:
+            self._ensure_allocation_source_can_allocate(dao, source_category_id, month, amount_minor)
 
-        # Generate a unique ID for this allocation.
         allocation_id = uuid4()
-        # Start a database transaction for atomicity.
         with dao.transaction():
-            # Persist the allocation record.
             self._persist_allocation(
                 dao,
                 allocation_id,
                 allocation_day,
                 month,
-                from_category_id,
+                source_category_id,
                 destination_category_id,
                 amount_minor,
                 memo_value,
+                is_from_rta=is_from_rta,
             )
-            # Retrieve the updated state of the destination category for the response.
             category_state = self._category_state_for_month(dao, destination_category_id, month)
+
         return category_state
 
     def update_allocation(
@@ -648,6 +649,7 @@ class TransactionEntryService:
             raise InvalidTransactionError("Allocation not found or not active.")
 
         old_amount, old_month_start, from_category_id, old_to_category_id = row
+        is_from_rta = from_category_id == self.AVAILABLE_TO_BUDGET_CATEGORY_ID
 
         # Derive new month_start from the new allocation date
         new_month_start = cmd.allocation_date.replace(day=1)
@@ -664,29 +666,18 @@ class TransactionEntryService:
                 )
 
             # 2. Check if New Source (or RTA) can provide funds
-            if from_category_id:
-                # Source is a category
-                # Note: If Source == Old Dest (reallocation), we just checked it has funds?
-                # No, Source is where funds come FROM. Dest is where they go TO.
-
-                # If Source is same as Old Dest (e.g. moving funds out of a category back to it?), rare.
-                # Standard case: Check Source in New Month.
+            if not is_from_rta:
                 src_state_new = self._category_state_for_month(dao, from_category_id, new_month_start)
-                # If source and dest are same category in different months?
-                # Just check simple availability.
                 if src_state_new.available_minor < cmd.amount_minor:
                     raise BudgetingError(
                         f"Source category has insufficient funds ({src_state_new.available_minor}) "
                         f"for {cmd.amount_minor}."
                     )
             else:
-                # Source is RTA
                 rta_new = dao.ready_to_assign(new_month_start)
-
-                # If we are in the same month, we can count the refund from the old allocation
+                # If we are in the same month, we can count the refund from the old allocation.
                 if old_month_start == new_month_start:
                     rta_new += old_amount
-
                 if rta_new < cmd.amount_minor:
                     raise BudgetingError(
                         f"Insufficient Ready-to-Assign ({rta_new}) in {new_month_start} for {cmd.amount_minor}."
@@ -698,7 +689,7 @@ class TransactionEntryService:
 
             if delta > 0:
                 # Increasing allocation. Need more from Source.
-                if from_category_id:
+                if not is_from_rta:
                     src_state = self._category_state_for_month(dao, from_category_id, new_month_start)
                     if src_state.available_minor < delta:
                         raise BudgetingError(
@@ -739,13 +730,13 @@ class TransactionEntryService:
 
             # 3. Revert old allocation impact on monthly state
             dao.adjust_category_allocation(old_to_category_id, old_month_start, -old_amount, -old_amount)
-            if from_category_id:
+            if not is_from_rta:
                 # Revert outflow from source
                 dao.adjust_category_allocation(from_category_id, old_month_start, old_amount, old_amount)
 
             # 4. Apply new allocation impact on monthly state
             dao.adjust_category_allocation(cmd.to_category_id, new_month_start, cmd.amount_minor, cmd.amount_minor)
-            if from_category_id:
+            if not is_from_rta:
                 # Apply outflow from source
                 dao.adjust_category_allocation(from_category_id, new_month_start, -cmd.amount_minor, -cmd.amount_minor)
 
@@ -781,6 +772,7 @@ class TransactionEntryService:
             raise InvalidTransactionError("Allocation not found or not active.")
 
         amount_minor, month_start, from_category_id, to_category_id = row
+        is_from_rta = from_category_id == self.AVAILABLE_TO_BUDGET_CATEGORY_ID
 
         with dao.transaction():
             # Retire the allocation
@@ -794,7 +786,7 @@ class TransactionEntryService:
             dao.adjust_category_allocation(to_category_id, month_start, -amount_minor, -amount_minor)
 
             # 2. Increase source available (if from a category) or just drop it (if from RTA, implicit)
-            if from_category_id:
+            if not is_from_rta:
                 # Revert outflow from source (add back)
                 dao.adjust_category_allocation(from_category_id, month_start, amount_minor, amount_minor)
 
@@ -1079,23 +1071,9 @@ class TransactionEntryService:
         return destination_category_id
 
     def _assert_destination_category_can_receive_allocations(self, category_record: CategoryRecord) -> None:
-        """
-        Asserts that the destination category is not a system category.
-
-        System categories are generally reserved and cannot receive direct allocations.
-
-        Parameters
-        ----------
-        category_record : CategoryRecord
-            The category record of the destination category.
-
-        Raises
-        ------
-        InvalidTransactionError
-            If the destination category is a system category.
-        """
-        if category_record.is_system:
-            raise InvalidTransactionError("System categories cannot receive allocations.")
+        """Asserts that a category is valid as an allocation destination."""
+        if not category_record.allow_allocations:
+            raise InvalidTransactionError(f"Category `{category_record.category_id}` cannot receive allocations.")
 
     def _ensure_allocation_source_can_allocate(
         self,
@@ -1129,8 +1107,8 @@ class TransactionEntryService:
             If the source category is a system category or has insufficient funds.
         """
         source_category = self._require_active_category(dao, from_category_id)
-        if source_category.is_system:
-            raise InvalidTransactionError("System categories cannot provide allocations.")
+        if not source_category.allow_allocations:
+            raise InvalidTransactionError(f"Category `{from_category_id}` cannot be used as an allocation source.")
         source_state = self._category_state_from_month(
             dao.get_category_month_state(from_category_id, month_start),
             from_category_id,
@@ -1166,10 +1144,12 @@ class TransactionEntryService:
         allocation_id: UUID,
         allocation_date: date,
         month_start: date,
-        from_category_id: str | None,
+        from_category_id: str,
         destination_category_id: str,
         amount_minor: int,
         memo: str | None,
+        *,
+        is_from_rta: bool,
     ) -> None:
         """
         Persists a budget allocation in the database and adjusts category balances.
@@ -1184,8 +1164,10 @@ class TransactionEntryService:
             The date of the allocation.
         month_start : date
             The start date of the month the allocation applies to.
-        from_category_id : str | None
-            Source category ID (if reallocation).
+        from_category_id : str
+            Source category ID (explicit; RTA uses available_to_budget).
+        is_from_rta : bool
+            True when the source is available_to_budget, meaning no category monthly state is adjusted for the source.
         destination_category_id : str
             Destination category ID.
         amount_minor : int
@@ -1193,7 +1175,6 @@ class TransactionEntryService:
         memo : str | None
             Optional memo.
         """
-        # Insert the allocation record.
         dao.insert_budget_allocation(
             allocation_id=allocation_id,
             allocation_date=allocation_date,
@@ -1203,10 +1184,12 @@ class TransactionEntryService:
             amount_minor=amount_minor,
             memo=memo,
         )
-        # Adjust the allocated and available amounts for the destination category.
+
         dao.adjust_category_allocation(destination_category_id, month_start, amount_minor, amount_minor)
-        # If there's a source category, adjust its allocated and available amounts negatively.
-        if from_category_id:
+
+        # When allocating from "available_to_budget" (RTA), we intentionally do not
+        # track any category monthly state for the source.
+        if not is_from_rta:
             dao.adjust_category_allocation(from_category_id, month_start, -amount_minor, -amount_minor)
 
     @staticmethod

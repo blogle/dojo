@@ -65,8 +65,8 @@ const queryClient = useQueryClient();
 const route = useRoute();
 
 const referenceQuery = useQuery({
-	queryKey: ["reference-data"],
-	queryFn: api.reference.load,
+	queryKey: ["reference-data", "transfers"],
+	queryFn: () => api.reference.load({ includePaymentCategories: true }),
 });
 
 const accounts = computed(() => referenceQuery.data.value?.accounts ?? []);

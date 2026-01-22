@@ -178,7 +178,7 @@ const monthSpend = computed(() => formatAmount(monthSpendMinor.value));
 const monthBudgetedMinor = computed(() => {
 	const allocations = allocationsQuery.data.value?.allocations ?? [];
 	return allocations.reduce((total, entry) => {
-		if (!entry?.from_category_id) {
+		if (entry?.from_category_id === "available_to_budget") {
 			return total + (entry.amount_minor || 0);
 		}
 		return total;

@@ -246,46 +246,31 @@ ACCOUNT_DETAIL_FIELDS: dict[AccountClass, set[str]] = {
 
 @dataclass(frozen=True)
 class CategoryRecord:
-    """
-    Represents a budgeting category.
-
-    Attributes
-    ----------
-    category_id : str
-        Unique identifier for the category.
-    name : str
-        Human-readable name of the category.
-    is_active : bool
-        Indicates if the category is currently active.
-    is_system : bool
-        Indicates if the category is a system-defined category.
-    """
+    """Represents a budgeting category and its semantic capabilities."""
 
     category_id: str
     name: str
     is_active: bool
     is_system: bool
 
+    # Context flags (see migrations/0016_category_context_flags.sql)
+    allow_transactions: bool
+    allow_allocations: bool
+    is_envelope: bool
+    is_payment: bool
+
     @classmethod
     def from_row(cls, row: SimpleNamespace) -> "CategoryRecord":
-        """
-        Creates a CategoryRecord instance from a SimpleNamespace object.
-
-        Parameters
-        ----------
-        row : SimpleNamespace
-            A SimpleNamespace object containing category data, typically from a database query.
-
-        Returns
-        -------
-        CategoryRecord
-            An instance of CategoryRecord.
-        """
+        # Use getattr defaults so tools like cache rebuild can run during migrations.
         return cls(
             category_id=str(row.category_id),
             name=str(row.name),
             is_active=bool(row.is_active),
-            is_system=bool(row.is_system),
+            is_system=bool(getattr(row, "is_system", False)),
+            allow_transactions=bool(getattr(row, "allow_transactions", True)),
+            allow_allocations=bool(getattr(row, "allow_allocations", True)),
+            is_envelope=bool(getattr(row, "is_envelope", True)),
+            is_payment=bool(getattr(row, "is_payment", False)),
         )
 
 
@@ -715,8 +700,8 @@ class BudgetAllocationRecord:
     allocation_date: date
     amount_minor: int
     memo: str | None
-    from_category_id: str | None
-    from_category_name: str | None
+    from_category_id: str
+    from_category_name: str
     to_category_id: str
     to_category_name: str
     created_at: datetime
@@ -736,14 +721,17 @@ class BudgetAllocationRecord:
         BudgetAllocationRecord
             An instance of BudgetAllocationRecord.
         """
+        assert row.from_category_id is not None
+        assert row.from_category_name is not None
+
         return cls(
             allocation_id=UUID(str(row.allocation_id)),
             concept_id=UUID(str(row.concept_id)),
             allocation_date=row.allocation_date,
             amount_minor=int(row.amount_minor),
             memo=str(row.memo) if row.memo is not None else None,
-            from_category_id=str(row.from_category_id) if row.from_category_id is not None else None,
-            from_category_name=str(row.from_category_name) if row.from_category_name is not None else None,
+            from_category_id=str(row.from_category_id),
+            from_category_name=str(row.from_category_name),
             to_category_id=str(row.to_category_id),
             to_category_name=str(row.to_category_name),
             created_at=row.created_at,
@@ -1311,20 +1299,16 @@ class BudgetingDAO:
         # Convert each fetched row into a BudgetCategoryDetailRecord.
         return [BudgetCategoryDetailRecord.from_row(row) for row in rows]
 
-    def list_reference_categories(self) -> list[ReferenceCategoryRecord]:
-        """
-        Lists simplified category records suitable for reference or selection.
-
-        Returns
-        -------
-        list[ReferenceCategoryRecord]
-            A list of ReferenceCategoryRecord instances.
-        """
-        # Load the SQL query for selecting reference categories.
+    def list_reference_categories(self, *, include_payment: bool = False) -> list[ReferenceCategoryRecord]:
+        """Lists simplified category records suitable for selection."""
         sql = _sql("select_reference_categories.sql")
-        # Execute the query and fetch all rows.
-        rows = self._fetchall_namespaces(sql)
-        # Convert each fetched row into a ReferenceCategoryRecord.
+        rows = self._fetchall_namespaces(sql, {"include_payment": include_payment})
+        return [ReferenceCategoryRecord.from_row(row) for row in rows]
+
+    def list_allocation_categories(self, month_start: date) -> list[ReferenceCategoryRecord]:
+        """Lists categories that are valid for allocations (month-aware availability)."""
+        sql = _sql("select_allocation_categories.sql")
+        rows = self._fetchall_namespaces(sql, {"month_start": month_start})
         return [ReferenceCategoryRecord.from_row(row) for row in rows]
 
     def insert_budget_category(
@@ -1845,7 +1829,7 @@ class BudgetingDAO:
         allocation_id: UUID,
         allocation_date: date,
         month_start: date,
-        from_category_id: str | None,
+        from_category_id: str,
         to_category_id: str,
         amount_minor: int,
         memo: str | None,
@@ -1861,8 +1845,8 @@ class BudgetingDAO:
             The date when the allocation was made.
         month_start : date
             The start date of the month this allocation applies to.
-        from_category_id : str | None
-            ID of the source category for the allocation (if any).
+        from_category_id : str
+            ID of the source category for the allocation (always explicit; RTA uses available_to_budget).
         to_category_id : str
             ID of the destination category for the allocation.
         amount_minor : int

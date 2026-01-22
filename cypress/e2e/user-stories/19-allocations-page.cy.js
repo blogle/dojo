@@ -44,7 +44,7 @@ describe("User Story 19 - Allocations Page", () => {
 		allocationPage.createAllocation(
 			"2025-11-15",
 			"100",
-			null, // From Ready to Assign
+			null, // From Available to Budget
 			"Dining Out",
 			"Initial allocation for dining",
 		);
@@ -55,7 +55,7 @@ describe("User Story 19 - Allocations Page", () => {
 			0,
 			"2025-11-15",
 			"$100.00",
-			"Ready to Assign",
+			"Available to Budget",
 			"Dining Out",
 			"Initial allocation for dining",
 		);
@@ -111,7 +111,7 @@ describe("User Story 19 - Allocations Page", () => {
 			1,
 			"2025-11-15",
 			"$120.00",
-			"Ready to Assign",
+			"Available to Budget",
 			"Groceries",
 			"Updated dining allocation",
 		);
@@ -135,7 +135,7 @@ describe("User Story 19 - Allocations Page", () => {
 		// Should not call API, but show error
 		// cy.get('@createAllocation').should('not.have.been.called');
 		allocationPage.verifyFormError(
-			"Ready-to-Assign is insufficient for this allocation.",
+			"Source category has insufficient available funds.",
 		);
 	});
 });

@@ -38,7 +38,8 @@ class AllocationPage {
 	categoryTransfer(fromCategory, toCategory, amountDollars, memo) {
 		cy.get("[data-testid='open-allocation-modal']").click();
 		this.elements.allocationForm().should("be.visible");
-		this.elements.fromCategorySelect().select(fromCategory);
+		const fromLabel = fromCategory || "Available to Budget";
+		this.elements.fromCategorySelect().select(fromLabel);
 		this.elements.categorySelect().select(toCategory);
 		const memoField = this.elements.memoInput();
 		memoField.clear();
@@ -72,7 +73,7 @@ class AllocationPage {
 		if (from) {
 			this.elements.fromCategorySelect().select(from);
 		} else {
-			this.elements.fromCategorySelect().select(""); // Ready to Assign
+			this.elements.fromCategorySelect().select("Available to Budget");
 		}
 		this.elements.categorySelect().select(to);
 		this.elements.amountInput().clear().type(amount);

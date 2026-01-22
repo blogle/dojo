@@ -194,11 +194,18 @@ export const api = {
 				: fetchJSON("/api/budget/ready-to-assign"),
 	},
 	reference: {
-		load: async () => fetchJSON("/api/reference-data"),
+		load: async ({ includePaymentCategories = false } = {}) => {
+			const qs = includePaymentCategories
+				? "?include_payment_categories=true"
+				: "";
+			return fetchJSON(`/api/reference-data${qs}`);
+		},
 	},
 	budgets: {
 		categories: async (month) =>
 			fetchJSON(`/api/budget-categories?month=${month}`),
+		allocationCategories: async (month) =>
+			fetchJSON(`/api/budget/allocation-categories?month=${month}`),
 		groups: async () => fetchJSON("/api/budget-category-groups"),
 		createCategory: async (payload) => {
 			const result = await fetchJSON("/api/budget-categories", {

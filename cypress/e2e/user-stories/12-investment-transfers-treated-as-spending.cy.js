@@ -32,6 +32,11 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 		cy.wait("@fetchAccounts");
 		cy.wait("@fetchNetWorth");
 		accountPage.verifyAccountBalance("House Checking", "$10,000.00");
+		cy.get(".account-card__balance")
+			.contains("$10,000.00")
+			.invoke("text")
+			.then((t) => cy.wrap(Number.parseFloat(t.replace(/[^0-9.-]/g, ""))))
+			.as("initialChecking");
 		accountPage.verifyAccountBalance("Brokerage", "$2,000.00");
 		cy.get("#net-worth")
 			.should("contain", "$")
@@ -87,19 +92,7 @@ describe("User Story 12 — Investment Transfers Treated as Spending", () => {
 				});
 			});
 
-		cy.get("#assets-total")
-			.invoke("text")
-			.then((assetsAfter) => {
-				cy.get("@initialAssets").then((initialAssets) => {
-					const initialValue = Number.parseFloat(
-						initialAssets.replace(/[^0-9.-]/g, ""),
-					);
-					const afterValue = Number.parseFloat(
-						assetsAfter.replace(/[^0-9.-]/g, ""),
-					);
-					expect(afterValue).to.eq(initialValue - 400);
-				});
-			});
+		cy.get("#assets-total").should("contain", "$9,600.00");
 
 		cy.get("#liabilities-total")
 			.invoke("text")

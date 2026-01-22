@@ -350,6 +350,11 @@ const allocationsQuery = useQuery({
 	queryFn: () => api.budgets.allocations(monthStart),
 });
 
+const allocationCategoriesQuery = useQuery({
+	queryKey: ["allocation-categories", monthStart],
+	queryFn: () => api.budgets.allocationCategories(monthStart),
+});
+
 const groupsQuery = useQuery({
 	queryKey: ["budget-category-groups"],
 	queryFn: api.budgets.groups,
@@ -399,9 +404,10 @@ const categories = computed(() => {
 	});
 });
 
-const allocationCategories = computed(() =>
-	[...categories.value].sort((a, b) => a.name.localeCompare(b.name)),
-);
+const allocationCategories = computed(() => {
+	const raw = allocationCategoriesQuery.data.value || [];
+	return [...raw].sort((a, b) => a.name.localeCompare(b.name));
+});
 
 const groups = computed(() =>
 	[...(groupsQuery.data.value || [])].sort(
@@ -824,6 +830,7 @@ const handleQuickAllocation = async (to_category_id, amount_minor, memo) => {
 	}
 	try {
 		await api.budgets.createAllocation({
+			from_category_id: "available_to_budget",
 			to_category_id,
 			amount_minor,
 			allocation_date: todayISO(),
@@ -846,6 +853,7 @@ const handleGroupQuickAllocation = async (allocations, _label) => {
 		await Promise.all(
 			allocations.map((a) =>
 				api.budgets.createAllocation({
+					from_category_id: "available_to_budget",
 					to_category_id: a.category_id,
 					amount_minor: a.amount_minor,
 					allocation_date: todayISO(),
@@ -959,5 +967,6 @@ const invalidateAll = () => {
 	queryClient.invalidateQueries({ queryKey: ["budget-category-groups"] });
 	queryClient.invalidateQueries({ queryKey: ["ready-to-assign"] });
 	queryClient.invalidateQueries({ queryKey: ["allocations"] });
+	queryClient.invalidateQueries({ queryKey: ["allocation-categories"] });
 };
 </script>
