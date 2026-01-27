@@ -9,6 +9,7 @@ coverage/
 *.pyc
 artifacts/
 data/*.duckdb
+data/Finances_2.0/
 src/dojo.egg-info/
 cypress/downloads
 cypress/screenshots
