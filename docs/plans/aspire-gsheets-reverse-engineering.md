@@ -30,13 +30,15 @@ Related (already checked in): `docs/plans/aspire-migration-domain-spec.md` descr
 - [x] (2026-01-29T23:12Z) Add `--a1-range` exports so we can capture non-named-range formulas (e.g. Dashboard/Calculations tables).
 - [x] (2026-01-29T23:12Z) Wrote Aspire documentation set under `docs/aspire/` (domains, entities, named ranges, semantics, customization).
 - [x] (2026-01-29T23:12Z) Added Dojo/Aspire concept mapping doc (`docs/aspire/dojo-mapping.md`) and updated migration-spec divergences.
+- [x] (2026-01-30) Expanded reporting semantics docs (Balances/Account Reports/Category Reports/Net Worth) and reconciliation cadence evidence; recorded split findings (no dedicated schema observed).
 
 ## Surprises & Discoveries
 
 - Observation: OAuth consent screen “Testing” requires adding the user as a Test user, otherwise the browser flow returns a 403 before granting access.
 - Observation: Some Aspire named ranges can be malformed or partially specified (e.g. missing `sheetId` like `r_DashboardData`, or zero-width ranges like `trx_Uuids`). The exporter must skip these safely.
 - Observation: Exporting each named range via one API call can trigger Sheets API 429 rate limits. Batching multiple `ranges=` per `values:batchGet` request avoids this reliably.
-- Observation: Many migration-relevant formulas live outside named ranges (e.g. `Dashboard` and `Calculations`). The exporter needs a way to export arbitrary A1 ranges for evidence.
+- Observation: Many migration-relevant formulas live outside named ranges (e.g. `Dashboard`, report tabs, and `Calculations`). The exporter needs a way to export arbitrary A1 ranges for evidence.
+- Observation: No dedicated “split transaction” schema (named ranges/sheets/extra columns) was found in the exported sheet structure; splits are likely represented as multiple ledger rows.
 
 ## Decision Log
 
@@ -209,9 +211,12 @@ If auth fails:
 
 (Keep any pasted artifacts small and sanitized. Never paste raw transaction/category names or balances from a personal sheet into this repo.)
 
-- Placeholder: sheet list + hidden flags.
-- Placeholder: named ranges list (names + A1 ranges only).
-- Placeholder: key formulas that define budget/ledger semantics.
+- Evidence export runs (gitignored):
+  - `artifacts/aspire_gsheets/<spreadsheet_id>/20260130T010739Z/` — A1 formulas for report tabs (`Balances`, `Account Reports`, `Category Reports`, `Net Worth Reports`, `Spending Reports`, `Trend Reports`) plus `Configuration`, `BackendData`, and `Calculations`.
+  - `artifacts/aspire_gsheets/<spreadsheet_id>/20260130T011641Z/` — additional `Calculations` slice for spending/trend report logic.
+  - `artifacts/aspire_gsheets/<spreadsheet_id>/20260130T011844Z/` — `Transactions!A1:J12` header + reconciliation cadence formulas.
+- Docs produced from the evidence:
+  - `docs/aspire/` (domains/entities, budgeting semantics, reporting semantics, configuration knobs, net worth semantics)
 
 ## Interfaces and Dependencies
 
@@ -234,3 +239,5 @@ Outputs should be JSON for machine readability.
 Plan change log: initial version created 2026-01-27 to implement GSheets tooling and Aspire reverse engineering as a prerequisite for a robust migration feature.
 
 Plan change log: 2026-01-27 updated CLI commands to use `uv run --extra gsheets` and the current exporter flags.
+
+Plan change log: 2026-01-30 expanded reporting semantics documentation (Balances/Account/Category/Net Worth) and recorded reconciliation cadence + split findings.
