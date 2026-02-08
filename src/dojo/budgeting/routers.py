@@ -802,6 +802,7 @@ def deactivate_account(
 def list_categories(
     month: date | None = _CATEGORY_MONTH_QUERY,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> list[BudgetCategoryDetail]:
     """
@@ -825,8 +826,8 @@ def list_categories(
     list[BudgetCategoryDetail]
         A list of `BudgetCategoryDetail` objects.
     """
-    # Retrieve and return a list of categories using the service, optionally filtered by month.
-    return service.list_categories(conn, month_start=month)
+    month_start = (month or system_date).replace(day=1)
+    return service.list_categories(conn, month_start=month_start)
 
 
 @router.post(
@@ -838,6 +839,7 @@ def create_category(
     payload: BudgetCategoryCreateRequest,
     month: date | None = _CATEGORY_MONTH_QUERY,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryDetail:
     """
@@ -867,7 +869,8 @@ def create_category(
     """
     try:
         # Attempt to create the category using the service.
-        return service.create_category(conn, payload, month_start=month)
+        month_start = (month or system_date).replace(day=1)
+        return service.create_category(conn, payload, month_start=month_start)
     except CategoryAlreadyExistsError as exc:
         # Handle cases where a category with the given ID already exists.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -882,6 +885,7 @@ def update_category(
     payload: BudgetCategoryUpdateRequest,
     month: date | None = _CATEGORY_MONTH_QUERY,
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
     service: BudgetCategoryAdminService = _CATEGORY_ADMIN_SERVICE_DEP,
 ) -> BudgetCategoryDetail:
     """
@@ -913,7 +917,8 @@ def update_category(
     """
     try:
         # Attempt to update the category using the service.
-        return service.update_category(conn, category_id, payload, month_start=month)
+        month_start = (month or system_date).replace(day=1)
+        return service.update_category(conn, category_id, payload, month_start=month_start)
     except CategoryNotFoundError as exc:
         # Handle cases where the category to be updated is not found.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

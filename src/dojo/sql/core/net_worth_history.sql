@@ -19,7 +19,7 @@ asset_accounts AS (
     SELECT account_id
     FROM accounts
     WHERE
-        is_active = TRUE
+        include_in_net_worth = TRUE
         AND account_type = 'asset'
         AND account_class != 'investment'
 ),
@@ -28,7 +28,7 @@ liability_accounts AS (
     SELECT account_id
     FROM accounts
     WHERE
-        is_active = TRUE
+        include_in_net_worth = TRUE
         AND account_type = 'liability'
 ),
 
@@ -36,7 +36,7 @@ investment_accounts AS (
     SELECT account_id
     FROM accounts
     WHERE
-        is_active = TRUE
+        include_in_net_worth = TRUE
         AND account_type = 'asset'
         AND account_class = 'investment'
 ),
@@ -163,7 +163,8 @@ investment_details_by_day AS (
     SELECT
         ia.account_id,
         c.as_of_date,
-        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor
+        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(iad.ledger_baseline_minor, 0) AS ledger_baseline_minor
     FROM investment_accounts AS ia
     CROSS JOIN calendar AS c
     LEFT JOIN investment_account_details AS iad
@@ -219,16 +220,13 @@ investment_values_by_day AS (
         ia.account_id,
         COALESCE(l.ledger_cash_minor, 0) AS ledger_cash_minor,
         COALESCE(d.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(d.ledger_baseline_minor, 0) AS ledger_baseline_minor,
         COALESCE(h.holdings_value_minor, 0) AS holdings_value_minor,
-        CASE
-            WHEN
-                COALESCE(d.uninvested_cash_minor, 0) != 0
-                OR COALESCE(h.holdings_value_minor, 0) != 0
-                THEN
-                    COALESCE(d.uninvested_cash_minor, 0)
-                    + COALESCE(h.holdings_value_minor, 0)
-            ELSE COALESCE(l.ledger_cash_minor, 0)
-        END AS account_value_minor
+        COALESCE(h.holdings_value_minor, 0)
+        + (
+            COALESCE(d.uninvested_cash_minor, 0)
+            + (COALESCE(l.ledger_cash_minor, 0) - COALESCE(d.ledger_baseline_minor, 0))
+        ) AS account_value_minor
     FROM calendar AS c
     CROSS JOIN investment_accounts AS ia
     LEFT JOIN investment_ledger_by_day AS l

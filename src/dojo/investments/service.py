@@ -34,6 +34,7 @@ def compute_market_value_minor(quantity: float, price_minor: int | None) -> int:
 @dataclass(frozen=True)
 class PortfolioTotals:
     holdings_value_minor: int
+    cash_derived_minor: int
     nav_minor: int
     total_return_minor: int
 
@@ -42,13 +43,16 @@ def compute_portfolio_totals(
     *,
     ledger_cash_minor: int,
     uninvested_cash_minor: int,
+    ledger_baseline_minor: int,
     lots: list[tuple[float, int | None]],
 ) -> PortfolioTotals:
     holdings_value_minor = sum(compute_market_value_minor(qty, price_minor) for (qty, price_minor) in lots)
-    nav_minor = uninvested_cash_minor + holdings_value_minor
+    cash_derived_minor = uninvested_cash_minor + (ledger_cash_minor - ledger_baseline_minor)
+    nav_minor = cash_derived_minor + holdings_value_minor
     total_return_minor = nav_minor - ledger_cash_minor
     return PortfolioTotals(
         holdings_value_minor=holdings_value_minor,
+        cash_derived_minor=cash_derived_minor,
         nav_minor=nav_minor,
         total_return_minor=total_return_minor,
     )
@@ -61,13 +65,16 @@ class InvestmentService:
     def get_portfolio_state(self, conn: duckdb.DuckDBPyConnection, account_id: str) -> PortfolioState:
         dao = InvestmentDAO(conn)
         account = dao.require_active_investment_account(account_id)
-        uninvested_cash_minor = dao.get_active_uninvested_cash_minor(account_id)
+        detail = dao.get_active_investment_account_detail(account_id)
+        uninvested_cash_minor = detail.uninvested_cash_minor if detail is not None else 0
+        ledger_baseline_minor = detail.ledger_baseline_minor if detail is not None else 0
         positions = dao.get_active_positions_with_prices(account_id)
 
         lots = [(p.quantity, p.close_minor) for p in positions]
         totals = compute_portfolio_totals(
             ledger_cash_minor=account.current_balance_minor,
             uninvested_cash_minor=uninvested_cash_minor,
+            ledger_baseline_minor=ledger_baseline_minor,
             lots=lots,
         )
 
@@ -152,12 +159,17 @@ class InvestmentService:
         positions: list[CreatePositionRequest],
     ) -> PortfolioState:
         dao = InvestmentDAO(conn)
-        dao.require_active_investment_account(account_id)
+        account = dao.require_active_investment_account(account_id)
 
         recorded_at = clock.now()
 
         with dao.transaction() as tx:
-            tx.scd2_set_uninvested_cash_minor(account_id, uninvested_cash_minor, recorded_at=recorded_at)
+            tx.scd2_set_statement_state(
+                account_id,
+                uninvested_cash_minor=uninvested_cash_minor,
+                ledger_baseline_minor=account.current_balance_minor,
+                recorded_at=recorded_at,
+            )
 
             existing = tx.get_active_positions_for_reconcile(account_id)
             existing_by_ticker = {row.ticker.upper(): row for row in existing}

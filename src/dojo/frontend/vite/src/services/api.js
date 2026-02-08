@@ -60,6 +60,70 @@ const invalidateLedgerQueries = () =>
 	]);
 
 export const api = {
+	onboarding: {
+		status: async () => fetchJSON("/api/onboarding/status"),
+		start: async (payload) =>
+			fetchJSON("/api/onboarding/start", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		cancel: async () =>
+			fetchJSON("/api/onboarding/cancel", {
+				method: "POST",
+			}),
+		googleOAuthStatus: async () =>
+			fetchJSON("/api/onboarding/google-oauth/status"),
+		googleOAuthStart: async () => {
+			const origin =
+				typeof window !== "undefined" ? window.location.origin : "";
+			const qs = origin ? `?origin=${encodeURIComponent(origin)}` : "";
+			return fetchJSON(`/api/onboarding/google-oauth/start${qs}`);
+		},
+	},
+	aspire: {
+		verifySheet: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/verify-sheet", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		extract: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/extract", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		getMapping: async () => fetchJSON("/api/onboarding/aspire/mapping"),
+		saveMapping: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/mapping", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		getTransfers: async () => fetchJSON("/api/onboarding/aspire/transfers"),
+		saveTransfers: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/transfers", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		getNetWorthDecisions: async () =>
+			fetchJSON("/api/onboarding/aspire/net-worth"),
+		saveNetWorthDecisions: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/net-worth", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+		preview: async () => fetchJSON("/api/onboarding/aspire/preview"),
+		apply: async (payload) =>
+			fetchJSON("/api/onboarding/aspire/apply", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify(payload),
+			}),
+	},
 	transactions: {
 		list: async (limit = 100) => fetchJSON(`/api/transactions?limit=${limit}`),
 		create: async (payload) => {

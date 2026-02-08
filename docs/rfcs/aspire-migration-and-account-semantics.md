@@ -807,9 +807,9 @@ Note: the active SPA is Vue/Vite; some legacy docs describe vanilla JS.
 
 - OAuth web flow (self-host friendly).
 - Credentials configured via environment variables:
-  - `DOJO_GOOGLE_OAUTH_CLIENT_ID`
-  - `DOJO_GOOGLE_OAUTH_CLIENT_SECRET`
-  - `DOJO_GOOGLE_OAUTH_REDIRECT_URI` (recommended)
+  - `GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+  - `GOOGLE_REDIRECT_URI` (recommended)
 
 Privacy:
 

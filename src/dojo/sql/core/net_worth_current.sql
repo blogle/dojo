@@ -2,7 +2,7 @@ WITH asset_totals AS (
     SELECT COALESCE(SUM(current_balance_minor), 0) AS assets_minor
     FROM accounts
     WHERE
-        is_active = TRUE
+        include_in_net_worth = TRUE
         AND account_type = 'asset'
         AND account_class != 'investment'
 ),
@@ -11,7 +11,7 @@ liability_totals AS (
     SELECT COALESCE(SUM(current_balance_minor), 0) AS liabilities_minor
     FROM accounts
     WHERE
-        is_active = TRUE
+        include_in_net_worth = TRUE
         AND account_type = 'liability'
 ),
 
@@ -21,7 +21,7 @@ investment_accounts AS (
         a.current_balance_minor AS ledger_cash_minor
     FROM accounts AS a
     WHERE
-        a.is_active = TRUE
+        a.include_in_net_worth = TRUE
         AND a.account_type = 'asset'
         AND a.account_class = 'investment'
 ),
@@ -29,7 +29,8 @@ investment_accounts AS (
 investment_cash_by_account AS (
     SELECT
         ia.account_id,
-        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor
+        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(iad.ledger_baseline_minor, 0) AS ledger_baseline_minor
     FROM investment_accounts AS ia
     LEFT JOIN investment_account_details AS iad
         ON
@@ -68,6 +69,7 @@ investment_values AS (
         ia.account_id,
         ia.ledger_cash_minor,
         COALESCE(c.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(c.ledger_baseline_minor, 0) AS ledger_baseline_minor,
         COALESCE(h.holdings_value_minor, 0) AS holdings_value_minor
     FROM investment_accounts AS ia
     LEFT JOIN investment_cash_by_account AS c
@@ -80,15 +82,11 @@ position_totals AS (
     SELECT
         COALESCE(
             SUM(
-                CASE
-                    WHEN
-                        investment_values.uninvested_cash_minor != 0
-                        OR investment_values.holdings_value_minor != 0
-                        THEN
-                            investment_values.uninvested_cash_minor
-                            + investment_values.holdings_value_minor
-                    ELSE investment_values.ledger_cash_minor
-                END
+                investment_values.holdings_value_minor
+                + (
+                    investment_values.uninvested_cash_minor
+                    + (investment_values.ledger_cash_minor - investment_values.ledger_baseline_minor)
+                )
             ),
             0
         ) AS positions_minor

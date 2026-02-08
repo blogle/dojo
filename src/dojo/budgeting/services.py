@@ -139,6 +139,18 @@ class TransactionEntryService:
     # Aspire-aligned "Ready to Assign" envelope for allocations.
     AVAILABLE_TO_BUDGET_CATEGORY_ID = "available_to_budget"
 
+    # Ledger purity guardrails (RFC: Aspire migration + account semantics)
+    _INVESTMENT_ALLOWED_CATEGORY_IDS: set[str] = {
+        "account_transfer",
+        "opening_balance",
+        "balance_adjustment",
+    }
+    _LOAN_TRACKING_ALLOWED_CATEGORY_IDS: set[str] = {
+        "account_transfer",
+        "opening_balance",
+        "balance_adjustment",
+    }
+
     def create(
         self,
         conn: duckdb.DuckDBPyConnection,
@@ -195,6 +207,8 @@ class TransactionEntryService:
             # Retrieve and validate the account and category, ensuring they are active.
             account_record = self._require_active_account(dao, cmd.account_id)
             category_record = self._require_active_category(dao, cmd.category_id)
+
+            self._assert_account_category_allowed(account_record, category_record)
             # Determine if this transaction should affect budget category activity.
             track_budget_activity = self._should_track_budget_activity(category_record)
             # Calculate the impact on the account balance.
@@ -1525,6 +1539,23 @@ class TransactionEntryService:
             return
         sign = 1 if amount_minor < 0 else -1
         dao.adjust_category_inflow(payment_category.category_id, month_start, sign * delta, sign * delta)
+
+    def _assert_account_category_allowed(self, account_record: AccountRecord, category_record: CategoryRecord) -> None:
+        """Prevent invalid ledger entries that can double count net worth."""
+
+        if account_record.account_class == "investment":
+            if category_record.category_id not in self._INVESTMENT_ALLOWED_CATEGORY_IDS:
+                raise InvalidTransactionError(
+                    "Investment accounts only allow transfers, opening balances, and balance adjustments. "
+                    "Trades/dividends/interest are captured via holdings reconciliation."
+                )
+
+        if account_record.account_class == "loan" and account_record.account_role == "tracking":
+            if category_record.category_id not in self._LOAN_TRACKING_ALLOWED_CATEGORY_IDS:
+                raise InvalidTransactionError(
+                    "Loan tracking accounts only allow transfers, opening balances, and balance adjustments. "
+                    "Use statement principal checkpoints (or split payments) instead of posting expenses here."
+                )
 
 
 def _coerce_account_type(value: str) -> Literal["asset", "liability"]:

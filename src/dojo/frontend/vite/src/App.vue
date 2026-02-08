@@ -1,8 +1,9 @@
 <template>
   <div class="app-shell">
-    <header class="app-header">
+    <header class="app-header" :class="{ 'app-header--onboarding': isOnboardingRoute }">
       <RouterLink to="/" class="app-header__logo">DOJO</RouterLink>
-      <nav class="app-header__nav" aria-label="Primary">
+      <p v-if="isOnboardingRoute" class="app-header__context">Onboarding</p>
+      <nav v-else class="app-header__nav" aria-label="Primary">
         <RouterLink to="/" class="app-header__link" data-route-link="dashboard">
           Dashboard
         </RouterLink>
@@ -41,5 +42,10 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { RouterLink, RouterView } from "vue-router";
+import { useRoute } from "vue-router";
+
+const route = useRoute();
+const isOnboardingRoute = computed(() => route.path === "/onboarding");
 </script>

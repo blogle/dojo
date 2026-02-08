@@ -30,7 +30,8 @@ ledger_by_day AS (
 details_by_day AS (
     SELECT
         d.market_date,
-        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor
+        COALESCE(iad.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(iad.ledger_baseline_minor, 0) AS ledger_baseline_minor
     FROM daily AS d
     LEFT JOIN investment_account_details AS iad
         ON
@@ -81,6 +82,7 @@ combined AS (
         d.market_date,
         COALESCE(l.ledger_cash_minor, 0) AS ledger_cash_minor,
         COALESCE(det.uninvested_cash_minor, 0) AS uninvested_cash_minor,
+        COALESCE(det.ledger_baseline_minor, 0) AS ledger_baseline_minor,
         COALESCE(h.holdings_value_minor, 0) AS holdings_value_minor
     FROM daily AS d
     LEFT JOIN ledger_by_day AS l
@@ -96,8 +98,8 @@ combined AS (
 
 SELECT
     market_date,
-    uninvested_cash_minor + holdings_value_minor AS nav_minor,
+    (uninvested_cash_minor + (ledger_cash_minor - ledger_baseline_minor)) + holdings_value_minor AS nav_minor,
     COALESCE(ledger_cash_minor - LAG(ledger_cash_minor) OVER (ORDER BY market_date), 0) AS cash_flow_minor,
-    (uninvested_cash_minor + holdings_value_minor) - ledger_cash_minor AS return_minor
+    ((uninvested_cash_minor + (ledger_cash_minor - ledger_baseline_minor)) + holdings_value_minor) - ledger_cash_minor AS return_minor
 FROM combined
 ORDER BY market_date;

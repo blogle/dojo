@@ -34,6 +34,7 @@ class InvestmentAccountDetailRow:
     is_self_directed: bool | None
     tax_classification: str | None
     uninvested_cash_minor: int
+    ledger_baseline_minor: int
 
 
 @dataclass(frozen=True)
@@ -244,13 +245,23 @@ class InvestmentDAO:
             is_self_directed=bool(row.is_self_directed) if row.is_self_directed is not None else None,
             tax_classification=str(row.tax_classification) if row.tax_classification is not None else None,
             uninvested_cash_minor=int(row.uninvested_cash_minor or 0),
+            ledger_baseline_minor=int(row.ledger_baseline_minor or 0),
         )
 
-    def scd2_set_uninvested_cash_minor(
-        self, account_id: str, uninvested_cash_minor: int, *, recorded_at: datetime
+    def scd2_set_statement_state(
+        self,
+        account_id: str,
+        *,
+        uninvested_cash_minor: int,
+        ledger_baseline_minor: int,
+        recorded_at: datetime,
     ) -> None:
         current = self.get_active_investment_account_detail(account_id)
-        if current is not None and current.uninvested_cash_minor == uninvested_cash_minor:
+        if (
+            current is not None
+            and current.uninvested_cash_minor == uninvested_cash_minor
+            and current.ledger_baseline_minor == ledger_baseline_minor
+        ):
             return
 
         if current is not None:
@@ -266,11 +277,13 @@ class InvestmentDAO:
             manager = current.manager
             is_self_directed = current.is_self_directed
             tax_classification = current.tax_classification
+            previous_baseline_minor = current.ledger_baseline_minor
         else:
             risk_free_sweep_rate = 0.0
             manager = None
             is_self_directed = None
             tax_classification = None
+            previous_baseline_minor = 0
 
         self._conn.execute(
             load_sql("insert_investment_account_detail_version.sql"),
@@ -282,11 +295,28 @@ class InvestmentDAO:
                 "is_self_directed": is_self_directed,
                 "tax_classification": tax_classification,
                 "uninvested_cash_minor": uninvested_cash_minor,
+                "ledger_baseline_minor": ledger_baseline_minor if ledger_baseline_minor is not None else previous_baseline_minor,
                 "valid_from": recorded_at,
                 "valid_to": "9999-12-31 00:00:00",
                 "created_at": recorded_at,
                 "updated_at": recorded_at,
             },
+        )
+
+    def scd2_set_uninvested_cash_minor(
+        self,
+        account_id: str,
+        uninvested_cash_minor: int,
+        *,
+        recorded_at: datetime,
+    ) -> None:
+        current = self.get_active_investment_account_detail(account_id)
+        baseline = current.ledger_baseline_minor if current is not None else 0
+        self.scd2_set_statement_state(
+            account_id,
+            uninvested_cash_minor=uninvested_cash_minor,
+            ledger_baseline_minor=baseline,
+            recorded_at=recorded_at,
         )
 
     # SCD2: positions ------------------------------------------------------

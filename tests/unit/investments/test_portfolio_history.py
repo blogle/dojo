@@ -43,6 +43,11 @@ def test_portfolio_history_reports_daily_nav_and_return(in_memory_db: duckdb.Duc
         [str(uuid4()), str(uuid4())],
     )
 
+    # In the real app, account balances are cache-backed and updated by cache rebuild.
+    # This test inserts ledger rows directly, so also update the cached balance to
+    # match the ledger cash at reconcile time.
+    in_memory_db.execute("UPDATE accounts SET current_balance_minor = 100000 WHERE account_id = 'inv_hist'")
+
     service = InvestmentService()
     service.reconcile_portfolio(
         in_memory_db,

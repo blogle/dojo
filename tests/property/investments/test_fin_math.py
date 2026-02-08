@@ -23,37 +23,44 @@ def lots_strategy(draw: st.DrawFn) -> list[tuple[float, int | None]]:
 @given(
     ledger_cash_minor=st.integers(min_value=-1_000_000, max_value=1_000_000),
     uninvested_cash_minor=st.integers(min_value=0, max_value=1_000_000),
+    ledger_baseline_minor=st.integers(min_value=-1_000_000, max_value=1_000_000),
     lots=lots_strategy(),
 )
 @settings(max_examples=50, deadline=None)
 def test_nav_identity_holds_in_minor_units(
     ledger_cash_minor: int,
     uninvested_cash_minor: int,
+    ledger_baseline_minor: int,
     lots: list[tuple[float, int | None]],
 ) -> None:
     totals = compute_portfolio_totals(
         ledger_cash_minor=ledger_cash_minor,
         uninvested_cash_minor=uninvested_cash_minor,
+        ledger_baseline_minor=ledger_baseline_minor,
         lots=lots,
     )
 
-    assert totals.nav_minor == uninvested_cash_minor + totals.holdings_value_minor
+    assert totals.cash_derived_minor == uninvested_cash_minor + (ledger_cash_minor - ledger_baseline_minor)
+    assert totals.nav_minor == totals.cash_derived_minor + totals.holdings_value_minor
 
 
 @given(
     ledger_cash_minor=st.integers(min_value=-1_000_000, max_value=1_000_000),
     uninvested_cash_minor=st.integers(min_value=0, max_value=1_000_000),
+    ledger_baseline_minor=st.integers(min_value=-1_000_000, max_value=1_000_000),
     lots=lots_strategy(),
 )
 @settings(max_examples=50, deadline=None)
 def test_return_identity_holds_in_minor_units(
     ledger_cash_minor: int,
     uninvested_cash_minor: int,
+    ledger_baseline_minor: int,
     lots: list[tuple[float, int | None]],
 ) -> None:
     totals = compute_portfolio_totals(
         ledger_cash_minor=ledger_cash_minor,
         uninvested_cash_minor=uninvested_cash_minor,
+        ledger_baseline_minor=ledger_baseline_minor,
         lots=lots,
     )
 

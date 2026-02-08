@@ -38,19 +38,29 @@ def rebuild_caches(
     *,
     rebuild_accounts: bool = True,
     rebuild_categories: bool = True,
+    in_transaction: bool = False,
 ) -> None:
-    """Recompute cache tables inside a single transaction."""
+    """Recompute cache tables.
 
-    conn.execute("BEGIN")
+    By default this function opens and commits a transaction.
+    Pass ``in_transaction=True`` when the caller already controls a surrounding
+    transaction (e.g. a multi-phase import) and wants cache rebuild to be part
+    of the same atomic unit.
+    """
+
+    if not in_transaction:
+        conn.execute("BEGIN")
     try:
         if rebuild_accounts:
             _rebuild_account_balances(conn)
         if rebuild_categories:
             _rebuild_budget_category_month_state(conn)
-        conn.execute("COMMIT")
+        if not in_transaction:
+            conn.execute("COMMIT")
     except Exception:
-        conn.execute("ROLLBACK")
-        logger.exception("cache rebuild failed; rolled back transaction")
+        if not in_transaction:
+            conn.execute("ROLLBACK")
+            logger.exception("cache rebuild failed; rolled back transaction")
         raise
 
 

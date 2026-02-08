@@ -197,15 +197,16 @@ def test_net_worth_equation_respects_account_activation(accounts: list[tuple[str
                 """
                 INSERT INTO accounts (
                     account_id, name, account_type, current_balance_minor,
-                    currency, is_active, account_class, account_role
+                    currency, is_active, include_in_net_worth, account_class, account_role
                 )
-                VALUES (?, ?, ?, ?, 'USD', ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)
                 """,
                 [
                     f"acct_{idx}",
                     f"Account {idx}",
                     account_type,
                     balance,
+                    is_active,
                     is_active,
                     "cash" if account_type == "asset" else "credit",
                     "tracking" if is_tracking else "on_budget",
@@ -214,7 +215,7 @@ def test_net_worth_equation_respects_account_activation(accounts: list[tuple[str
 
         snapshot = current_snapshot(conn)
         rows = conn.execute(
-            "SELECT account_type, current_balance_minor, is_active FROM accounts",
+            "SELECT account_type, current_balance_minor, include_in_net_worth FROM accounts",
         ).fetchall()
         manual_assets = sum(row[1] for row in rows if row[0] == "asset" and row[2])
         manual_liabilities = sum(row[1] for row in rows if row[0] == "liability" and row[2])

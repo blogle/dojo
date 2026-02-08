@@ -41,6 +41,33 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Aspire migration / onboarding
+    google_oauth_client_id: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_CLIENT_ID",
+        description="Google OAuth client id (Sheets read-only).",
+    )
+    google_oauth_client_secret: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_CLIENT_SECRET",
+        description="Google OAuth client secret (Sheets read-only).",
+    )
+    google_oauth_redirect_uri: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_REDIRECT_URI",
+        description="Optional explicit redirect URI for Google OAuth callback.",
+    )
+
+    aspire_migration_allow_partial_mapping: bool = Field(
+        default=False,
+        description="Dev/test helper: allow advancing with partial mapping/decisions.",
+    )
+
+    aspire_migration_session_ttl_days: int = Field(
+        default=14,
+        description="TTL for abandoned Aspire migration sessions (best-effort cleanup).",
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="dojo_",
         env_file=".env",

@@ -24,6 +24,9 @@ from dojo.core.db import get_connection
 from dojo.core.migrate import apply_migrations
 from dojo.core.reconciliation_router import router as reconciliation_router
 from dojo.core.routers import router as core_router
+from dojo.aspire_migration.routers import router as onboarding_router
+from dojo.aspire_migration.google_oauth import GoogleOAuthStore
+from dojo.aspire.gsheets_client import GoogleSheetsClient
 from dojo.investments.routers import router as investments_router
 from dojo.investments.service import InvestmentService
 
@@ -109,12 +112,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.budget_category_admin_service = BudgetCategoryAdminService()
     app.state.investment_service = InvestmentService()
 
+    # Aspire migration (ephemeral OAuth + Sheets client)
+    app.state.google_oauth_store = GoogleOAuthStore()
+    app.state.sheets_client_factory = lambda credentials: GoogleSheetsClient(credentials)
+
     # Include API routers for different functional domains.
     # All API routes will be prefixed with "/api".
     app.include_router(core_router, prefix="/api")
     app.include_router(budgeting_router, prefix="/api")
     app.include_router(reconciliation_router, prefix="/api")
     app.include_router(investments_router, prefix="/api")
+    app.include_router(onboarding_router, prefix="/api")
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

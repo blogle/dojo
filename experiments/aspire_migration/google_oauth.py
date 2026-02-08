@@ -35,9 +35,7 @@ def _require_oauth_flow() -> Any:
 
 def _client_config(settings: Settings, *, redirect_uri: str) -> dict[str, Any]:
     if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
-        raise GoogleOAuthError(
-            "Google OAuth is not configured. Set DOJO_GOOGLE_OAUTH_CLIENT_ID and DOJO_GOOGLE_OAUTH_CLIENT_SECRET."
-        )
+        raise GoogleOAuthError("Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
 
     # Minimal config for google-auth-oauthlib.
     return {

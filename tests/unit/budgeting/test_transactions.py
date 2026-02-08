@@ -719,7 +719,7 @@ def test_month_cash_inflow_counts_cash_accounts_only(
         NewTransactionRequest(
             transaction_date=date.today(),
             account_id="external_brokerage",
-            category_id="income",
+            category_id="opening_balance",
             amount_minor=40000,
         ),
     )
