@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dojo Migration Onboarding</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        :root {
+            /* Palette */
+            --c-primary: #3D2B1F;    /* Dark Brown */
+            --c-secondary: #8F7C6A;  /* Muted Brown */
+            --c-accent: #5F7161;     /* Muted Green */
+            --c-bg: #FDFBF7;         /* Off-White Paper */
+            --c-text: #2A2A2A;       /* Charcoal */
+            --c-text-light: #685E55; 
+            --c-surface: #FFFFFF;
+            --c-danger: #D15E5E;
+            --c-success: #5F7161;
+            
+            /* Spacing */
+            --s-1: 4px;
+            --s-2: 8px;
+            --s-3: 16px;
+            --s-4: 24px;
+            --s-5: 32px;
+            --s-6: 48px;
+
+            /* Borders */
+            --border-std: 1px solid var(--c-secondary);
+            --border-light: 1px solid rgba(143, 124, 106, 0.3);
+
+            /* Typography */
+            --font-heading: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        /* RESET & BASE */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--c-bg);
+            color: var(--c-text);
+            font-family: var(--font-body);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-heading);
+            color: var(--c-primary);
+            font-weight: 600;
+        }
+
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
+        input, select { font-family: inherit; }
+
+        /* UTILITIES */
+        .container { max-width: 900px; margin: 0 auto; width: 100%; padding: 0 var(--s-4); }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: var(--s-2); }
+        .gap-3 { gap: 12px; }
+        .gap-4 { gap: var(--s-4); }
+        .mt-4 { margin-top: var(--s-4); }
+        .mb-2 { margin-bottom: var(--s-2); }
+        .mb-4 { margin-bottom: var(--s-4); }
+        .mb-6 { margin-bottom: 24px; }
+        .mb-8 { margin-bottom: 32px; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .text-mono { font-family: var(--font-mono); }
+        .text-light { color: var(--c-text-light); }
+        .text-accent { color: var(--c-accent); }
+        .font-bold { font-weight: 600; }
+        .font-medium { font-weight: 500; }
+        .w-full { width: 100%; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .overflow-hidden { overflow: hidden; }
+
+        /* COMPONENT: BUTTONS */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 var(--s-4);
+            height: 48px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            border-radius: 4px;
+        }
+        .btn-primary {
+            background-color: var(--c-primary);
+            color: var(--c-bg);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--c-text);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            border: 1px solid var(--c-primary);
+            color: var(--c-primary);
+        }
+        .btn-secondary:hover {
+            background-color: rgba(61, 43, 31, 0.05);
+        }
+        .btn-tertiary {
+            color: var(--c-text-light);
+        }
+        .btn-tertiary:hover {
+            color: var(--c-primary);
+        }
+        .btn-sm {
+            height: 32px;
+            padding: 0 var(--s-2);
+            font-size: 0.8rem;
+        }
+
+        /* COMPONENT: INPUTS */
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--c-text-light);
+            margin-bottom: var(--s-1);
+            font-weight: 500;
+        }
+        .input-underline {
+            width: 100%;
+            border: none;
+            border-bottom: 2px solid var(--c-secondary);
+            background: transparent;
+            padding: var(--s-2) 0;
+            font-size: 1rem;
+            color: var(--c-primary);
+            border-radius: 0;
+            transition: border-color 0.2s;
+        }
+        .input-underline:focus {
+            outline: none;
+            border-color: var(--c-accent);
+            border-bottom-width: 2px;
+        }
+        .input-underline::placeholder {
+            color: rgba(143, 124, 106, 0.5);
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            padding: 8px 0;
+        }
+
+        /* COMPONENT: CARDS & TILES */
+        .card {
+            background: var(--c-surface);
+            border: var(--border-std);
+            padding: var(--s-4);
+            border-radius: 4px;
+        }
+        .tile {
+            background: var(--c-surface);
+            border: var(--border-std);
+            padding: var(--s-5);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .tile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-color: var(--c-primary);
+        }
+        .tile.selected {
+            background: #F5F3F0;
+            border-color: var(--c-primary);
+            box-shadow: inset 0 0 0 1px var(--c-primary);
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(61, 43, 31, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background: var(--c-bg);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid var(--c-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* WIZARD LAYOUT */
+        .wizard-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .wizard-header {
+            padding: var(--s-3) 0;
+            border-bottom: var(--border-light);
+            background: var(--c-bg);
+            flex-shrink: 0;
+        }
+        .progress-bar {
+            height: 2px;
+            background: rgba(143, 124, 106, 0.3);
+            width: 100%;
+            margin-top: var(--s-3);
+            position: relative;
+            border-radius: 2px;
+        }
+        .progress-fill {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            background: var(--c-primary);
+            transition: width 0.4s ease;
+            border-radius: 2px;
+        }
+        
+        .wizard-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--s-6) 0;
+        }
+
+        .wizard-footer {
+            padding: var(--s-4) 0;
+            border-top: var(--border-std);
+            background: var(--c-bg);
+            position: sticky;
+            bottom: 0;
+            flex-shrink: 0;
+        }
+
+        /* TABLES */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--c-text-light);
+            padding: var(--s-2) 0;
+            border-bottom: var(--border-std);
+            background: #FAFAFA;
+            padding-left: var(--s-2);
+        }
+        .data-table td {
+            padding: var(--s-3) var(--s-2);
+            border-bottom: var(--border-light);
+            font-size: 0.95rem;
+        }
+        .row-warning { background-color: #FFF8E1; }
+        .row-selected { background-color: #E8F5E9; }
+
+        /* TAGS & PILLS */
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tag.blue { color: #1565C0; background: #E3F2FD; }
+        .tag.amber { color: #F57F17; background: #FFF8E1; }
+        .tag.green { color: #2E7D32; background: #E8F5E9; }
+        .tag.red { color: #C62828; background: #FFEBEE; }
+        .tag.gray { color: var(--c-text-light); background: #EEEEEE; }
+
+        /* SUMMARY BANNER */
+        .summary-banner {
+            background: var(--c-primary);
+            color: white;
+            padding: 24px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .summary-item .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        .summary-item .value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        /* SPINNER */
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--c-secondary);
+            border-top-color: var(--c-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* MIGRATION CARD (Step 9) */
+        .migration-card {
+            border: var(--border-std);
+            border-radius: 4px;
+            background: white;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .migration-header {
+            padding: 16px 24px;
+            background: #FAFAFA;
+            border-bottom: var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .migration-body { padding: 24px; }
+        .account-destination-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: var(--border-light);
+            border-radius: 4px;
+            margin-bottom: 12px;
+            background: #FDFBF7;
+        }
+
+        /* TOOLTIP */
+        .tooltip-trigger { position: relative; cursor: help; border-bottom: 1px dotted var(--c-text-light); }
+        .tooltip-trigger:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%; left: 50%;
+            transform: translateX(-50%);
+            background: var(--c-primary);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: pre-line;
+            z-index: 100;
+            width: max-content;
+            max-width: 250px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        /* ACTION BAR */
+        .action-bar {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--c-primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        /* ANIMATIONS */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .slide-up-enter-active { transition: all 0.4s ease; }
+        .slide-up-enter-from { opacity: 0; transform: translateY(20px); }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <datalist id="institutions">
+        <option value="Chase"></option>
+        <option value="Bank of America"></option>
+        <option value="Wells Fargo"></option>
+        <option value="Citigroup"></option>
+        <option value="American Express"></option>
+        <option value="Vanguard"></option>
+        <option value="Fidelity"></option>
+        <option value="Charles Schwab"></option>
+        <option value="Capital One"></option>
+        <option value="Discover"></option>
+        <option value="USAA"></option>
+        <option value="Navy Federal Credit Union"></option>
+        <option value="PNC Bank"></option>
+        <option value="TD Bank"></option>
+        <option value="Goldman Sachs"></option>
+        <option value="Morgan Stanley"></option>
+        <option value="Interactive Brokers"></option>
+        <option value="E*TRADE"></option>
+        <option value="Robinhood"></option>
+        <option value="Coinbase"></option>
+        <option value="SoFi"></option>
+        <option value="Ally Bank"></option>
+    </datalist>
+
+    <script>
+        const { createApp, ref, computed, reactive, onMounted, watch } = Vue;
+
+        /* --- MOCK DATA --- */
+        const MOCK_ACCOUNTS = [
+            { id: 1, name: 'Chase Sapphire', type: 'Credit Card', settled: -1250.00, pending: -145.20, status: 'Active' },
+            { id: 2, name: 'Wells Fargo Checking', type: 'Checking', settled: 4520.50, pending: 0, status: 'Active' },
+            { id: 3, name: 'Vanguard Brokerage', type: 'Investment', settled: 0, pending: 0, status: 'Active' }, 
+            { id: 4, name: 'My Mortgage', type: 'Loan', settled: -245000.00, pending: 0, status: 'Active' },
+            { id: 5, name: 'Old Savings', type: 'Savings', settled: 0, pending: 0, status: 'Hidden' },
+        ];
+
+        const MOCK_ENVELOPES = [
+            { id: 'e1', category: 'Groceries', group: 'Living', status: 'Active', configType: 'Recurring', configDetails: 'Monthly', budgetAmount: 600.00, activity: -149.80, budgeted: 600.00, available: 450.20 },
+            { id: 'e2', category: 'Rent', group: 'Fixed', status: 'Active', configType: 'Recurring', configDetails: 'Monthly', budgetAmount: 1800.00, activity: 0, budgeted: 1800.00, available: 1800.00 },
+            { id: 'e3', category: 'Dining Out', group: 'Fun', status: 'Active', configType: 'Recurring', configDetails: 'Monthly', budgetAmount: 200.00, activity: -79.50, budgeted: 200.00, available: 120.50 },
+            { id: 'e4', category: 'Emergency Fund', group: 'Savings', status: 'Active', configType: 'Target', configDetails: 'By Dec 2026', budgetAmount: 250.00, activity: 0, budgeted: 250.00, available: 12500.00 },
+            { id: 'e5', category: 'Old Car Repair', group: 'Hidden', status: 'Retired', configType: 'None', configDetails: '-', budgetAmount: 0, activity: 0, budgeted: 0, available: 0 },
+        ];
+
+        const MOCK_TRANSACTIONS = [
+            { id: 101, date: '2025-10-12', category: 'Uncategorized', account: 'Checking', amount: -500.00, memo: 'Transfer to unknown', selected: false, resolution: '' },
+            { id: 102, date: '2025-10-12', category: 'Uncategorized', account: 'Savings', amount: 500.00, memo: 'Deposit from Checking', selected: false, resolution: '' },
+            { id: 103, date: '2025-11-01', category: 'Auto-save', account: 'Checking', amount: -20.00, memo: 'Adjustment', selected: false, resolution: '' },
+        ];
+
+        const MOCK_NET_WORTH_DUPLICATES = [
+            { id: 'nw1', name: 'Chase Sapphire', dojoAccount: 'Chase Sapphire (Budget)', drift: -45.20, type: 'Duplicate', history: [1200, 1250, 1220, 1280, 1250] },
+            { id: 'nw2', name: 'Wells Fargo', dojoAccount: 'Wells Fargo Checking', drift: 0.00, type: 'Duplicate', history: [4000, 4200, 4100, 4500, 4520] },
+        ];
+
+        const MOCK_NET_WORTH_LEGACY = [
+            { 
+                id: 'inv', 
+                name: 'Retirement Accounts', 
+                lastBalance: 152450.00, 
+                destinations: [
+                    { id: 'd1', name: 'Vanguard 401k', type: 'Investment', balance: 100000.00 },
+                    { id: 'd2', name: 'Roth IRA', type: 'Investment', balance: 52450.00 }
+                ]
+            },
+            { 
+                id: 'mtg', 
+                name: 'Home Loan', 
+                lastBalance: -245000.00, 
+                destinations: [] 
+            }
+        ];
+
+        /* --- WIZARD SCHEMAS FROM DEMO --- */
+        const WIZARD_SCHEMAS = {
+            cash: {
+                label: "Cash & Checking",
+                icon: 'ph-bank',
+                title: "Cash & Checking Details",
+                balanceLabel: "Current Ledger Balance",
+                fields: [
+                    { id: "institution_name", label: "Institution", type: "text", list: "institutions", placeholder: "Select or type..." },
+                    { id: "account_name", label: "Account Nickname", type: "text", placeholder: "e.g. Primary Checking" },
+                    { id: "interest_rate_apy", label: "Interest Rate (APY %)", type: "number", step: "0.01", placeholder: "0.00" }
+                ]
+            },
+            credit: {
+                label: "Credit Card",
+                icon: 'ph-credit-card',
+                title: "Credit Card Details",
+                balanceLabel: "Current Amount Owed",
+                balanceHelper: "Enter as a positive number. The system will track it as a liability.",
+                fields: [
+                    { id: "institution_name", label: "Institution", type: "text", list: "institutions", placeholder: "Select or type..." },
+                    { id: "account_name", label: "Card Nickname", type: "text", placeholder: "e.g. Gold Card" },
+                    { id: "card_type", label: "Network", type: "select", options: ["Visa", "Mastercard", "American Express", "Discover"] },
+                    { id: "apr", label: "Purchase APR (%)", type: "number", step: "0.01" }
+                ]
+            },
+            accessible: {
+                label: "Savings / CD",
+                icon: 'ph-piggy-bank',
+                title: "Accessible Asset Details",
+                balanceLabel: "Current Balance",
+                fields: [
+                    { id: "institution_name", label: "Institution", type: "text", list: "institutions", placeholder: "Select or type..." },
+                    { id: "account_name", label: "Account Nickname", type: "text" },
+                    { id: "interest_rate_apy", label: "APY (%)", type: "number", step: "0.01" },
+                    { id: "early_withdrawal_penalty", label: "Early Withdrawal Penalty", type: "checkbox", helper: "Check if this account charges fees for early access." }
+                ]
+            },
+            investment: {
+                label: "Investment",
+                icon: 'ph-chart-line-up',
+                title: "Investment Account Details",
+                balanceLabel: "Uninvested Cash Balance",
+                balanceHelper: "Holdings (Stocks/ETFs) are tracked separately via the Positions table.",
+                fields: [
+                    { id: "institution_name", label: "Institution", type: "text", list: "institutions", placeholder: "Select or type..." },
+                    { id: "account_name", label: "Account Nickname", type: "text" },
+                    { id: "tax_classification", label: "Tax Classification", type: "select", options: ["Taxable Brokerage", "Traditional IRA", "Roth IRA", "401k", "529"] },
+                    { id: "is_self_directed", label: "Self-Directed", type: "checkbox", helper: "Check if you manage trades manually." }
+                ]
+            },
+            loan: {
+                label: "Loan / Mortgage",
+                icon: 'ph-house',
+                title: "Loan Details",
+                balanceLabel: "Current Outstanding Balance",
+                fields: [
+                    { id: "institution_name", label: "Institution", type: "text", list: "institutions", placeholder: "Select or type..." },
+                    { id: "loan_name", label: "Loan Nickname", type: "text", placeholder: "e.g. Student Loan A" },
+                    { id: "initial_principal_minor", label: "Original Principal", type: "number", step: "0.01" },
+                    { id: "interest_rate_apy", label: "Interest Rate (%)", type: "number", step: "0.01" },
+                    { id: "mortgage_escrow_details", label: "Escrow Notes", type: "text", placeholder: "Optional tax/insurance details" }
+                ]
+            },
+            tangible: {
+                label: "Tangible Asset",
+                icon: 'ph-treasure-chest',
+                title: "Asset Details",
+                balanceLabel: "Current Fair Value",
+                fields: [
+                    { id: "asset_name", label: "Asset Name", type: "text", placeholder: "e.g. 2018 Honda Civic" },
+                    { id: "acquisition_cost_minor", label: "Original Cost Basis", type: "number", step: "0.01" }
+                ]
+            }
+        };
+
+        /* --- COMPONENTS --- */
+
+        const StepWelcome = {
+            template: `
+                <div class="flex flex-col items-center justify-center h-full max-w-3xl mx-auto">
+                    <h2 class="text-3xl mb-2 text-center">Welcome to Dojo</h2>
+                    <p class="text-light mb-12 text-center">How would you like to set up your new financial home?</p>
+                    <div class="grid grid-cols-2 gap-6 w-full">
+                        <div class="tile opacity-60 cursor-not-allowed">
+                            <div class="mb-4 text-light"><i class="ph ph-plant" style="font-size: 32px;"></i></div>
+                            <h3 class="mb-2">Start Fresh</h3>
+                            <p class="text-sm text-light">Create a clean slate.</p>
+                        </div>
+                        <div class="tile selected" @click="$emit('next')">
+                            <div class="mb-4 text-accent"><i class="ph ph-arrows-left-right" style="font-size: 32px;"></i></div>
+                            <h3 class="mb-2 text-primary">Migrate from Aspire</h3>
+                            <p class="text-sm text-light">Import your history, categories, and net worth data.</p>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepOAuth = {
+            template: `
+                <div class="flex flex-col items-center text-center justify-center h-full max-w-md mx-auto slide-up-enter-active">
+                    <h2 class="mb-4">Connect Google Drive</h2>
+                    <p class="text-light mb-8">We need read-only access to your Aspire spreadsheet.</p>
+                    <div class="card w-full flex flex-col gap-4">
+                        <button @click="$emit('next')" class="btn btn-primary w-full gap-2"><i class="ph-bold ph-google-logo"></i>Connect Google Account</button>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepSheetPicker = {
+            setup(props, { emit }) {
+                const url = ref('');
+                const isValid = computed(() => url.value.includes('docs.google.com/spreadsheets'));
+                return { url, isValid, handleNext: () => isValid.value && emit('startExtraction') };
+            },
+            template: `
+                <div class="max-w-xl mx-auto mt-8">
+                    <h2 class="mb-2">Which sheet are we using?</h2>
+                    <div class="input-group mb-8">
+                        <label>Spreadsheet URL</label>
+                        <input v-model="url" type="text" class="input-underline" placeholder="https://docs.google.com/spreadsheets/d/...">
+                    </div>
+                    <div v-if="isValid" class="card flex items-center gap-4 mb-4" style="border-color: var(--c-accent); background: #f0fdf4;">
+                        <i class="ph-fill ph-check-circle" style="color: var(--c-accent); font-size: 24px;"></i>
+                        <div class="text-sm">Valid Sheet Detected</div>
+                    </div>
+                    <div class="flex justify-end"><button @click="handleNext" :disabled="!isValid" :class="['btn btn-primary', !isValid ? 'opacity-50' : '']">Extract Data</button></div>
+                </div>
+            `
+        };
+
+        const StepExtraction = {
+            props: ['status'],
+            template: `<div class="flex flex-col items-center justify-center h-full"><div class="spinner mb-8"></div><h3 class="mb-2 text-xl">{{ status }}</h3></div>`
+        };
+
+        const StepPreview = {
+            template: `
+                <div class="max-w-4xl mx-auto mt-8">
+                    <div class="flex justify-between items-end mb-8"><div><h2 class="mb-2">We found your data</h2></div><div class="tag green">Extraction Successful</div></div>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="tile text-center"><h3 class="text-3xl mb-1">14</h3><div class="text-xs text-mono text-light">ACCOUNTS</div></div>
+                        <div class="tile text-center"><h3 class="text-3xl mb-1">4.2k</h3><div class="text-xs text-mono text-light">TRANSACTIONS</div></div>
+                        <div class="tile text-center"><h3 class="text-3xl mb-1">62</h3><div class="text-xs text-mono text-light">NW MARKS</div></div>
+                        <div class="tile text-center"><h3 class="text-3xl mb-1">7yr</h3><div class="text-xs text-mono text-light">HISTORY</div></div>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepAccounts = {
+            setup() { return { accounts: MOCK_ACCOUNTS }; },
+            template: `
+                <div class="max-w-4xl mx-auto mt-8">
+                    <h2 class="mb-2">Budget Accounts</h2>
+                    <p class="text-light mb-6">Confirm transaction-linked accounts and their balances.</p>
+                    <div class="card p-0 overflow-hidden">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Account Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th class="text-right">Settled Balance</th>
+                                    <th class="text-right" style="padding-right: 24px;">Pending Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="acc in accounts" :key="acc.id">
+                                    <td class="font-medium">{{ acc.name }}</td>
+                                    <td class="text-sm text-light">{{ acc.type }}</td>
+                                    <td><span :class="acc.status === 'Hidden' ? 'tag gray' : 'tag green'">{{ acc.status === 'Hidden' ? 'Retired' : 'Active' }}</span></td>
+                                    <td class="text-right text-mono font-medium">{{ acc.settled.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
+                                    <td class="text-right text-mono text-light" style="padding-right: 24px;">{{ acc.pending === 0 ? '-' : acc.pending.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `
+        };
+
+        const BudgetEditModal = {
+            props: ['envelope', 'isOpen'],
+            emits: ['close', 'save'],
+            setup(props, { emit }) {
+                const form = reactive({ ...props.envelope });
+                const strategy = ref('recurring'); // recurring or target
+
+                watch(() => props.envelope, (newVal) => {
+                    Object.assign(form, newVal);
+                    strategy.value = newVal.configType === 'Target' ? 'target' : 'recurring';
+                });
+
+                const monthlyComputed = computed(() => {
+                    if (strategy.value === 'target') return (form.budgetAmount / 12).toFixed(2); // Mock logic
+                    return form.budgetAmount;
+                });
+
+                return { form, strategy, monthlyComputed, emit };
+            },
+            template: `
+                <div v-if="isOpen" class="modal-overlay" @click.self="emit('close')">
+                    <div class="modal-content">
+                        <div class="p-6 border-b border-light"><h3 class="text-lg">Edit Budget Category</h3></div>
+                        <div class="p-6 flex-1">
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <div class="input-group"><label>Category Name</label><input v-model="form.category" class="input-underline"></div>
+                                <div class="input-group"><label>Group</label><input v-model="form.group" class="input-underline"></div>
+                            </div>
+                            
+                            <h4 class="text-xs uppercase text-light mb-4 font-bold">Budget Strategy</h4>
+                            <div class="flex gap-4 mb-6 border-b border-light">
+                                <button class="pb-2 text-sm font-medium" :class="strategy === 'recurring' ? 'text-primary border-b-2 border-primary' : 'text-light'" @click="strategy = 'recurring'">Recurring</button>
+                                <button class="pb-2 text-sm font-medium" :class="strategy === 'target' ? 'text-primary border-b-2 border-primary' : 'text-light'" @click="strategy = 'target'">Target Date</button>
+                            </div>
+
+                            <div v-if="strategy === 'recurring'">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="input-group"><label>Period</label><select class="input-underline"><option>Monthly</option><option>Weekly</option><option>Annually</option></select></div>
+                                    <div class="input-group"><label>Amount Due</label><input v-model="form.budgetAmount" type="number" class="input-underline"></div>
+                                </div>
+                            </div>
+
+                            <div v-if="strategy === 'target'">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="input-group"><label>Target Date</label><input type="date" class="input-underline"></div>
+                                    <div class="input-group"><label>Target Amount</label><input v-model="form.budgetAmount" type="number" class="input-underline"></div>
+                                </div>
+                                <div class="text-sm bg-gray-100 p-3 rounded">Estimated Monthly Contribution: <strong>\${{ monthlyComputed }}</strong></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t border-light flex justify-end gap-2">
+                            <button @click="emit('close')" class="btn btn-tertiary">Cancel</button>
+                            <button @click="emit('save', form)" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepEnvelopes = {
+            components: { BudgetEditModal },
+            setup() {
+                const envelopes = ref(MOCK_ENVELOPES);
+                const activeEnvelopes = computed(() => envelopes.value.filter(e => e.status === 'Active'));
+                const retiredEnvelopes = computed(() => envelopes.value.filter(e => e.status !== 'Active'));
+                
+                const editingEnvelope = ref(null);
+                const isModalOpen = ref(false);
+
+                const openEdit = (env) => { editingEnvelope.value = env; isModalOpen.value = true; };
+                const saveEdit = (updated) => {
+                    const idx = envelopes.value.findIndex(e => e.id === updated.id);
+                    if (idx !== -1) envelopes.value[idx] = { ...updated };
+                    isModalOpen.value = false;
+                };
+
+                return { envelopes, activeEnvelopes, retiredEnvelopes, editingEnvelope, isModalOpen, openEdit, saveEdit };
+            },
+            template: `
+                <div class="max-w-5xl mx-auto mt-8">
+                    <h2 class="mb-2">Budget Envelopes</h2>
+                    <p class="text-light mb-6">Review your envelope configurations.</p>
+
+                    <div v-for="(list, title) in { 'Active Envelopes': activeEnvelopes, 'Retired Envelopes': retiredEnvelopes }" :key="title" class="mb-8">
+                        <h3 class="mb-3 text-sm font-bold uppercase text-light">{{ title }}</h3>
+                        <div class="card p-0 overflow-hidden">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Group</th>
+                                        <th>Config</th>
+                                        <th class="text-right">Configured Budget</th>
+                                        <th class="text-right" style="padding-right: 24px;">Available</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="env in list" :key="env.id">
+                                        <td class="font-medium">{{ env.category }}</td>
+                                        <td class="text-sm text-light">{{ env.group }}</td>
+                                        <td class="text-xs text-light">{{ env.configType === 'None' ? '-' : env.configType + ' (' + env.configDetails + ')' }}</td>
+                                        <td class="text-right text-mono text-sm">{{ env.budgetAmount.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
+                                        <td class="text-right text-mono font-bold" style="padding-right: 24px;">
+                                            <span class="tooltip-trigger" :data-tooltip="'Activity: ' + env.activity + '\\nBudgeted: ' + env.budgeted">
+                                                {{ env.available.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}
+                                            </span>
+                                        </td>
+                                        <td><button @click="openEdit(env)" class="text-primary hover:text-accent"><i class="ph-bold ph-pencil-simple"></i></button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <BudgetEditModal :isOpen="isModalOpen" :envelope="editingEnvelope" @close="isModalOpen=false" @save="saveEdit" />
+                </div>
+            `
+        };
+
+        const StepTransfers = {
+            setup() {
+                const transactions = ref(MOCK_TRANSACTIONS);
+                const selectedIds = computed(() => transactions.value.filter(t => t.selected).map(t => t.id));
+                
+                const linkSelected = () => {
+                    alert(`Linking transaction IDs: ${selectedIds.value.join(' & ')}`);
+                    // Mock removal
+                    transactions.value = transactions.value.filter(t => !t.selected);
+                };
+
+                return { transactions, selectedIds, linkSelected };
+            },
+            template: `
+                <div class="max-w-5xl mx-auto mt-8 pb-24">
+                    <div class="flex justify-between items-start mb-6">
+                        <div><h2 class="mb-2">Transfer Exceptions</h2><p class="text-light">Unpaired transfer legs. Select two to link them manually, or classify individually.</p></div>
+                        <div class="tag amber">Action Required</div>
+                    </div>
+
+                    <div class="card p-0 overflow-hidden">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px; padding-left: 16px;"></th>
+                                    <th>Date</th>
+                                    <th>Account</th>
+                                    <th>Category</th>
+                                    <th>Memo</th>
+                                    <th class="text-right">Amount</th>
+                                    <th style="padding-right: 24px; width: 200px;">Resolution</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="tx in transactions" :key="tx.id" :class="{'row-selected': tx.selected}" class="cursor-pointer" @click="tx.selected = !tx.selected">
+                                    <td style="padding-left: 16px;"><input type="checkbox" v-model="tx.selected" @click.stop></td>
+                                    <td class="text-sm text-mono text-light">{{ tx.date }}</td>
+                                    <td class="text-sm font-medium">{{ tx.account }}</td>
+                                    <td class="text-sm text-light">{{ tx.category }}</td>
+                                    <td class="text-sm text-light italic">{{ tx.memo }}</td>
+                                    <td class="text-right text-mono" :class="tx.amount < 0 ? 'text-primary' : 'text-success'">{{ tx.amount.toFixed(2) }}</td>
+                                    <td style="padding-right: 24px;">
+                                        <select v-model="tx.resolution" class="input-underline text-sm" @click.stop :disabled="tx.selected">
+                                            <option value="">Select Action...</option>
+                                            <option value="expense">External Expense</option>
+                                            <option value="income">External Income</option>
+                                            <option value="adjustment">Balance Adjustment</option>
+                                            <option value="ignore">Ignore</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <transition name="slide-up">
+                        <div v-if="selectedIds.length === 2" class="action-bar">
+                            <span class="font-medium">2 Transactions Selected</span>
+                            <button @click="linkSelected" class="btn btn-sm" style="background: white; color: var(--c-primary);">Link as Transfer</button>
+                        </div>
+                    </transition>
+                </div>
+            `
+        };
+
+        const StepNWMappings = {
+            setup() { return { duplicates: MOCK_NET_WORTH_DUPLICATES }; },
+            template: `
+                <div class="max-w-4xl mx-auto mt-8">
+                    <h2 class="mb-2">Consolidate Net Worth</h2>
+                    <div class="card p-0 overflow-hidden">
+                        <table class="data-table">
+                            <thead><tr><th>Aspire Category</th><th>Dojo Account</th><th style="padding-right: 24px;">Strategy</th></tr></thead>
+                            <tbody><tr v-for="item in duplicates" :key="item.id"><td>{{ item.name }}</td><td class="text-light">{{ item.dojoAccount }}</td><td style="padding-right: 24px;"><span class="tag green">Merge</span></td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            `
+        };
+
+        const AccountCreationModal = {
+            props: ['isOpen'],
+            emits: ['close', 'created'],
+            setup(props, { emit }) {
+                const step = ref(1);
+                const type = ref('');
+                const form = reactive({ balance: 0, date: new Date().toISOString().slice(0, 10) });
+
+                const schemas = WIZARD_SCHEMAS;
+                const currentSchema = computed(() => type.value ? schemas[type.value] : null);
+
+                const selectType = (t) => { type.value = t; step.value = 2; };
+                
+                const canProceed = computed(() => {
+                    if (step.value === 1) return !!type.value;
+                    if (step.value === 2) {
+                        const firstFieldId = currentSchema.value?.fields[0]?.id;
+                        return !!form[firstFieldId];
+                    }
+                    if (step.value === 3) return !!form.date;
+                    return true;
+                });
+
+                const next = () => {
+                    if (step.value < 4) step.value++;
+                    else {
+                        emit('created', { 
+                            name: form[currentSchema.value.fields[0].id] || 'New Account', 
+                            type: currentSchema.value.label,
+                            balance: form.balance 
+                        });
+                        emit('close');
+                        step.value = 1; type.value = ''; Object.keys(form).forEach(k => { if(k!=='balance'&&k!=='date') delete form[k] }); form.balance=0;
+                    }
+                };
+
+                const back = () => { if (step.value > 1) step.value--; };
+
+                return { step, type, form, schemas, currentSchema, selectType, next, back, canProceed, emit };
+            },
+            template: `
+                <div v-if="isOpen" class="modal-overlay" @click.self="emit('close')">
+                    <div class="modal-content">
+                        <!-- HEADER -->
+                        <div class="p-6 border-b border-light flex justify-between items-center">
+                            <div>
+                                <div class="text-xs text-light font-mono uppercase tracking-wider mb-1">Account Onboarding</div>
+                                <h3 class="text-lg">{{ step === 1 ? 'Select Account Type' : (currentSchema ? currentSchema.title : 'Account Details') }}</h3>
+                            </div>
+                            <div class="flex gap-2">
+                                <div v-for="i in 4" :key="i" class="w-2 h-2 rounded-full transition-colors duration-300" :class="i <= step ? 'bg-primary' : 'bg-gray-200'"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- BODY -->
+                        <div class="p-6 flex-1 overflow-y-auto" style="min-height: 350px;">
+                            
+                            <!-- STEP 1: TYPE SELECTION -->
+                            <div v-if="step === 1">
+                                <p class="text-light mb-6 text-sm">Choose the category that best describes this asset or liability.</p>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div v-for="(schema, key) in schemas" :key="key" 
+                                        class="tile flex flex-col items-center justify-center p-6 text-center" 
+                                        :class="{'selected': type === key}"
+                                        @click="selectType(key)">
+                                        <i class="ph mb-3 text-3xl text-primary" :class="schema.icon"></i>
+                                        <span class="font-bold text-sm">{{ schema.label }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STEP 2: DYNAMIC FIELDS -->
+                            <div v-if="step === 2 && currentSchema" class="flex flex-col gap-4">
+                                <div v-for="field in currentSchema.fields" :key="field.id">
+                                    <div v-if="field.type === 'checkbox'">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" v-model="form[field.id]">
+                                            <span>{{ field.label }}</span>
+                                        </label>
+                                        <p v-if="field.helper" class="text-xs text-light ml-7 -mt-2">{{ field.helper }}</p>
+                                    </div>
+                                    <div v-else class="input-group mb-0">
+                                        <label>{{ field.label }}</label>
+                                        <select v-if="field.type === 'select'" v-model="form[field.id]" class="input-underline">
+                                            <option v-for="opt in field.options" :key="opt">{{ opt }}</option>
+                                        </select>
+                                        <input v-else :type="field.type" v-model="form[field.id]" class="input-underline" :placeholder="field.placeholder" :step="field.step" :list="field.list">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STEP 3: BALANCE -->
+                            <div v-if="step === 3 && currentSchema">
+                                <div class="input-group">
+                                    <label>{{ currentSchema.balanceLabel }}</label>
+                                    <input v-model="form.balance" type="number" step="0.01" class="input-underline text-3xl font-mono" placeholder="0.00">
+                                    <p v-if="currentSchema.balanceHelper" class="text-xs text-light mt-2">{{ currentSchema.balanceHelper }}</p>
+                                </div>
+                                <div class="input-group">
+                                    <label>As of Date</label>
+                                    <input v-model="form.date" type="date" class="input-underline">
+                                </div>
+                            </div>
+
+                            <!-- STEP 4: REVIEW -->
+                            <div v-if="step === 4 && currentSchema">
+                                <p class="text-light mb-6 text-sm">Review configuration before creating ledger entries.</p>
+                                <div class="bg-gray-50 border border-secondary rounded p-4 grid grid-cols-2 gap-4">
+                                    <div class="col-span-2 pb-2 border-b border-light flex justify-between">
+                                        <span class="text-xs uppercase text-light">Type</span>
+                                        <span class="font-medium">{{ currentSchema.label }}</span>
+                                    </div>
+                                    <div v-for="field in currentSchema.fields" :key="field.id" :class="field.type === 'checkbox' ? 'col-span-2' : ''">
+                                        <span class="block text-xs uppercase text-light mb-1">{{ field.label }}</span>
+                                        <span class="font-medium text-sm">{{ form[field.id] === true ? 'Yes' : (form[field.id] || '—') }}</span>
+                                    </div>
+                                    <div class="col-span-2 pt-2 border-t border-light mt-2">
+                                        <span class="block text-xs uppercase text-light mb-1">{{ currentSchema.balanceLabel }}</span>
+                                        <span class="text-2xl font-mono font-bold">{{ Number(form.balance).toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FOOTER -->
+                        <div class="p-4 border-t border-light flex justify-between bg-white rounded-b-lg">
+                            <button @click="back" class="btn btn-tertiary" :disabled="step === 1">Back</button>
+                            <button @click="next" class="btn btn-primary" :disabled="!canProceed">{{ step === 4 ? 'Create Account' : 'Next' }}</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepNWMigrate = {
+            components: { AccountCreationModal },
+            setup() {
+                const categories = reactive(MOCK_NET_WORTH_LEGACY);
+                const isWizardOpen = ref(false);
+                const activeCategory = ref(null);
+
+                const openWizard = (cat) => { activeCategory.value = cat; isWizardOpen.value = true; };
+                const addAccount = (acc) => {
+                    activeCategory.value.destinations.push({ id: Date.now(), name: acc.name, type: acc.type, balance: Number(acc.balance) });
+                };
+
+                const totalLegacy = computed(() => categories.reduce((sum, cat) => sum + Math.abs(cat.lastBalance), 0));
+                const totalMapped = computed(() => categories.reduce((sum, cat) => sum + cat.destinations.reduce((dSum, dest) => dSum + dest.balance, 0), 0));
+                const diff = computed(() => totalMapped.value - totalLegacy.value);
+
+                return { categories, totalLegacy, totalMapped, diff, isWizardOpen, openWizard, addAccount };
+            },
+            template: `
+                <div class="max-w-3xl mx-auto mt-8">
+                    <h2 class="mb-4">Migrate Net Worth</h2>
+                    <div class="summary-banner">
+                        <div class="summary-item"><div class="label">Total Legacy</div><div class="value">{{ totalLegacy.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                        <div class="summary-item"><div class="label">Total Mapped</div><div class="value">{{ totalMapped.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                        <div class="summary-item"><div class="label">Difference</div><div class="value" :style="{ color: Math.abs(diff) < 1 ? 'white' : '#FFCDD2' }">{{ diff > 0 ? '+' : '' }}{{ diff.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                    </div>
+
+                    <div v-for="cat in categories" :key="cat.id" class="migration-card">
+                        <div class="migration-header">
+                            <div><strong class="text-primary">{{ cat.name }}</strong><span class="text-sm text-light ml-2">Balance: {{ cat.lastBalance.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span></div>
+                            <span class="tag" :class="Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - Math.abs(cat.lastBalance)) < 1 ? 'green' : 'amber'">{{ Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - Math.abs(cat.lastBalance)) < 1 ? 'Matched' : 'Unbalanced' }}</span>
+                        </div>
+                        <div class="migration-body">
+                            <div v-for="dest in cat.destinations" :key="dest.id" class="account-destination-row">
+                                <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-success"></i><span class="font-medium text-sm">{{ dest.name }}</span><span class="text-xs text-light border border-secondary rounded px-1">{{ dest.type }}</span></div>
+                                <div class="text-mono text-sm">{{ dest.balance.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</div>
+                            </div>
+                            <button @click="openWizard(cat)" class="btn btn-secondary btn-sm w-full border-dashed mt-2">+ Add Destination Account</button>
+                        </div>
+                    </div>
+                    <AccountCreationModal :isOpen="isWizardOpen" @close="isWizardOpen=false" @created="addAccount" />
+                </div>
+            `
+        };
+
+        const StepValidate = {
+            template: `
+                <div class="max-w-4xl mx-auto mt-8">
+                    <h2 class="mb-2">Preview Migration</h2>
+                    <p class="text-light mb-6">Validation successful.</p>
+                    <div class="card p-6 mb-8">
+                        <h4 class="text-sm uppercase text-light mb-4">Net Worth History Comparison</h4>
+                        <svg viewBox="0 0 800 200" class="w-full h-48 overflow-visible"><line x1="0" y1="200" x2="800" y2="200" stroke="#E5E0D8" /><path d="M 0 100 L 200 120 L 400 80 L 600 110 L 800 90" fill="none" stroke="#ccc" stroke-width="2" stroke-dasharray="8 4" /><path d="M 0 100 L 200 125 L 400 75 L 600 115 L 800 85" fill="none" stroke="var(--c-primary)" stroke-width="2" /></svg>
+                    </div>
+                </div>
+            `
+        };
+
+        const StepSuccess = {
+            template: `<div class="max-w-md mx-auto mt-12 text-center slide-up-enter-active"><div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--c-primary)] text-white mb-6"><i class="ph-bold ph-check" style="font-size: 40px;"></i></div><h2 class="mb-4 text-2xl">Migration Complete</h2><button class="btn btn-primary w-full">Go to Dashboard</button></div>`
+        };
+
+        const App = {
+            components: { StepWelcome, StepOAuth, StepSheetPicker, StepExtraction, StepPreview, StepAccounts, StepEnvelopes, StepTransfers, StepNWMappings, StepNWMigrate, StepValidate, StepSuccess },
+            setup() {
+                const currentStep = ref(1);
+                const isExtracting = ref(false);
+                const extractionStatus = ref('');
+                const steps = [{ id: 1, title: 'Welcome' }, { id: 2, title: 'Connect' }, { id: 3, title: 'Source' }, { id: 4, title: 'Preview' }, { id: 5, title: 'Accounts' }, { id: 6, title: 'Envelopes' }, { id: 7, title: 'Transfers' }, { id: 8, title: 'Mappings' }, { id: 9, title: 'Migrate' }, { id: 10, title: 'Validate' }, { id: 11, title: 'Finish' }];
+                
+                const nextStep = () => { if(currentStep.value < 11) currentStep.value++; };
+                const prevStep = () => { if(currentStep.value > 1) currentStep.value--; };
+                const startExtraction = () => { isExtracting.value = true; let i = 0; const interval = setInterval(() => { if (i >= 5) { clearInterval(interval); isExtracting.value = false; currentStep.value = 4; } else { extractionStatus.value = ["Connecting...", "Reading...", "Parsing...", "Analyzing...", "Done"][i++]; } }, 800); };
+                
+                return { currentStep, steps, nextStep, prevStep, isExtracting, extractionStatus, startExtraction, progressWidth: computed(() => ((currentStep.value - 1) / 10) * 100 + '%') };
+            },
+            template: `
+                <div class="wizard-shell">
+                    <div class="wizard-header container">
+                        <div class="flex justify-between items-center"><div class="flex items-center gap-3"><div class="font-bold text-xl tracking-tight text-primary">Dojo</div><div class="h-4 w-px bg-gray-300"></div><div class="text-xs font-mono text-light tracking-widest uppercase">Onboarding</div></div><div class="text-xs text-light font-mono" v-if="!isExtracting && currentStep > 1 && currentStep < 11">Step {{ currentStep }} of 11</div></div>
+                        <div class="progress-bar" v-if="currentStep > 1 && currentStep < 11 && !isExtracting"><div class="progress-fill" :style="{ width: progressWidth }"></div></div>
+                    </div>
+                    <div class="wizard-content container">
+                        <transition name="fade" mode="out-in">
+                            <StepExtraction v-if="isExtracting" :status="extractionStatus" />
+                            <component v-else :is="['StepWelcome', 'StepOAuth', 'StepSheetPicker', 'StepPreview', 'StepAccounts', 'StepEnvelopes', 'StepTransfers', 'StepNWMappings', 'StepNWMigrate', 'StepValidate', 'StepSuccess'][currentStep-1]" @next="nextStep" @startExtraction="startExtraction" />
+                        </transition>
+                    </div>
+                    <div class="wizard-footer container" v-if="!isExtracting && currentStep < 11">
+                        <div class="flex justify-between items-center">
+                            <button v-if="currentStep > 1" @click="prevStep" class="btn btn-tertiary">Back</button><div v-else></div>
+                            <div class="flex gap-4 items-center"><span v-if="currentStep > 2" class="text-xs text-accent font-medium uppercase tracking-wider flex items-center gap-1"><i class="ph-fill ph-cloud-check"></i> Saved</span><button v-if="currentStep > 1" @click="nextStep" class="btn btn-primary" style="min-width: 120px;">{{ currentStep === 10 ? 'Apply Import' : (currentStep === 3 ? 'Extract Data' : 'Continue') }}</button></div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        createApp(App).mount('#app');
+    </script>
+</body>
+</html>
