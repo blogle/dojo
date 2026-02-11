@@ -186,11 +186,18 @@ Table columns:
 
 Allowed actions:
 
-- Inline edit row (category/memo) to resolve as non-transfer.
 - Select exactly two unresolved rows -> `Link as Transfer` action bar.
+- Resolve a single orphan only via system correction category selection:
+  - `opening_balance`
+  - `balance_adjustment`
+- Arbitrary budget-category remapping is not allowed for transfer exceptions.
 - `Undo` is available for resolved rows:
   - undo linked pair restores both rows to unresolved
-  - undo edited row restores original unresolved values
+  - undo system-category resolution restores unresolved state
+
+Guardrail:
+
+- Aspire reconciliation marker rows (`v_BreakSymbol`) are non-financial and must never be surfaced as transfer exceptions.
 
 Progress rule:
 

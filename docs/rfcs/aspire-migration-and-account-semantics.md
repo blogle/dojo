@@ -211,9 +211,13 @@ Transfer pairing invariant:
   Orphans break net worth neutrality and reconciliation.
 - Migration pairing rule (Aspire): auto-pair only when deterministic.
   - Default heuristic: same absolute amount, different accounts, and within a small date tolerance window (start with +/- 3 days).
-  - If a leg cannot be paired deterministically, it becomes a transfer exception that must be explicitly classified before apply:
-    - external inflow/outflow (pick a real budget category), or
-    - balance correction mapped to `opening_balance` / `balance_adjustment`.
+  - If a leg cannot be paired deterministically, it becomes a transfer exception that must be explicitly resolved before apply:
+    - link exactly two exception legs as one transfer concept (with undo), or
+    - map the orphan leg to a system correction category (`opening_balance` or `balance_adjustment`).
+
+Marker-row guardrail:
+
+- Aspire reconciliation break rows (`v_BreakSymbol`) are non-financial markers and must never appear as transfer exceptions.
 
 4) History must include retired/inactive entities (as-of correct)
 
@@ -835,8 +839,12 @@ Resumability:
 - Categories: create budget categories/groups; handle hidden/retired.
 - Transfers: detect transfer-category legs and auto-pair deterministically.
   - Use the pairing heuristic described in the invariant section (amount + date tolerance + account mismatch).
-  - Do not present a manual pairing UI.
-  - The "Apply import" step is blocked only by transfer exceptions (legs that could not be paired deterministically) until the user classifies them.
+  - Present a focused transfer-exceptions UI for unresolved legs only:
+    - allow linking exactly two unresolved legs as a transfer concept,
+    - allow mapping unresolved single legs only to `opening_balance` / `balance_adjustment`,
+    - allow undo for both resolution types.
+  - Do not allow arbitrary budget-category remapping for transfer exceptions.
+  - The "Apply import" step is blocked by unresolved transfer exceptions.
 
 ### Step 5: Map net worth domain
 
@@ -886,7 +894,7 @@ Budget parity (trust check):
 ### Step 7: Apply import
 
 - Apply is blocked until correctness-critical ambiguities are resolved:
-  - unmatched transfer candidates,
+  - unresolved transfer exceptions,
   - duplicate-mapping collisions,
   - and any net worth categories the user chose to include in Dojo-derived totals without an asset/debt classification.
 - Transactional apply: a single DB transaction across all phases; no partial commits.
