@@ -5,11 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dojo Migration Onboarding</title>
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
     <!-- Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
@@ -19,15 +14,17 @@
     <style>
         :root {
             /* Palette */
-            --c-primary: #3D2B1F;    /* Dark Brown */
-            --c-secondary: #8F7C6A;  /* Muted Brown */
-            --c-accent: #5F7161;     /* Muted Green */
-            --c-bg: #FDFBF7;         /* Off-White Paper */
-            --c-text: #2A2A2A;       /* Charcoal */
-            --c-text-light: #685E55; 
+            --c-primary: #333333;
+            --c-secondary: #e0e0e0;
+            --c-accent: #c7b299;
+            --c-bg: #fdfcfb;
+            --c-text: #333333;
+            --c-text-light: #8a8a8a;
             --c-surface: #FFFFFF;
-            --c-danger: #D15E5E;
-            --c-success: #5F7161;
+            --c-danger: #9c4843;
+            --c-success: #6b8e23;
+            --c-action: #5a6e5a;
+            --c-action-hover: #4a5c4a;
             
             /* Spacing */
             --s-1: 4px;
@@ -39,12 +36,12 @@
 
             /* Borders */
             --border-std: 1px solid var(--c-secondary);
-            --border-light: 1px solid rgba(143, 124, 106, 0.3);
+            --border-light: 1px solid #ece8e2;
 
             /* Typography */
-            --font-heading: 'Space Grotesk', sans-serif;
-            --font-body: 'Inter', sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --font-heading: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
 
         /* RESET & BASE */
@@ -63,7 +60,7 @@
 
         h1, h2, h3, h4 {
             font-family: var(--font-heading);
-            color: var(--c-primary);
+            color: var(--c-text);
             font-weight: 600;
         }
 
@@ -72,6 +69,29 @@
 
         /* UTILITIES */
         .container { max-width: 900px; margin: 0 auto; width: 100%; padding: 0 var(--s-4); }
+        .grid { display: grid; }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .max-w-md { max-width: 480px; }
+        .max-w-xl { max-width: 640px; }
+        .max-w-3xl { max-width: 768px; }
+        .max-w-4xl { max-width: 960px; }
+        .max-w-5xl { max-width: 1120px; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .h-full { height: 100%; }
+        .h-48 { height: 12rem; }
+        .h-20 { height: 5rem; }
+        .h-4 { height: 1rem; }
+        .h-2 { height: 0.5rem; }
+        .w-20 { width: 5rem; }
+        .w-px { width: 1px; }
+        .w-2 { width: 0.5rem; }
+        .block { display: block; }
+        .inline-flex { display: inline-flex; }
+        .flex-1 { flex: 1; }
+        .justify-end { justify-content: flex-end; }
+        .items-start { align-items: flex-start; }
+        .items-end { align-items: flex-end; }
         .flex { display: flex; }
         .flex-col { flex-direction: column; }
         .items-center { align-items: center; }
@@ -80,22 +100,82 @@
         .gap-2 { gap: var(--s-2); }
         .gap-3 { gap: 12px; }
         .gap-4 { gap: var(--s-4); }
+        .gap-6 { gap: var(--s-6); }
+        .gap-1 { gap: var(--s-1); }
         .mt-4 { margin-top: var(--s-4); }
+        .mt-2 { margin-top: var(--s-2); }
+        .mt-8 { margin-top: var(--s-5); }
+        .mt-12 { margin-top: var(--s-6); }
+        .-mt-2 { margin-top: -8px; }
         .mb-2 { margin-bottom: var(--s-2); }
+        .mb-1 { margin-bottom: var(--s-1); }
+        .mb-3 { margin-bottom: 12px; }
         .mb-4 { margin-bottom: var(--s-4); }
         .mb-6 { margin-bottom: 24px; }
         .mb-8 { margin-bottom: 32px; }
+        .mb-12 { margin-bottom: 48px; }
+        .mb-0 { margin-bottom: 0; }
+        .ml-2 { margin-left: var(--s-2); }
+        .ml-7 { margin-left: 28px; }
+        .p-0 { padding: 0; }
+        .p-3 { padding: 12px; }
+        .p-4 { padding: 16px; }
+        .p-6 { padding: 24px; }
+        .pb-2 { padding-bottom: var(--s-2); }
+        .pb-24 { padding-bottom: 96px; }
+        .pt-2 { padding-top: var(--s-2); }
+        .px-1 { padding-left: 4px; padding-right: 4px; }
+        .rounded { border-radius: 4px; }
+        .rounded-b-lg { border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+        .rounded-full { border-radius: 999px; }
+        .border { border: var(--border-light); }
+        .border-b { border-bottom: var(--border-light); }
+        .border-t { border-top: var(--border-light); }
+        .border-dashed { border-style: dashed; }
+        .border-light { border-color: #ece8e2; }
+        .border-secondary { border-color: var(--c-secondary); }
+        .border-primary { border-color: var(--c-primary); }
+        .border-b-2 { border-bottom: 2px solid; }
+        .col-span-2 { grid-column: span 2 / span 2; }
         .text-sm { font-size: 0.875rem; }
         .text-xs { font-size: 0.75rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-xl { font-size: 1.25rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .text-3xl { font-size: 1.875rem; }
         .text-mono { font-family: var(--font-mono); }
         .text-light { color: var(--c-text-light); }
         .text-accent { color: var(--c-accent); }
+        .text-primary { color: var(--c-primary); }
+        .text-success { color: var(--c-success); }
+        .text-white { color: #fff; }
         .font-bold { font-weight: 600; }
         .font-medium { font-weight: 500; }
+        .font-mono { font-family: var(--font-mono); }
         .w-full { width: 100%; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .overflow-hidden { overflow: hidden; }
+        .overflow-visible { overflow: visible; }
+        .overflow-y-auto { overflow-y: auto; }
+        .italic { font-style: italic; }
+        .uppercase { text-transform: uppercase; }
+        .tracking-tight { letter-spacing: -0.01em; }
+        .tracking-wider { letter-spacing: 0.06em; }
+        .tracking-widest { letter-spacing: 0.12em; }
+        .transition-colors { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+        .duration-300 { transition-duration: 0.3s; }
+        .bg-gray-50 { background: #faf7f1; }
+        .bg-gray-100 { background: #f2ece3; }
+        .bg-gray-200 { background: #ddd3c5; }
+        .bg-gray-300 { background: #c6b8a5; }
+        .bg-white { background: #fff; }
+        .bg-primary { background: var(--c-primary); }
+        .opacity-50 { opacity: 0.5; }
+        .opacity-60 { opacity: 0.6; }
+        .cursor-not-allowed { cursor: not-allowed; }
+        .cursor-pointer { cursor: pointer; }
+        .hover\:text-accent:hover { color: var(--c-accent); }
 
         /* COMPONENT: BUTTONS */
         .btn {
@@ -110,11 +190,11 @@
             border-radius: 4px;
         }
         .btn-primary {
-            background-color: var(--c-primary);
+            background-color: var(--c-action);
             color: var(--c-bg);
         }
         .btn-primary:hover:not(:disabled) {
-            background-color: var(--c-text);
+            background-color: var(--c-action-hover);
             transform: translateY(-1px);
         }
         .btn-primary:disabled {
@@ -126,7 +206,7 @@
             color: var(--c-primary);
         }
         .btn-secondary:hover {
-            background-color: rgba(61, 43, 31, 0.05);
+            background-color: rgba(90, 110, 90, 0.08);
         }
         .btn-tertiary {
             color: var(--c-text-light);
@@ -193,7 +273,6 @@
         }
         .tile:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             border-color: var(--c-primary);
         }
         .tile.selected {
@@ -220,7 +299,6 @@
             max-width: 600px;
             max-height: 90vh;
             overflow-y: auto;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             border: 1px solid var(--c-secondary);
             display: flex;
             flex-direction: column;
@@ -249,7 +327,7 @@
         .progress-fill {
             position: absolute;
             left: 0; top: 0; bottom: 0;
-            background: var(--c-primary);
+            background: var(--c-action);
             transition: width 0.4s ease;
             border-radius: 2px;
         }
@@ -292,6 +370,7 @@
         }
         .row-warning { background-color: #FFF8E1; }
         .row-selected { background-color: #E8F5E9; }
+        .row-resolved { background-color: #f3f8f3; }
 
         /* TAGS & PILLS */
         .tag {
@@ -311,26 +390,28 @@
 
         /* SUMMARY BANNER */
         .summary-banner {
-            background: var(--c-primary);
-            color: white;
+            background: #f4f3f1;
+            color: var(--c-text);
             padding: 24px;
             border-radius: 4px;
             display: flex;
             justify-content: space-around;
             text-align: center;
             margin-bottom: 32px;
+            border: var(--border-std);
         }
         .summary-item .label {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            opacity: 0.7;
+            color: var(--c-text-light);
             margin-bottom: 4px;
         }
         .summary-item .value {
             font-size: 20px;
             font-weight: 700;
             font-family: var(--font-mono);
+            color: var(--c-text);
         }
 
         /* SPINNER */
@@ -404,8 +485,42 @@
             display: flex;
             align-items: center;
             gap: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             z-index: 100;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border: var(--border-std);
+            cursor: help;
+            position: relative;
+        }
+        .status-badge.good { background: #edf3ed; color: #35553a; }
+        .status-badge.warn { background: #f8f1e7; color: #7d5a16; }
+        .status-badge.block { background: #f6e8e6; color: #863535; }
+
+        .wizard-logo {
+            font-family: var(--font-mono);
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--c-text);
+        }
+
+        .validation-note {
+            margin-top: 10px;
+            color: var(--c-danger);
+            font-size: 0.82rem;
+            border-left: 2px solid var(--c-danger);
+            padding-left: 8px;
         }
 
         /* ANIMATIONS */
@@ -460,18 +575,35 @@
             { id: 'e2', category: 'Rent', group: 'Fixed', status: 'Active', configType: 'Recurring', configDetails: 'Monthly', budgetAmount: 1800.00, activity: 0, budgeted: 1800.00, available: 1800.00 },
             { id: 'e3', category: 'Dining Out', group: 'Fun', status: 'Active', configType: 'Recurring', configDetails: 'Monthly', budgetAmount: 200.00, activity: -79.50, budgeted: 200.00, available: 120.50 },
             { id: 'e4', category: 'Emergency Fund', group: 'Savings', status: 'Active', configType: 'Target', configDetails: 'By Dec 2026', budgetAmount: 250.00, activity: 0, budgeted: 250.00, available: 12500.00 },
-            { id: 'e5', category: 'Old Car Repair', group: 'Hidden', status: 'Retired', configType: 'None', configDetails: '-', budgetAmount: 0, activity: 0, budgeted: 0, available: 0 },
+            { id: 'e5', category: 'Old Car Repair', group: 'Hidden', status: 'Retired', configType: 'None', configDetails: '-', budgetAmount: 75, activity: 0, budgeted: 0, available: 25 },
         ];
 
-        const MOCK_TRANSACTIONS = [
-            { id: 101, date: '2025-10-12', category: 'Uncategorized', account: 'Checking', amount: -500.00, memo: 'Transfer to unknown', selected: false, resolution: '' },
-            { id: 102, date: '2025-10-12', category: 'Uncategorized', account: 'Savings', amount: 500.00, memo: 'Deposit from Checking', selected: false, resolution: '' },
-            { id: 103, date: '2025-11-01', category: 'Auto-save', account: 'Checking', amount: -20.00, memo: 'Adjustment', selected: false, resolution: '' },
+        const MOCK_TRANSFER_EXCEPTIONS = [
+            { id: 101, date: '2025-10-12', category: 'Uncategorized', account: 'Checking', amount: -500.00, memo: 'Transfer to unknown', originalCategory: 'Uncategorized', originalMemo: 'Transfer to unknown', selected: false, resolved: false, editing: false, resolutionType: '', linkedGroupId: null },
+            { id: 102, date: '2025-10-12', category: 'Uncategorized', account: 'Savings', amount: 500.00, memo: 'Deposit from Checking', originalCategory: 'Uncategorized', originalMemo: 'Deposit from Checking', selected: false, resolved: false, editing: false, resolutionType: '', linkedGroupId: null },
+            { id: 103, date: '2025-11-01', category: 'Emergency Fund', account: 'Checking', amount: -20.00, memo: 'Monthly contribution', originalCategory: 'Uncategorized', originalMemo: 'Adjustment', selected: false, resolved: true, editing: false, resolutionType: 'edited', linkedGroupId: null },
         ];
 
         const MOCK_NET_WORTH_DUPLICATES = [
             { id: 'nw1', name: 'Chase Sapphire', dojoAccount: 'Chase Sapphire (Budget)', drift: -45.20, type: 'Duplicate', history: [1200, 1250, 1220, 1280, 1250] },
             { id: 'nw2', name: 'Wells Fargo', dojoAccount: 'Wells Fargo Checking', drift: 0.00, type: 'Duplicate', history: [4000, 4200, 4100, 4500, 4520] },
+        ];
+
+        const MOCK_DUPLICATE_MAPPINGS = [
+            {
+                id: 'map-1',
+                budgetAccount: 'Wells Fargo Checking',
+                netWorthAccount: 'Wells Fargo',
+                strategy: 'merge',
+                reason: 'Normalized name exact match'
+            },
+            {
+                id: 'map-2',
+                budgetAccount: 'Chase Sapphire',
+                netWorthAccount: 'Chase Sapphire',
+                strategy: 'merge',
+                reason: 'Exact label and overlapping marks'
+            }
         ];
 
         const MOCK_NET_WORTH_LEGACY = [
@@ -576,10 +708,10 @@
                     <h2 class="text-3xl mb-2 text-center">Welcome to Dojo</h2>
                     <p class="text-light mb-12 text-center">How would you like to set up your new financial home?</p>
                     <div class="grid grid-cols-2 gap-6 w-full">
-                        <div class="tile opacity-60 cursor-not-allowed">
+                        <div class="tile" @click="$emit('startFresh')">
                             <div class="mb-4 text-light"><i class="ph ph-plant" style="font-size: 32px;"></i></div>
                             <h3 class="mb-2">Start Fresh</h3>
-                            <p class="text-sm text-light">Create a clean slate.</p>
+                            <p class="text-sm text-light">Skip migration and start with an empty workspace.</p>
                         </div>
                         <div class="tile selected" @click="$emit('next')">
                             <div class="mb-4 text-accent"><i class="ph ph-arrows-left-right" style="font-size: 32px;"></i></div>
@@ -595,7 +727,7 @@
             template: `
                 <div class="flex flex-col items-center text-center justify-center h-full max-w-md mx-auto slide-up-enter-active">
                     <h2 class="mb-4">Connect Google Drive</h2>
-                    <p class="text-light mb-8">We need read-only access to your Aspire spreadsheet.</p>
+                    <p class="text-light mb-8">We request read-only access to locate your Aspire sheet and extract named ranges only. OAuth tokens stay in memory and are never written to disk.</p>
                     <div class="card w-full flex flex-col gap-4">
                         <button @click="$emit('next')" class="btn btn-primary w-full gap-2"><i class="ph-bold ph-google-logo"></i>Connect Google Account</button>
                     </div>
@@ -604,23 +736,26 @@
         };
 
         const StepSheetPicker = {
+            props: ['sheetUrl', 'sheetError'],
+            emits: ['update-sheet-url'],
             setup(props, { emit }) {
-                const url = ref('');
-                const isValid = computed(() => url.value.includes('docs.google.com/spreadsheets'));
-                return { url, isValid, handleNext: () => isValid.value && emit('startExtraction') };
+                const isValid = computed(() => /docs\.google\.com\/spreadsheets\/d\//.test(props.sheetUrl || ''));
+                const updateUrl = (event) => emit('update-sheet-url', event.target.value);
+                return { isValid, updateUrl };
             },
             template: `
                 <div class="max-w-xl mx-auto mt-8">
                     <h2 class="mb-2">Which sheet are we using?</h2>
+                    <p class="text-light mb-6">Paste the Google Sheets URL for your Aspire workbook.</p>
                     <div class="input-group mb-8">
                         <label>Spreadsheet URL</label>
-                        <input v-model="url" type="text" class="input-underline" placeholder="https://docs.google.com/spreadsheets/d/...">
+                        <input :value="sheetUrl" @input="updateUrl" type="text" class="input-underline" placeholder="https://docs.google.com/spreadsheets/d/...">
                     </div>
-                    <div v-if="isValid" class="card flex items-center gap-4 mb-4" style="border-color: var(--c-accent); background: #f0fdf4;">
+                    <div v-if="isValid" class="card flex items-center gap-4 mb-4" style="border-color: var(--c-primary); background: #edf3ed;">
                         <i class="ph-fill ph-check-circle" style="color: var(--c-accent); font-size: 24px;"></i>
                         <div class="text-sm">Valid Sheet Detected</div>
                     </div>
-                    <div class="flex justify-end"><button @click="handleNext" :disabled="!isValid" :class="['btn btn-primary', !isValid ? 'opacity-50' : '']">Extract Data</button></div>
+                    <p v-if="sheetError" class="validation-note">{{ sheetError }}</p>
                 </div>
             `
         };
@@ -756,11 +891,11 @@
             },
             template: `
                 <div class="max-w-5xl mx-auto mt-8">
-                    <h2 class="mb-2">Budget Envelopes</h2>
-                    <p class="text-light mb-6">Review your envelope configurations.</p>
+                    <h2 class="mb-2">Budget Categories</h2>
+                    <p class="text-light mb-6">Review active and retired categories before continuing.</p>
 
-                    <div v-for="(list, title) in { 'Active Envelopes': activeEnvelopes, 'Retired Envelopes': retiredEnvelopes }" :key="title" class="mb-8">
-                        <h3 class="mb-3 text-sm font-bold uppercase text-light">{{ title }}</h3>
+                    <div class="mb-8">
+                        <h3 class="mb-3 text-sm font-bold uppercase text-light">Active Budgets</h3>
                         <div class="card p-0 overflow-hidden">
                             <table class="data-table">
                                 <thead>
@@ -774,17 +909,39 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="env in list" :key="env.id">
+                                    <tr v-for="env in activeEnvelopes" :key="env.id">
                                         <td class="font-medium">{{ env.category }}</td>
                                         <td class="text-sm text-light">{{ env.group }}</td>
                                         <td class="text-xs text-light">{{ env.configType === 'None' ? '-' : env.configType + ' (' + env.configDetails + ')' }}</td>
                                         <td class="text-right text-mono text-sm">{{ env.budgetAmount.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
-                                        <td class="text-right text-mono font-bold" style="padding-right: 24px;">
-                                            <span class="tooltip-trigger" :data-tooltip="'Activity: ' + env.activity + '\\nBudgeted: ' + env.budgeted">
+                                        <td class="text-right text-mono font-bold" style="padding-right: 24px; text-decoration: underline; text-underline-offset: 2px;">
+                                            <span class="tooltip-trigger" :data-tooltip="'This month activity: ' + env.activity.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) + '\\nThis month budgeted: ' + env.budgeted.toLocaleString('en-US', {style: 'currency', currency: 'USD'})">
                                                 {{ env.available.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}
                                             </span>
                                         </td>
-                                        <td><button @click="openEdit(env)" class="text-primary hover:text-accent"><i class="ph-bold ph-pencil-simple"></i></button></td>
+                                        <td><button @click="openEdit(env)" class="text-primary hover:text-accent" title="Edit category"><i class="ph-bold ph-pencil-simple"></i></button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="mb-3 text-sm font-bold uppercase text-light">Retired Budgets</h3>
+                        <div class="card p-0 overflow-hidden">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th class="text-right">Configured Budget (Last)</th>
+                                        <th class="text-right" style="padding-right: 24px;">Available Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="env in retiredEnvelopes" :key="env.id">
+                                        <td class="font-medium">{{ env.category }}</td>
+                                        <td class="text-right text-mono text-sm">{{ env.budgetAmount.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
+                                        <td class="text-right text-mono font-medium" style="padding-right: 24px;" :class="Math.abs(env.available) > 0 ? 'text-primary' : 'text-light'">{{ env.available.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -796,23 +953,80 @@
         };
 
         const StepTransfers = {
-            setup() {
-                const transactions = ref(MOCK_TRANSACTIONS);
-                const selectedIds = computed(() => transactions.value.filter(t => t.selected).map(t => t.id));
-                
+            props: ['transactions'],
+            setup(props, { emit }) {
+                const selectedIds = computed(() => props.transactions.filter(t => t.selected && !t.resolved).map(t => t.id));
+                const unresolvedCount = computed(() => props.transactions.filter(t => !t.resolved).length);
+
+                const syncStatus = () => emit('transfers-status', unresolvedCount.value);
+
                 const linkSelected = () => {
-                    alert(`Linking transaction IDs: ${selectedIds.value.join(' & ')}`);
-                    // Mock removal
-                    transactions.value = transactions.value.filter(t => !t.selected);
+                    const groupId = `grp-${Date.now()}`;
+                    props.transactions.forEach((tx) => {
+                        if (tx.selected && !tx.resolved) {
+                            tx.resolved = true;
+                            tx.resolutionType = 'linked';
+                            tx.linkedGroupId = groupId;
+                            tx.selected = false;
+                            tx.editing = false;
+                        }
+                    });
+                    syncStatus();
                 };
 
-                return { transactions, selectedIds, linkSelected };
+                const openEdit = (tx) => {
+                    if (tx.resolutionType === 'linked') return;
+                    tx.editing = true;
+                };
+
+                const saveEdit = (tx) => {
+                    tx.editing = false;
+                    if (tx.resolutionType === 'linked') {
+                        syncStatus();
+                        return;
+                    }
+                    if (tx.category !== 'Uncategorized') {
+                        tx.resolved = true;
+                        tx.resolutionType = 'edited';
+                        tx.linkedGroupId = null;
+                        tx.selected = false;
+                    } else {
+                        tx.resolved = false;
+                        tx.resolutionType = '';
+                    }
+                    syncStatus();
+                };
+
+                const undoResolution = (tx) => {
+                    if (tx.resolutionType === 'linked' && tx.linkedGroupId) {
+                        props.transactions.forEach((row) => {
+                            if (row.linkedGroupId === tx.linkedGroupId) {
+                                row.resolved = false;
+                                row.resolutionType = '';
+                                row.linkedGroupId = null;
+                                row.selected = false;
+                            }
+                        });
+                    } else {
+                        tx.resolved = false;
+                        tx.resolutionType = '';
+                        tx.category = tx.originalCategory || 'Uncategorized';
+                        tx.memo = tx.originalMemo || '';
+                        tx.linkedGroupId = null;
+                        tx.selected = false;
+                    }
+                    syncStatus();
+                };
+
+                onMounted(syncStatus);
+
+                return { selectedIds, unresolvedCount, linkSelected, openEdit, saveEdit, undoResolution };
             },
             template: `
                 <div class="max-w-5xl mx-auto mt-8 pb-24">
                     <div class="flex justify-between items-start mb-6">
-                        <div><h2 class="mb-2">Transfer Exceptions</h2><p class="text-light">Unpaired transfer legs. Select two to link them manually, or classify individually.</p></div>
-                        <div class="tag amber">Action Required</div>
+                        <div><h2 class="mb-2">Transfer Exceptions</h2><p class="text-light">Resolve orphan transfer legs by editing category/memo or linking two rows as one transfer concept.</p></div>
+                        <div :class="unresolvedCount === 0 ? 'tag green' : 'tag amber'">{{ unresolvedCount === 0 ? 'Resolved' : 'Action Required' }}</div>
                     </div>
 
                     <div class="card p-0 overflow-hidden">
@@ -825,25 +1039,29 @@
                                     <th>Category</th>
                                     <th>Memo</th>
                                     <th class="text-right">Amount</th>
-                                    <th style="padding-right: 24px; width: 200px;">Resolution</th>
+                                    <th style="padding-right: 24px; width: 170px;">State</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="tx in transactions" :key="tx.id" :class="{'row-selected': tx.selected}" class="cursor-pointer" @click="tx.selected = !tx.selected">
-                                    <td style="padding-left: 16px;"><input type="checkbox" v-model="tx.selected" @click.stop></td>
+                                <tr v-for="tx in transactions" :key="tx.id" :class="{'row-selected': tx.selected, 'row-warning': tx.editing, 'row-resolved': tx.resolved}" class="cursor-pointer" @click="openEdit(tx)">
+                                    <td style="padding-left: 16px;"><input type="checkbox" v-model="tx.selected" @click.stop :disabled="tx.resolved"></td>
                                     <td class="text-sm text-mono text-light">{{ tx.date }}</td>
                                     <td class="text-sm font-medium">{{ tx.account }}</td>
-                                    <td class="text-sm text-light">{{ tx.category }}</td>
-                                    <td class="text-sm text-light italic">{{ tx.memo }}</td>
-                                    <td class="text-right text-mono" :class="tx.amount < 0 ? 'text-primary' : 'text-success'">{{ tx.amount.toFixed(2) }}</td>
+                                    <td class="text-sm text-light">
+                                        <input v-if="tx.editing" v-model="tx.category" class="input-underline" @blur="saveEdit(tx)" @keyup.enter="saveEdit(tx)">
+                                        <span v-else>{{ tx.category }}</span>
+                                    </td>
+                                    <td class="text-sm text-light italic">
+                                        <input v-if="tx.editing" v-model="tx.memo" class="input-underline" @blur="saveEdit(tx)" @keyup.enter="saveEdit(tx)">
+                                        <span v-else>{{ tx.memo }}</span>
+                                    </td>
+                                    <td class="text-right text-mono" :class="tx.amount < 0 ? 'text-primary' : 'text-success'">{{ tx.amount.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</td>
                                     <td style="padding-right: 24px;">
-                                        <select v-model="tx.resolution" class="input-underline text-sm" @click.stop :disabled="tx.selected">
-                                            <option value="">Select Action...</option>
-                                            <option value="expense">External Expense</option>
-                                            <option value="income">External Income</option>
-                                            <option value="adjustment">Balance Adjustment</option>
-                                            <option value="ignore">Ignore</option>
-                                        </select>
+                                        <div class="flex items-center gap-2 justify-end">
+                                            <span v-if="tx.resolved" class="tag green">{{ tx.resolutionType === 'linked' ? 'Linked' : 'Edited' }}</span>
+                                            <span v-else class="tag gray">Open</span>
+                                            <button v-if="tx.resolved" class="btn btn-sm btn-tertiary" @click.stop="undoResolution(tx)">Undo</button>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -861,14 +1079,36 @@
         };
 
         const StepNWMappings = {
-            setup() { return { duplicates: MOCK_NET_WORTH_DUPLICATES }; },
+            props: ['mappings'],
             template: `
                 <div class="max-w-4xl mx-auto mt-8">
-                    <h2 class="mb-2">Consolidate Net Worth</h2>
+                    <h2 class="mb-2">Link Overlapping Accounts</h2>
+                    <p class="text-light mb-6">Pair budget accounts with matching Aspire net worth entries so each real account is counted once.</p>
                     <div class="card p-0 overflow-hidden">
                         <table class="data-table">
-                            <thead><tr><th>Aspire Category</th><th>Dojo Account</th><th style="padding-right: 24px;">Strategy</th></tr></thead>
-                            <tbody><tr v-for="item in duplicates" :key="item.id"><td>{{ item.name }}</td><td class="text-light">{{ item.dojoAccount }}</td><td style="padding-right: 24px;"><span class="tag green">Merge</span></td></tr></tbody>
+                            <thead>
+                                <tr>
+                                    <th>Budget Account</th>
+                                    <th>Aspire Net Worth Account</th>
+                                    <th>Reason</th>
+                                    <th style="padding-right: 24px;">Strategy</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in mappings" :key="item.id">
+                                    <td class="font-medium">{{ item.budgetAccount }}</td>
+                                    <td>
+                                        <input v-model="item.netWorthAccount" class="input-underline" aria-label="Aspire account mapping">
+                                    </td>
+                                    <td class="text-xs text-light">{{ item.reason }}</td>
+                                    <td style="padding-right: 24px;">
+                                        <select v-model="item.strategy" class="input-underline">
+                                            <option value="merge">Merge (recommended)</option>
+                                            <option value="legacy_only">Keep Legacy Marks Only</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -882,11 +1122,45 @@
                 const step = ref(1);
                 const type = ref('');
                 const form = reactive({ balance: 0, date: new Date().toISOString().slice(0, 10) });
+                const positions = ref([{ id: 'p1', symbol: '', quantity: 0, price: 0, costBasis: 0 }]);
 
                 const schemas = WIZARD_SCHEMAS;
                 const currentSchema = computed(() => type.value ? schemas[type.value] : null);
 
-                const selectType = (t) => { type.value = t; step.value = 2; };
+                const holdingsTotal = computed(() => positions.value.reduce((sum, pos) => sum + (Number(pos.quantity) || 0) * (Number(pos.price) || 0), 0));
+                const totalAccountValue = computed(() => Number(form.balance || 0) + holdingsTotal.value);
+
+                const selectType = (t) => {
+                    type.value = t;
+                    step.value = 2;
+                    if (t !== 'investment') positions.value = [{ id: 'p1', symbol: '', quantity: 0, price: 0, costBasis: 0 }];
+                };
+
+                const addPosition = () => {
+                    positions.value.push({
+                        id: `p-${Date.now()}`,
+                        symbol: '',
+                        quantity: 0,
+                        price: 0,
+                        costBasis: 0
+                    });
+                };
+
+                const removePosition = (id) => {
+                    positions.value = positions.value.filter((pos) => pos.id !== id);
+                    if (positions.value.length === 0) addPosition();
+                };
+
+                const resetWizard = () => {
+                    step.value = 1;
+                    type.value = '';
+                    Object.keys(form).forEach((k) => {
+                        if (k !== 'balance' && k !== 'date') delete form[k];
+                    });
+                    form.balance = 0;
+                    form.date = new Date().toISOString().slice(0, 10);
+                    positions.value = [{ id: 'p1', symbol: '', quantity: 0, price: 0, costBasis: 0 }];
+                };
                 
                 const canProceed = computed(() => {
                     if (step.value === 1) return !!type.value;
@@ -894,29 +1168,63 @@
                         const firstFieldId = currentSchema.value?.fields[0]?.id;
                         return !!form[firstFieldId];
                     }
-                    if (step.value === 3) return !!form.date;
+                    if (step.value === 3) {
+                        if (!form.date) return false;
+                        if (type.value === 'investment') return totalAccountValue.value > 0;
+                        return true;
+                    }
                     return true;
                 });
 
                 const next = () => {
                     if (step.value < 4) step.value++;
                     else {
+                        const filledPositions = positions.value
+                            .filter((pos) => pos.symbol && Number(pos.quantity) > 0)
+                            .map((pos) => ({
+                                symbol: pos.symbol.toUpperCase(),
+                                quantity: Number(pos.quantity),
+                                price: Number(pos.price),
+                                costBasis: Number(pos.costBasis || 0)
+                            }));
+
                         emit('created', { 
                             name: form[currentSchema.value.fields[0].id] || 'New Account', 
                             type: currentSchema.value.label,
-                            balance: form.balance 
+                            classKey: type.value,
+                            balance: type.value === 'investment' ? Number(totalAccountValue.value) : Number(form.balance),
+                            cashBalance: Number(form.balance),
+                            holdingsValue: holdingsTotal.value,
+                            positions: filledPositions
                         });
                         emit('close');
-                        step.value = 1; type.value = ''; Object.keys(form).forEach(k => { if(k!=='balance'&&k!=='date') delete form[k] }); form.balance=0;
+                        resetWizard();
                     }
                 };
 
                 const back = () => { if (step.value > 1) step.value--; };
 
-                return { step, type, form, schemas, currentSchema, selectType, next, back, canProceed, emit };
+                return {
+                    step,
+                    type,
+                    form,
+                    positions,
+                    holdingsTotal,
+                    totalAccountValue,
+                    schemas,
+                    currentSchema,
+                    selectType,
+                    addPosition,
+                    removePosition,
+                    next,
+                    back,
+                    canProceed,
+                    emit,
+                    resetWizard
+                };
             },
             template: `
-                <div v-if="isOpen" class="modal-overlay" @click.self="emit('close')">
+                <div v-if="isOpen" class="modal-overlay" @click.self="resetWizard(); emit('close')">
                     <div class="modal-content">
                         <!-- HEADER -->
                         <div class="p-6 border-b border-light flex justify-between items-center">
@@ -973,6 +1281,40 @@
                                     <input v-model="form.balance" type="number" step="0.01" class="input-underline text-3xl font-mono" placeholder="0.00">
                                     <p v-if="currentSchema.balanceHelper" class="text-xs text-light mt-2">{{ currentSchema.balanceHelper }}</p>
                                 </div>
+                                <div v-if="type === 'investment'" class="card mt-4 p-4">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h4 class="text-sm">Positions / Lots</h4>
+                                        <button class="btn btn-sm btn-secondary" @click="addPosition">+ Add Position</button>
+                                    </div>
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Ticker</th>
+                                                <th class="text-right">Quantity</th>
+                                                <th class="text-right">Price</th>
+                                                <th class="text-right">Cost Basis</th>
+                                                <th style="width: 52px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="pos in positions" :key="pos.id">
+                                                <td><input v-model="pos.symbol" class="input-underline" placeholder="VTI"></td>
+                                                <td class="text-right"><input v-model="pos.quantity" type="number" step="0.0001" class="input-underline text-right" placeholder="0"></td>
+                                                <td class="text-right"><input v-model="pos.price" type="number" step="0.01" class="input-underline text-right" placeholder="0.00"></td>
+                                                <td class="text-right"><input v-model="pos.costBasis" type="number" step="0.01" class="input-underline text-right" placeholder="Optional"></td>
+                                                <td><button class="btn btn-sm btn-tertiary" @click="removePosition(pos.id)"><i class="ph ph-trash"></i></button></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <div class="mt-4 flex justify-between items-center">
+                                        <span class="text-sm text-light">Holdings value</span>
+                                        <span class="text-mono font-medium">{{ holdingsTotal.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
+                                    </div>
+                                    <div class="mt-2 flex justify-between items-center">
+                                        <span class="text-sm text-light">Total account value (cash + holdings)</span>
+                                        <span class="text-mono font-bold">{{ totalAccountValue.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
+                                    </div>
+                                </div>
                                 <div class="input-group">
                                     <label>As of Date</label>
                                     <input v-model="form.date" type="date" class="input-underline">
@@ -981,7 +1323,7 @@
 
                             <!-- STEP 4: REVIEW -->
                             <div v-if="step === 4 && currentSchema">
-                                <p class="text-light mb-6 text-sm">Review configuration before creating ledger entries.</p>
+                                <p class="text-light mb-6 text-sm">Review configuration before creating this account.</p>
                                 <div class="bg-gray-50 border border-secondary rounded p-4 grid grid-cols-2 gap-4">
                                     <div class="col-span-2 pb-2 border-b border-light flex justify-between">
                                         <span class="text-xs uppercase text-light">Type</span>
@@ -994,6 +1336,11 @@
                                     <div class="col-span-2 pt-2 border-t border-light mt-2">
                                         <span class="block text-xs uppercase text-light mb-1">{{ currentSchema.balanceLabel }}</span>
                                         <span class="text-2xl font-mono font-bold">{{ Number(form.balance).toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
+                                    </div>
+                                    <div v-if="type === 'investment'" class="col-span-2 pt-2 border-t border-light mt-2">
+                                        <span class="block text-xs uppercase text-light mb-1">Positions</span>
+                                        <span class="font-medium text-sm">{{ positions.filter((p) => p.symbol && Number(p.quantity) > 0).length }} holdings · {{ holdingsTotal.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
+                                        <span class="block text-2xl font-mono font-bold mt-2">{{ totalAccountValue.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1011,39 +1358,52 @@
 
         const StepNWMigrate = {
             components: { AccountCreationModal },
-            setup() {
-                const categories = reactive(MOCK_NET_WORTH_LEGACY);
+            props: ['categories'],
+            setup(props) {
                 const isWizardOpen = ref(false);
                 const activeCategory = ref(null);
 
-                const openWizard = (cat) => { activeCategory.value = cat; isWizardOpen.value = true; };
-                const addAccount = (acc) => {
-                    activeCategory.value.destinations.push({ id: Date.now(), name: acc.name, type: acc.type, balance: Number(acc.balance) });
+                const signedBalance = (classKey, amount) => {
+                    const raw = Math.abs(Number(amount || 0));
+                    return classKey === 'loan' || classKey === 'credit' ? -raw : raw;
                 };
 
-                const totalLegacy = computed(() => categories.reduce((sum, cat) => sum + Math.abs(cat.lastBalance), 0));
-                const totalMapped = computed(() => categories.reduce((sum, cat) => sum + cat.destinations.reduce((dSum, dest) => dSum + dest.balance, 0), 0));
+                const openWizard = (cat) => { activeCategory.value = cat; isWizardOpen.value = true; };
+                const addAccount = (acc) => {
+                    activeCategory.value.destinations.push({
+                        id: Date.now(),
+                        name: acc.name,
+                        type: acc.type,
+                        classKey: acc.classKey,
+                        balance: signedBalance(acc.classKey, acc.balance),
+                        positionsCount: Array.isArray(acc.positions) ? acc.positions.length : 0
+                    });
+                };
+
+                const totalLegacy = computed(() => props.categories.reduce((sum, cat) => sum + cat.lastBalance, 0));
+                const totalMapped = computed(() => props.categories.reduce((sum, cat) => sum + cat.destinations.reduce((dSum, dest) => dSum + dest.balance, 0), 0));
                 const diff = computed(() => totalMapped.value - totalLegacy.value);
 
-                return { categories, totalLegacy, totalMapped, diff, isWizardOpen, openWizard, addAccount };
+                return { categories: props.categories, totalLegacy, totalMapped, diff, isWizardOpen, openWizard, addAccount };
             },
             template: `
                 <div class="max-w-3xl mx-auto mt-8">
-                    <h2 class="mb-4">Migrate Net Worth</h2>
+                    <h2 class="mb-2">Net Worth Accounts</h2>
+                    <p class="text-light mb-6">For remaining net worth entries, create destination accounts and set starting values. For investment accounts, include cash and holdings so performance starts from the right value.</p>
                     <div class="summary-banner">
-                        <div class="summary-item"><div class="label">Total Legacy</div><div class="value">{{ totalLegacy.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
-                        <div class="summary-item"><div class="label">Total Mapped</div><div class="value">{{ totalMapped.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
-                        <div class="summary-item"><div class="label">Difference</div><div class="value" :style="{ color: Math.abs(diff) < 1 ? 'white' : '#FFCDD2' }">{{ diff > 0 ? '+' : '' }}{{ diff.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                        <div class="summary-item"><div class="label">Last Reported Net Worth</div><div class="value">{{ totalLegacy.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                        <div class="summary-item"><div class="label">Derived Net Worth</div><div class="value">{{ totalMapped.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
+                        <div class="summary-item"><div class="label">Difference</div><div class="value" :style="{ color: Math.abs(diff) < 1 ? 'var(--c-text)' : 'var(--c-danger)' }">{{ diff > 0 ? '+' : '' }}{{ diff.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}) }}</div></div>
                     </div>
 
                     <div v-for="cat in categories" :key="cat.id" class="migration-card">
                         <div class="migration-header">
                             <div><strong class="text-primary">{{ cat.name }}</strong><span class="text-sm text-light ml-2">Balance: {{ cat.lastBalance.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</span></div>
-                            <span class="tag" :class="Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - Math.abs(cat.lastBalance)) < 1 ? 'green' : 'amber'">{{ Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - Math.abs(cat.lastBalance)) < 1 ? 'Matched' : 'Unbalanced' }}</span>
+                            <span class="tag" :class="Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - cat.lastBalance) < 1 ? 'green' : 'amber'">{{ Math.abs(cat.destinations.reduce((s,d)=>s+d.balance,0) - cat.lastBalance) < 1 ? 'Matched' : 'Unbalanced' }}</span>
                         </div>
                         <div class="migration-body">
                             <div v-for="dest in cat.destinations" :key="dest.id" class="account-destination-row">
-                                <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-success"></i><span class="font-medium text-sm">{{ dest.name }}</span><span class="text-xs text-light border border-secondary rounded px-1">{{ dest.type }}</span></div>
+                                <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-success"></i><span class="font-medium text-sm">{{ dest.name }}</span><span class="text-xs text-light border border-secondary rounded px-1">{{ dest.type }}</span><span v-if="dest.positionsCount > 0" class="text-xs text-light">{{ dest.positionsCount }} positions</span></div>
                                 <div class="text-mono text-sm">{{ dest.balance.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}</div>
                             </div>
                             <button @click="openWizard(cat)" class="btn btn-secondary btn-sm w-full border-dashed mt-2">+ Add Destination Account</button>
@@ -1055,10 +1415,18 @@
         };
 
         const StepValidate = {
+            props: ['unresolvedTransfers'],
             template: `
                 <div class="max-w-4xl mx-auto mt-8">
                     <h2 class="mb-2">Preview Migration</h2>
-                    <p class="text-light mb-6">Validation successful.</p>
+                    <p class="text-light mb-6">Compare Aspire marks and Dojo-derived net worth before applying migration.</p>
+                    <div class="card p-4 mb-6">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">Transfer exceptions resolved</span>
+                            <span :class="unresolvedTransfers === 0 ? 'tag green' : 'tag amber'">{{ unresolvedTransfers === 0 ? 'Pass' : unresolvedTransfers + ' open' }}</span>
+                        </div>
+                        <p class="text-xs text-light mt-2">Apply is blocked until all orphan transfer legs are resolved.</p>
+                    </div>
                     <div class="card p-6 mb-8">
                         <h4 class="text-sm uppercase text-light mb-4">Net Worth History Comparison</h4>
                         <svg viewBox="0 0 800 200" class="w-full h-48 overflow-visible"><line x1="0" y1="200" x2="800" y2="200" stroke="#E5E0D8" /><path d="M 0 100 L 200 120 L 400 80 L 600 110 L 800 90" fill="none" stroke="#ccc" stroke-width="2" stroke-dasharray="8 4" /><path d="M 0 100 L 200 125 L 400 75 L 600 115 L 800 85" fill="none" stroke="var(--c-primary)" stroke-width="2" /></svg>
@@ -1068,39 +1436,176 @@
         };
 
         const StepSuccess = {
-            template: `<div class="max-w-md mx-auto mt-12 text-center slide-up-enter-active"><div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--c-primary)] text-white mb-6"><i class="ph-bold ph-check" style="font-size: 40px;"></i></div><h2 class="mb-4 text-2xl">Migration Complete</h2><button class="btn btn-primary w-full">Go to Dashboard</button></div>`
+            template: `<div class="max-w-md mx-auto mt-12 text-center slide-up-enter-active"><div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary text-white mb-6"><i class="ph-bold ph-check" style="font-size: 40px;"></i></div><h2 class="mb-4 text-2xl">Migration Complete</h2><p class="text-light mb-6">Your Aspire data is now in Dojo. Open the dashboard to review follow-up tasks and reconciliations.</p><button class="btn btn-primary w-full">Go to Dashboard</button></div>`
         };
 
         const App = {
             components: { StepWelcome, StepOAuth, StepSheetPicker, StepExtraction, StepPreview, StepAccounts, StepEnvelopes, StepTransfers, StepNWMappings, StepNWMigrate, StepValidate, StepSuccess },
             setup() {
+                const STORAGE_KEY = 'dojo_aspire_onboarding_mockup_v3';
                 const currentStep = ref(1);
                 const isExtracting = ref(false);
+                const isApplying = ref(false);
                 const extractionStatus = ref('');
-                const steps = [{ id: 1, title: 'Welcome' }, { id: 2, title: 'Connect' }, { id: 3, title: 'Source' }, { id: 4, title: 'Preview' }, { id: 5, title: 'Accounts' }, { id: 6, title: 'Envelopes' }, { id: 7, title: 'Transfers' }, { id: 8, title: 'Mappings' }, { id: 9, title: 'Migrate' }, { id: 10, title: 'Validate' }, { id: 11, title: 'Finish' }];
-                
+                const sheetUrl = ref('');
+                const sheetError = ref('');
+                const transferRows = ref(JSON.parse(JSON.stringify(MOCK_TRANSFER_EXCEPTIONS)));
+                const mappings = ref(JSON.parse(JSON.stringify(MOCK_DUPLICATE_MAPPINGS)));
+                const nwCategories = ref(JSON.parse(JSON.stringify(MOCK_NET_WORTH_LEGACY)));
+                const unresolvedTransfers = ref(transferRows.value.filter((t) => !t.resolved).length);
+                const steps = [{ id: 1, title: 'Welcome' }, { id: 2, title: 'Connect' }, { id: 3, title: 'Source' }, { id: 4, title: 'Overview' }, { id: 5, title: 'Accounts' }, { id: 6, title: 'Categories' }, { id: 7, title: 'Transfers' }, { id: 8, title: 'Linking' }, { id: 9, title: 'Net Worth' }, { id: 10, title: 'Preview' }, { id: 11, title: 'Finish' }];
+                const isValidSheetUrl = (value) => /docs\.google\.com\/spreadsheets\/d\//.test(value || '');
+
                 const nextStep = () => { if(currentStep.value < 11) currentStep.value++; };
                 const prevStep = () => { if(currentStep.value > 1) currentStep.value--; };
-                const startExtraction = () => { isExtracting.value = true; let i = 0; const interval = setInterval(() => { if (i >= 5) { clearInterval(interval); isExtracting.value = false; currentStep.value = 4; } else { extractionStatus.value = ["Connecting...", "Reading...", "Parsing...", "Analyzing...", "Done"][i++]; } }, 800); };
-                
-                return { currentStep, steps, nextStep, prevStep, isExtracting, extractionStatus, startExtraction, progressWidth: computed(() => ((currentStep.value - 1) / 10) * 100 + '%') };
+                const startFresh = () => { currentStep.value = 11; };
+                const startExtraction = () => {
+                    isExtracting.value = true;
+                    let i = 0;
+                    const statuses = ['Checking your sheet...', 'Reading accounts and categories...', 'Reading net worth history...', 'Preparing migration preview...', 'Extraction complete'];
+                    const interval = setInterval(() => {
+                        if (i >= statuses.length) {
+                            clearInterval(interval);
+                            isExtracting.value = false;
+                            currentStep.value = 4;
+                        } else {
+                            extractionStatus.value = statuses[i++];
+                        }
+                    }, 850);
+                };
+                const applyImport = () => {
+                    if (unresolvedTransfers.value > 0) {
+                        alert('Resolve all transfer exceptions before finishing migration.');
+                        return;
+                    }
+                    isApplying.value = true;
+                    let i = 0;
+                    const statuses = ['Validating required checks...', 'Applying migration...', 'Refreshing balances and views...', 'Finishing setup...'];
+                    const interval = setInterval(() => {
+                        if (i >= statuses.length) {
+                            clearInterval(interval);
+                            isApplying.value = false;
+                            currentStep.value = 11;
+                        } else {
+                            extractionStatus.value = statuses[i++];
+                        }
+                    }, 900);
+                };
+                const updateUnresolvedTransfers = (count) => { unresolvedTransfers.value = count; };
+                const updateSheetUrl = (value) => {
+                    sheetUrl.value = value;
+                    if (isValidSheetUrl(value)) sheetError.value = '';
+                };
+                const handleContinue = () => {
+                    if (currentStep.value === 3) {
+                        if (!isValidSheetUrl(sheetUrl.value)) {
+                            sheetError.value = 'Please enter a valid Google Sheets URL before continuing.';
+                            return;
+                        }
+                        sheetError.value = '';
+                        startExtraction();
+                        return;
+                    }
+                    if (currentStep.value === 10) {
+                        applyImport();
+                        return;
+                    }
+                    nextStep();
+                };
+
+                const stepBadge = computed(() => {
+                    if (currentStep.value === 3 && !isValidSheetUrl(sheetUrl.value)) {
+                        return { label: 'Needs Attention', cls: 'warn', tip: 'Paste a valid Google Sheets URL to continue.' };
+                    }
+                    if (currentStep.value === 7 && unresolvedTransfers.value > 0) {
+                        return { label: 'Needs Attention', cls: 'warn', tip: 'Resolve all orphan transfer legs by linking pairs or editing category/memo.' };
+                    }
+                    if (currentStep.value === 10 && unresolvedTransfers.value > 0) {
+                        return { label: 'Blocked', cls: 'block', tip: 'Finish is blocked until transfer exceptions are fully resolved.' };
+                    }
+                    return { label: 'Passing', cls: 'good', tip: 'Current step has no blocking validation issues.' };
+                });
+
+                onMounted(() => {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (!saved) return;
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.currentStep) currentStep.value = parsed.currentStep;
+                        if (typeof parsed.sheetUrl === 'string') sheetUrl.value = parsed.sheetUrl;
+                        if (Array.isArray(parsed.transferRows)) transferRows.value = parsed.transferRows;
+                        if (Array.isArray(parsed.mappings)) mappings.value = parsed.mappings;
+                        if (Array.isArray(parsed.nwCategories)) nwCategories.value = parsed.nwCategories;
+                        unresolvedTransfers.value = transferRows.value.filter((t) => !t.resolved).length;
+                    } catch (err) {
+                        console.warn('Could not restore mockup state:', err);
+                    }
+                });
+
+                watch([currentStep, sheetUrl, transferRows, mappings, nwCategories], () => {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        currentStep: currentStep.value,
+                        sheetUrl: sheetUrl.value,
+                        transferRows: transferRows.value,
+                        mappings: mappings.value,
+                        nwCategories: nwCategories.value
+                    }));
+                }, { deep: true });
+
+                return {
+                    currentStep,
+                    steps,
+                    prevStep,
+                    isExtracting,
+                    isApplying,
+                    extractionStatus,
+                    startExtraction,
+                    startFresh,
+                    handleContinue,
+                    sheetUrl,
+                    sheetError,
+                    updateSheetUrl,
+                    transferRows,
+                    mappings,
+                    nwCategories,
+                    unresolvedTransfers,
+                    updateUnresolvedTransfers,
+                    stepBadge,
+                    progressWidth: computed(() => ((currentStep.value - 1) / 10) * 100 + '%')
+                };
             },
             template: `
                 <div class="wizard-shell">
                     <div class="wizard-header container">
-                        <div class="flex justify-between items-center"><div class="flex items-center gap-3"><div class="font-bold text-xl tracking-tight text-primary">Dojo</div><div class="h-4 w-px bg-gray-300"></div><div class="text-xs font-mono text-light tracking-widest uppercase">Onboarding</div></div><div class="text-xs text-light font-mono" v-if="!isExtracting && currentStep > 1 && currentStep < 11">Step {{ currentStep }} of 11</div></div>
-                        <div class="progress-bar" v-if="currentStep > 1 && currentStep < 11 && !isExtracting"><div class="progress-fill" :style="{ width: progressWidth }"></div></div>
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3"><div class="wizard-logo">DOJO</div><div class="h-4 w-px bg-gray-300"></div><div class="text-xs font-mono text-light tracking-widest uppercase">Onboarding</div></div>
+                            <div class="flex items-center gap-2" v-if="!isExtracting && !isApplying && currentStep > 1 && currentStep < 11">
+                                <span class="text-xs text-light font-mono">{{ steps[currentStep - 1].title }} · Step {{ currentStep }} of 11</span>
+                                <span class="status-badge" :class="stepBadge.cls" :title="stepBadge.tip">{{ stepBadge.label }} <i class="ph ph-info"></i></span>
+                            </div>
+                        </div>
+                        <div class="progress-bar" v-if="currentStep > 1 && currentStep < 11 && !isExtracting && !isApplying"><div class="progress-fill" :style="{ width: progressWidth }"></div></div>
                     </div>
                     <div class="wizard-content container">
                         <transition name="fade" mode="out-in">
-                            <StepExtraction v-if="isExtracting" :status="extractionStatus" />
-                            <component v-else :is="['StepWelcome', 'StepOAuth', 'StepSheetPicker', 'StepPreview', 'StepAccounts', 'StepEnvelopes', 'StepTransfers', 'StepNWMappings', 'StepNWMigrate', 'StepValidate', 'StepSuccess'][currentStep-1]" @next="nextStep" @startExtraction="startExtraction" />
+                            <StepExtraction v-if="isExtracting || isApplying" :status="extractionStatus" />
+                            <StepWelcome v-else-if="currentStep === 1" @next="handleContinue" @startFresh="startFresh" />
+                            <StepOAuth v-else-if="currentStep === 2" @next="handleContinue" />
+                            <StepSheetPicker v-else-if="currentStep === 3" :sheetUrl="sheetUrl" :sheetError="sheetError" @update-sheet-url="updateSheetUrl" />
+                            <StepPreview v-else-if="currentStep === 4" />
+                            <StepAccounts v-else-if="currentStep === 5" />
+                            <StepEnvelopes v-else-if="currentStep === 6" />
+                            <StepTransfers v-else-if="currentStep === 7" :transactions="transferRows" @transfers-status="updateUnresolvedTransfers" />
+                            <StepNWMappings v-else-if="currentStep === 8" :mappings="mappings" />
+                            <StepNWMigrate v-else-if="currentStep === 9" :categories="nwCategories" />
+                            <StepValidate v-else-if="currentStep === 10" :unresolvedTransfers="unresolvedTransfers" />
+                            <StepSuccess v-else />
                         </transition>
                     </div>
-                    <div class="wizard-footer container" v-if="!isExtracting && currentStep < 11">
+                    <div class="wizard-footer container" v-if="!isExtracting && !isApplying && currentStep < 11">
                         <div class="flex justify-between items-center">
                             <button v-if="currentStep > 1" @click="prevStep" class="btn btn-tertiary">Back</button><div v-else></div>
-                            <div class="flex gap-4 items-center"><span v-if="currentStep > 2" class="text-xs text-accent font-medium uppercase tracking-wider flex items-center gap-1"><i class="ph-fill ph-cloud-check"></i> Saved</span><button v-if="currentStep > 1" @click="nextStep" class="btn btn-primary" style="min-width: 120px;">{{ currentStep === 10 ? 'Apply Import' : (currentStep === 3 ? 'Extract Data' : 'Continue') }}</button></div>
+                            <div class="flex gap-4 items-center"><span v-if="currentStep > 2" class="text-xs text-accent font-medium uppercase tracking-wider flex items-center gap-1"><i class="ph-fill ph-cloud-check"></i> Saved</span><button v-if="currentStep > 1" @click="handleContinue" class="btn btn-primary" style="min-width: 120px;">{{ currentStep === 10 ? 'Finish' : 'Continue' }}</button></div>
                         </div>
                     </div>
                 </div>
