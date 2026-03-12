@@ -238,9 +238,22 @@ ACCOUNT_DETAIL_FIELDS: dict[AccountClass, set[str]] = {
     "cash": {"interest_rate_apy"},
     "credit": {"apr", "card_type", "cash_advance_apr"},
     "investment": {"risk_free_sweep_rate", "is_self_directed", "tax_classification"},
-    "loan": {"initial_principal_minor", "interest_rate_apy", "mortgage_escrow_details"},
+    "loan": {
+        "initial_principal_minor",
+        "interest_rate_apy",
+        "mortgage_escrow_details",
+        "loan_start_date",
+        "original_term_months",
+        "payment_mode",
+    },
     "accessible": {"interest_rate_apy", "term_end_date", "early_withdrawal_penalty"},
-    "tangible": {"asset_name", "acquisition_cost_minor"},
+    "tangible": {
+        "asset_name",
+        "acquisition_cost_minor",
+        "acquisition_date",
+        "valuation_source",
+        "notes",
+    },
 }
 
 

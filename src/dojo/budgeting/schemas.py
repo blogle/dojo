@@ -557,8 +557,14 @@ class AccountCreateRequest(AccountCommand):
     tax_classification: str | None = None
     initial_principal_minor: int | None = None
     mortgage_escrow_details: str | None = None
+    loan_start_date: date | None = None
+    original_term_months: int | None = None
+    payment_mode: str | None = None
     asset_name: str | None = None
     acquisition_cost_minor: int | None = None
+    acquisition_date: date | None = None
+    valuation_source: str | None = None
+    notes: str | None = None
 
 
 class AccountUpdateRequest(AccountCommand):
@@ -581,8 +587,14 @@ class AccountUpdateRequest(AccountCommand):
     tax_classification: str | None = None
     initial_principal_minor: int | None = None
     mortgage_escrow_details: str | None = None
+    loan_start_date: date | None = None
+    original_term_months: int | None = None
+    payment_mode: str | None = None
     asset_name: str | None = None
     acquisition_cost_minor: int | None = None
+    acquisition_date: date | None = None
+    valuation_source: str | None = None
+    notes: str | None = None
 
 
 class AccountDetail(AccountCommand):
@@ -636,6 +648,9 @@ class LoanAccountDetails(BaseModel):
     interest_rate_apy: float | None = None
     initial_principal_minor: int | None = None
     mortgage_escrow_details: str | None = None
+    loan_start_date: date | None = None
+    original_term_months: int | None = None
+    payment_mode: str | None = None
 
 
 class TangibleAssetDetails(BaseModel):
@@ -643,6 +658,9 @@ class TangibleAssetDetails(BaseModel):
 
     asset_name: str | None = None
     acquisition_cost_minor: int | None = None
+    acquisition_date: date | None = None
+    valuation_source: str | None = None
+    notes: str | None = None
 
 
 class InvestmentAccountDetails(BaseModel):

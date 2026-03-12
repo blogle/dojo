@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Account Onboarding Wizard: New multi-step modal for creating accounts with detailed configuration (APY, credit limits, etc.) aligned with architecture specs.
 - Backend schemas and migrations to support detailed account properties (interest rates, terms, institution names).
+- Expanded loan and tangible asset details (dates, terms, notes, valuation source).
 - Account detail pages: dedicated per-account pages with charts, filtered ledgers/holdings, and URL-driven integrity actions (reconcile, verify holdings, valuation).
 - Account reconciliation: worksheet view + checkpoint commits from Accounts page.
 - Cache rebuild utility (`scripts/rebuild-caches`) for recomputing current balances and budgeting state.
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI polish: refined border thickness and table spacing.
 
 ### Fixed
+- Aspire migration net-worth handoff now uses an asset/debt toggle, dollar-denominated inputs, and market-priced aggregate holdings for investment cutover setup.
 - Budget/transaction date handling: fixed missing `todayISO` import and timezone formatting drift.
 - Cypress e2e stability: pin backend date via `x-test-date`, stub `Date` in specs (without freezing timers), and anchor fixtures to explicit months.
 - Cypress code coverage is now optional, so `scripts/run-tests` no longer fails when the plugin is missing.
@@ -102,4 +104,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 - None.
-

@@ -563,11 +563,17 @@ def get_account_detail(
             interest_rate_apy=row.loan_interest_rate_apy,
             initial_principal_minor=row.loan_initial_principal_minor,
             mortgage_escrow_details=row.loan_mortgage_escrow_details,
+            loan_start_date=row.loan_loan_start_date,
+            original_term_months=row.loan_original_term_months,
+            payment_mode=row.loan_payment_mode,
         )
     elif account_class == "tangible":
         details = TangibleAssetDetails(
             asset_name=row.tangible_asset_name,
             acquisition_cost_minor=row.tangible_acquisition_cost_minor,
+            acquisition_date=row.tangible_acquisition_date,
+            valuation_source=row.tangible_valuation_source,
+            notes=row.tangible_notes,
         )
     elif account_class == "investment":
         details = InvestmentAccountDetails(
