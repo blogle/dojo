@@ -29,6 +29,22 @@ class ReconcilePortfolioRequest(BaseModel):
     positions: list[CreatePositionRequest] = Field(default_factory=list)
 
 
+class LookupQuotesRequest(BaseModel):
+    """Request payload for looking up current quotes by ticker."""
+
+    tickers: list[str] = Field(default_factory=list)
+
+
+class SecurityQuote(BaseModel):
+    """Best-effort quote lookup result for a single ticker."""
+
+    ticker: str
+    price_minor: int | None = None
+    as_of_date: date | None = None
+    source: str = "unavailable"
+    name: str | None = None
+
+
 class Security(BaseModel):
     security_id: UUID
     ticker: str

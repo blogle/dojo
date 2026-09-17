@@ -86,11 +86,39 @@ class AspireAccountMapping(BaseModel):
     account_role: AccountRole
     is_active: bool = True
 
+    # Preview-only fields (computed from staged transactions).
+    display_type: str | None = None
+    current_balance_minor: int | None = None
+    pending_balance_minor: int | None = None
+
 
 class AspireCategoryMapping(BaseModel):
     dojo_name: str = Field(min_length=1)
     group_name: str = Field(min_length=1)
     is_active: bool = True
+
+    # Budget goal configuration (maps onto Dojo budget category goal fields).
+    goal_type: Literal["recurring", "target_date"] | None = None
+    goal_amount_minor: int | None = None
+    goal_target_date: date | None = None
+    goal_frequency: Literal["monthly", "quarterly", "yearly"] | None = None
+
+    # Preview-only fields (computed from staged transactions/allocations).
+    config_label: str | None = None
+    configured_budget_minor: int | None = None
+    budgeted_minor: int | None = None
+    activity_minor: int | None = None
+    available_minor: int | None = None
+
+    # Best-effort validation against Aspire dashboard proxies.
+    proxy_configured_budget_minor: int | None = None
+    proxy_budgeted_minor: int | None = None
+    proxy_activity_minor: int | None = None
+    proxy_available_minor: int | None = None
+    drift_configured_budget_minor: int | None = None
+    drift_budgeted_minor: int | None = None
+    drift_activity_minor: int | None = None
+    drift_available_minor: int | None = None
 
 
 class AspireBudgetMapping(BaseModel):
@@ -106,6 +134,10 @@ class GetAspireMappingResponse(BaseModel):
     aspire_hidden_categories: list[str] = Field(default_factory=list)
     aspire_special_labels: dict[str, str] = Field(default_factory=dict)
     aspire_status_symbols: dict[str, str] = Field(default_factory=dict)
+
+    # Proxy-parity summary for step 6 diagnostics.
+    category_proxy_coverage_count: int = 0
+    category_proxy_drift_count: int = 0
 
 
 class SaveAspireMappingRequest(BaseModel):
@@ -123,8 +155,8 @@ class AspireTransferExceptionRow(BaseModel):
 
 
 class TransferResolutionKind(BaseModel):
-    kind: Literal["external", "opening_balance", "balance_adjustment"]
-    category_id: str | None = None
+    kind: Literal["linked", "opening_balance", "balance_adjustment"]
+    linked_row_index: int | None = None
 
 
 class GetAspireTransfersResponse(BaseModel):
@@ -151,18 +183,31 @@ NetWorthDecisionKind = Literal[
 class NetWorthHolding(BaseModel):
     ticker: str
     quantity: float
+    # Current price per share (minor units). Used for starting NAV + market price seed.
+    current_price_minor: int = 0
+
+    # Optional cost basis: users often know total basis, not per-share.
+    # If provided, importer derives avg_cost_minor = round(cost_basis_total_minor / quantity).
+    cost_basis_total_minor: int | None = None
+
+    # Back-compat: older wizard used avg_cost_minor as a numeric input and also (incorrectly)
+    # as the current price seed. We still accept it and will treat it as price when
+    # current_price_minor is missing.
     avg_cost_minor: int = 0
 
 
 class NetWorthDestination(BaseModel):
     name: str = Field(min_length=1)
-    account_class: Literal["investment", "loan", "tangible"]
+    institution_name: str | None = None
+    account_class: Literal["cash", "credit", "accessible", "investment", "loan", "tangible"]
     account_type: Literal["asset", "liability"]
     starting_value_minor: int = Field(description="As-of value at cutover in signed minor units")
 
     # Investment-only
     statement_cash_minor: int | None = None
     holdings: list[NetWorthHolding] = Field(default_factory=list)
+    is_self_directed: bool | None = None
+    tax_classification: str | None = None
 
     # Loan-only
     interest_rate_apy: float | None = None
@@ -188,6 +233,7 @@ class NetWorthDecision(BaseModel):
 
 class GetNetWorthDecisionsResponse(BaseModel):
     decisions: dict[str, NetWorthDecision] = Field(default_factory=dict)
+    last_reported_by_category_minor: dict[str, int] = Field(default_factory=dict)
 
 
 class SaveNetWorthDecisionsRequest(BaseModel):
@@ -230,11 +276,15 @@ class BudgetParityResponse(BaseModel):
     rows: list[BudgetParityRow] = Field(default_factory=list)
 
 
+BudgetParitySemanticDifference = Literal["month_rollover_overspending"]
+
+
 class MigrationPreviewResponse(BaseModel):
     legacy_net_worth_bucket: list[SeriesPoint] = Field(default_factory=list)
     dojo_net_worth_month_end: list[SeriesPoint] = Field(default_factory=list)
     duplicate_drift: list[DuplicateDriftRow] = Field(default_factory=list)
     budget_parity: BudgetParityResponse | None = None
+    budget_parity_known_differences: list[BudgetParitySemanticDifference] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     can_apply: bool = False
 
@@ -244,6 +294,8 @@ ImportStatus = Literal["not_started", "in_progress", "completed", "failed"]
 
 class ApplyAspireMigrationRequest(BaseModel):
     force: bool = False
+    ack_budget_parity_mismatch: bool = False
+    budget_parity_semantic_difference: BudgetParitySemanticDifference | None = None
 
 
 class ApplyAspireMigrationResponse(BaseModel):

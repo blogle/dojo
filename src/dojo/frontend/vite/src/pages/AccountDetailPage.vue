@@ -333,9 +333,9 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import HoldingsTable from "../components/investments/HoldingsTable.vue";
 import PortfolioChart from "../components/investments/PortfolioChart.vue";
+import ReconciliationSession from "../components/ReconciliationSession.vue";
 import TransactionForm from "../components/TransactionForm.vue";
 import TransactionTable from "../components/TransactionTable.vue";
-import ReconciliationSession from "../components/ReconciliationSession.vue";
 import { api } from "../services/api.js";
 import {
 	dollarsToMinor,
@@ -1361,6 +1361,27 @@ const detailRows = computed(() => {
 			value: String(details.mortgage_escrow_details),
 		});
 	}
+	if (details.loan_start_date) {
+		rows.push({ label: "Loan start", value: String(details.loan_start_date) });
+	}
+	if (
+		details.original_term_months !== undefined &&
+		details.original_term_months !== null
+	) {
+		rows.push({
+			label: "Original term",
+			value: `${details.original_term_months} months`,
+		});
+	}
+	if (details.payment_mode) {
+		rows.push({
+			label: "Payment tracking",
+			value:
+				details.payment_mode === "split_payments"
+					? "Split payments"
+					: "Statement principal",
+		});
+	}
 	if (details.asset_name) {
 		rows.push({ label: "Asset", value: String(details.asset_name) });
 	}
@@ -1371,6 +1392,24 @@ const detailRows = computed(() => {
 		rows.push({
 			label: "Cost basis",
 			value: formatAmount(details.acquisition_cost_minor),
+		});
+	}
+	if (details.acquisition_date) {
+		rows.push({
+			label: "Acquired on",
+			value: String(details.acquisition_date),
+		});
+	}
+	if (details.valuation_source) {
+		rows.push({
+			label: "Valuation source",
+			value: String(details.valuation_source),
+		});
+	}
+	if (details.notes) {
+		rows.push({
+			label: "Notes",
+			value: String(details.notes),
 		});
 	}
 	if (details.tax_classification) {

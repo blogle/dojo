@@ -218,6 +218,12 @@ export const api = {
 	investments: {
 		getAccount: async (accountId) =>
 			fetchJSON(`/api/investments/accounts/${accountId}`),
+		lookupQuotes: async (tickers) =>
+			fetchJSON("/api/investments/quotes", {
+				method: "POST",
+				headers: defaultHeaders,
+				body: JSON.stringify({ tickers }),
+			}),
 		getHistory: async (accountId, startDate, endDate) =>
 			fetchJSON(
 				`/api/investments/accounts/${accountId}/history?start_date=${startDate}&end_date=${endDate}`,
@@ -341,6 +347,7 @@ export const api = {
 export const postOpeningBalanceTransaction = async (
 	account,
 	openingBalanceMinor,
+	transactionDate = todayISO(),
 ) => {
 	if (!account || !openingBalanceMinor) {
 		return;
@@ -353,7 +360,7 @@ export const postOpeningBalanceTransaction = async (
 		return;
 	}
 	await api.transactions.create({
-		transaction_date: todayISO(),
+		transaction_date: transactionDate,
 		account_id: account.account_id,
 		category_id: "opening_balance",
 		amount_minor: signedAmount,

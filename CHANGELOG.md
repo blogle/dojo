@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Budget category availability now carries forward across months.
+- Account onboarding now uses a tighter four-step wizard (`type -> static details -> starting state -> review`) with account-specific planning fields and investment holdings support.
 - Budget allocations UI refactored into `AllocationModal` + `AllocationTable`; the budgets page now focuses on orchestration.
 - `scripts/run-tests` supports `--coverage` and merges pytest + Cypress coverage when enabled.
 - UI polish: refined border thickness and table spacing.

@@ -154,3 +154,29 @@ def test_investments_api_flow_end_to_end(investment_api_client: TestClient) -> N
     assert data["nav_minor"] == 110000
     assert data["total_return_minor"] == 10000
     assert data["total_return_pct"] == 0.1
+
+
+def test_lookup_quotes_uses_market_client_when_store_is_empty(
+    investment_api_client: TestClient,
+) -> None:
+    response = investment_api_client.post(
+        "/api/investments/quotes",
+        json={"tickers": ["aapl", "AAPL", "vxus"]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == [
+        {
+            "ticker": "AAPL",
+            "price_minor": 11000,
+            "as_of_date": "2025-01-15",
+            "source": "yahoo_finance",
+            "name": None,
+        },
+        {
+            "ticker": "VXUS",
+            "price_minor": 11000,
+            "as_of_date": "2025-01-15",
+            "source": "yahoo_finance",
+            "name": None,
+        },
+    ]

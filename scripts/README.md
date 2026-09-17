@@ -60,6 +60,45 @@ scripts/search-logs -n dojo-lint-abcd --lint --pattern error
 scripts/search-logs dojo-run-tests-abcd --tests --list
 ```
 
+### `scripts/capture-onboarding-parity`
+
+- **Description**: Captures live onboarding screenshots for Aspire migration parity review using a dedicated Cypress parity spec, then normalizes screenshots into `artifacts/onboarding-mockup/live/*.png`.
+- **Underlying tools**: `npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome --spec cypress/e2e/parity/aspire-onboarding-parity.cy.js`
+- **Options**:
+  - `--root DIR`: override artifact root (default: `artifacts/onboarding-mockup`)
+  - `-h`/`--help`: show usage
+- **Behavior**:
+  - Writes raw screenshots to `<root>/live/raw/` and normalized files to `<root>/live/<shot>.png`.
+  - Fails if any required parity shot is missing.
+  - Creates `<root>/parity-report.md` from `docs/plans/aspire-onboarding-parity-report-template.md` when missing.
+  - Enables the parity Cypress spec with `ONBOARDING_PARITY=1` so it stays skipped during normal e2e runs.
+
+### `scripts/capture-onboarding-mockup-reference`
+
+- **Description**: Captures reference screenshots from `aspire_onboarding_mockup.html` for parity baseline comparison.
+- **Underlying tools**:
+  - `python -m http.server` (serves repo root)
+  - `npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome --spec cypress/e2e/parity/aspire-onboarding-mockup-reference.cy.js`
+- **Options**:
+  - `--root DIR`: override artifact root (default: `artifacts/onboarding-mockup`)
+  - `--port N`: static server port (default: `8788`)
+  - `-h`/`--help`: show usage
+- **Behavior**:
+  - Writes raw screenshots to `<root>/reference/raw/` and normalized files to `<root>/reference/<shot>.png`.
+  - Fails if any required reference shot is missing.
+  - Enables parity specs with `CYPRESS_ONBOARDING_PARITY=1`.
+
+### `scripts/check-onboarding-parity`
+
+- **Description**: Enforces onboarding visual-parity gate artifacts before additional wizard UI work proceeds.
+- **Options**:
+  - `--root DIR`: override artifact root (default: `artifacts/onboarding-mockup`)
+  - `-h`/`--help`: show usage
+- **Behavior**:
+  - Requires all parity screenshot files under `<root>/reference/*.png` and `<root>/live/*.png`.
+  - Requires `<root>/parity-report.md` with `Status: APPROVED` and all required shots checked (`[x]`).
+  - Exits non-zero with actionable missing-item output when parity gate is incomplete.
+
 ### `scripts/run-migrations-check`
 
 - **Description**: Applies all migrations against a temporary DuckDB file and logs the plan (optional) so migration safety can be verified in CI or locally without touching real data. Cleans up the temp file on success and prints its path on failure.

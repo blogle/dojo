@@ -153,8 +153,29 @@ class ExtractedAspireRows:
     user_def_amounts_minor: dict[str, int]
     user_def_goals_minor: dict[str, int]
 
+    category_type_symbols: dict[str, str]
+    configuration_rows: list["AspireConfigurationRow"]
+    dashboard_category_proxy: dict[str, "AspireDashboardCategoryProxy"]
+
     special_labels: dict[str, str]
     status_symbols: dict[str, str]
+
+
+@dataclass(frozen=True)
+class AspireConfigurationRow:
+    row_type_symbol: str | None
+    name: str | None
+    monthly_target_minor: int
+    due_date: date | None
+    goal_amount_minor: int
+
+
+@dataclass(frozen=True)
+class AspireDashboardCategoryProxy:
+    configured_budget_minor: int
+    budgeted_minor: int
+    activity_minor: int
+    available_minor: int
 
 
 _REQUIRED_RANGES = [
@@ -169,6 +190,21 @@ _REQUIRED_RANGES = [
     "cts_Amounts",
     "cts_FromCategories",
     "cts_ToCategories",
+    "r_ConfigurationData",
+    # Special labels
+    "v_AtoB",
+    "v_AccountTransfer",
+    "v_BalanceAdjustment",
+    "v_StartingBalance",
+    # Status symbols
+    "v_ApprovedSymbol",
+    "v_PendingSymbol",
+    "v_BreakSymbol",
+    # Category configuration marker symbols
+    "v_CategoryGroupSymbol",
+    "v_ReportableCategorySymbol",
+    "v_NonReportableCategorySymbol",
+    "v_DebtAccountSymbol",
 ]
 
 _OPTIONAL_RANGES = [
@@ -190,16 +226,7 @@ _OPTIONAL_RANGES = [
     "UserDefCategories",
     "UserDefAmounts",
     "UserDefGoals",
-    # Special labels
-    "v_AtoB",
-    "v_AccountTransfer",
-    "v_BalanceAdjustment",
-    "v_StartingBalance",
     "v_Today",
-    # Status symbols
-    "v_ApprovedSymbol",
-    "v_PendingSymbol",
-    "v_BreakSymbol",
 ]
 
 
@@ -231,8 +258,25 @@ def extract_aspire_rows(
         raise AspireExtractionError("Missing value ranges in batch response")
 
     by_name: dict[str, list[Any]] = {}
+    values_by_name: dict[str, list[list[Any]]] = {}
     for idx, name in enumerate(ranges):
-        by_name[name] = _column((value_ranges[idx] or {}).get("values"))
+        raw_values = (value_ranges[idx] or {}).get("values") or []
+        values_by_name[name] = raw_values
+        by_name[name] = _column(raw_values)
+
+    # Best-effort Aspire proxy table (Dashboard category rows).
+    dashboard_values: list[list[Any]] = []
+    try:
+        dashboard_payload = client.batch_get_values(
+            spreadsheet_id=spreadsheet_id,
+            ranges=["'Dashboard'!J6:R140"],
+            value_render_option="UNFORMATTED_VALUE",
+        )
+        dashboard_ranges = dashboard_payload.get("valueRanges", []) or []
+        if dashboard_ranges:
+            dashboard_values = (dashboard_ranges[0] or {}).get("values") or []
+    except Exception:
+        dashboard_values = []
 
     def _names(range_name: str) -> list[str]:
         raw = by_name.get(range_name) or []
@@ -308,6 +352,93 @@ def extract_aspire_rows(
         value = _scalar_str(key)
         if value is not None:
             status_symbols[key] = value
+
+    category_type_symbols: dict[str, str] = {}
+    for key in (
+        "v_CategoryGroupSymbol",
+        "v_ReportableCategorySymbol",
+        "v_NonReportableCategorySymbol",
+        "v_DebtAccountSymbol",
+    ):
+        value = _scalar_str(key)
+        if value is not None:
+            category_type_symbols[key] = value
+
+    # Budget configuration table (categories + groups + targets/goals).
+    configuration_rows: list[AspireConfigurationRow] = []
+    config_values = values_by_name.get("r_ConfigurationData") or []
+    for raw_row in config_values:
+        # Range is C:K => [type, name, .., target(G), due_date(H), .., goal(K)]
+        row_type = _to_str(raw_row[0] if len(raw_row) > 0 else None)
+        name = _to_str(raw_row[1] if len(raw_row) > 1 else None)
+        target_cell = raw_row[4] if len(raw_row) > 4 else None
+        due_cell = raw_row[5] if len(raw_row) > 5 else None
+        goal_cell = raw_row[8] if len(raw_row) > 8 else None
+
+        try:
+            monthly_target_minor = _money_to_minor(target_cell)
+        except AspireExtractionError:
+            monthly_target_minor = 0
+        try:
+            goal_amount_minor = _money_to_minor(goal_cell)
+        except AspireExtractionError:
+            goal_amount_minor = 0
+
+        due_date: date | None = None
+        if due_cell not in (None, ""):
+            try:
+                due_date = _serial_to_date(due_cell)
+            except AspireExtractionError:
+                due_date = None
+
+        if not any([row_type, name, monthly_target_minor, goal_amount_minor, due_date]):
+            continue
+        configuration_rows.append(
+            AspireConfigurationRow(
+                row_type_symbol=row_type,
+                name=name,
+                monthly_target_minor=monthly_target_minor,
+                due_date=due_date,
+                goal_amount_minor=goal_amount_minor,
+            )
+        )
+
+    dashboard_category_proxy: dict[str, AspireDashboardCategoryProxy] = {}
+    known_user_categories = {name for name in user_def_categories if _to_str(name)}
+    for row in dashboard_values:
+        if not row:
+            continue
+        category_name = _to_str(row[0] if len(row) > 0 else None)
+        if not category_name:
+            continue
+        if known_user_categories and category_name not in known_user_categories:
+            continue
+        available_cell = row[2] if len(row) > 2 else None
+        activity_cell = row[5] if len(row) > 5 else None
+        configured_cell = row[6] if len(row) > 6 else None
+        budgeted_cell = row[8] if len(row) > 8 else None
+        try:
+            available_minor = _money_to_minor(available_cell)
+        except AspireExtractionError:
+            available_minor = 0
+        try:
+            activity_minor = _money_to_minor(activity_cell)
+        except AspireExtractionError:
+            activity_minor = 0
+        try:
+            configured_minor = _money_to_minor(configured_cell)
+        except AspireExtractionError:
+            configured_minor = 0
+        try:
+            budgeted_minor = _money_to_minor(budgeted_cell)
+        except AspireExtractionError:
+            budgeted_minor = 0
+        dashboard_category_proxy[category_name] = AspireDashboardCategoryProxy(
+            configured_budget_minor=configured_minor,
+            budgeted_minor=budgeted_minor,
+            activity_minor=activity_minor,
+            available_minor=available_minor,
+        )
 
     # Transactions
     dates_raw = by_name.get("trx_Dates") or []
@@ -527,6 +658,26 @@ def extract_aspire_rows(
         "net_worth_categories": net_worth_categories,
         "user_def_amounts_minor": user_def_amounts_minor,
         "user_def_goals_minor": user_def_goals_minor,
+        "category_type_symbols": category_type_symbols,
+        "configuration_rows": [
+            {
+                "row_type_symbol": r.row_type_symbol,
+                "name": r.name,
+                "monthly_target_minor": r.monthly_target_minor,
+                "due_date": r.due_date.isoformat() if r.due_date else None,
+                "goal_amount_minor": r.goal_amount_minor,
+            }
+            for r in configuration_rows
+        ],
+        "dashboard_category_proxy": {
+            name: {
+                "configured_budget_minor": row.configured_budget_minor,
+                "budgeted_minor": row.budgeted_minor,
+                "activity_minor": row.activity_minor,
+                "available_minor": row.available_minor,
+            }
+            for name, row in sorted(dashboard_category_proxy.items())
+        },
         "special_labels": special_labels,
         "status_symbols": status_symbols,
     }
@@ -561,6 +712,9 @@ def extract_aspire_rows(
         net_worth_categories=net_worth_categories,
         user_def_amounts_minor=user_def_amounts_minor,
         user_def_goals_minor=user_def_goals_minor,
+        category_type_symbols=category_type_symbols,
+        configuration_rows=configuration_rows,
+        dashboard_category_proxy=dashboard_category_proxy,
         special_labels=special_labels,
         status_symbols=status_symbols,
     )

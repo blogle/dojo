@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# NAME
+#     capture-onboarding-mockup-reference - capture mockup reference screenshots
+# SYNOPSIS
+#     scripts/capture-onboarding-mockup-reference [--root DIR] [--port N] [-h|--help]
+# DESCRIPTION
+#     Serves aspire_onboarding_mockup.html locally, runs Cypress reference capture,
+#     and writes normalized reference screenshots to <root>/reference/<shot>.png.
+
+set -euo pipefail
+
+ROOT_DIR="artifacts/onboarding-mockup"
+PORT=8788
+RAW_DIR=""
+REFERENCE_DIR=""
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SPEC_PATH="cypress/e2e/parity/aspire-onboarding-mockup-reference.cy.js"
+SERVER_PID=""
+
+usage() {
+	cat <<EOF
+NAME
+	capture-onboarding-mockup-reference - capture onboarding mockup reference shots
+SYNOPSIS
+	scripts/capture-onboarding-mockup-reference [--root DIR] [--port N] [-h|--help]
+DESCRIPTION
+	Starts a static server for repo root, runs the Cypress mockup parity spec,
+	and writes normalized screenshots to <root>/reference/<shot>.png.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--root)
+			shift
+			[[ $# -gt 0 ]] || {
+				echo "--root requires a directory" >&2
+				exit 1
+			}
+			ROOT_DIR="$1"
+			shift
+			;;
+		--root=*)
+			ROOT_DIR="${1#*=}"
+			shift
+			;;
+		--port)
+			shift
+			[[ $# -gt 0 ]] || {
+				echo "--port requires a value" >&2
+				exit 1
+			}
+			PORT="$1"
+			shift
+			;;
+		--port=*)
+			PORT="${1#*=}"
+			shift
+			;;
+		*)
+			echo "Unknown argument: $1" >&2
+			exit 1
+			;;
+	esac
+done
+
+RAW_DIR="${ROOT_DIR}/reference/raw"
+REFERENCE_DIR="${ROOT_DIR}/reference"
+
+mkdir -p "$RAW_DIR"
+mkdir -p "$REFERENCE_DIR"
+rm -f "$REFERENCE_DIR"/*.png
+rm -rf "$RAW_DIR"/*
+
+cleanup() {
+	if [[ -n "$SERVER_PID" ]]; then
+		kill "$SERVER_PID" >/dev/null 2>&1 || true
+	fi
+}
+trap cleanup EXIT
+
+python -m http.server "$PORT" --bind 127.0.0.1 --directory "$REPO_ROOT" >"$RAW_DIR/mockup-server.log" 2>&1 &
+SERVER_PID="$!"
+
+python - "$PORT" <<'PY'
+from __future__ import annotations
+
+import sys
+import time
+from urllib.request import urlopen
+
+port = int(sys.argv[1])
+url = f"http://127.0.0.1:{port}/aspire_onboarding_mockup.html"
+
+deadline = time.time() + 20
+while time.time() < deadline:
+    try:
+        with urlopen(url, timeout=1) as response:
+            if response.status == 200:
+                raise SystemExit(0)
+    except Exception:
+        time.sleep(0.2)
+
+raise SystemExit("mockup server did not become ready")
+PY
+
+set +e
+env CYPRESS_SCREENSHOTS_FOLDER="$RAW_DIR" \
+	CYPRESS_ONBOARDING_PARITY=1 \
+	CYPRESS_MOCKUP_BASE_URL="http://127.0.0.1:${PORT}" \
+	npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome --spec "$SPEC_PATH"
+cypress_exit=$?
+set -e
+
+python - "$RAW_DIR" "$REFERENCE_DIR" "$cypress_exit" <<'PY'
+from __future__ import annotations
+
+import shutil
+import sys
+from pathlib import Path
+
+raw_dir = Path(sys.argv[1])
+reference_dir = Path(sys.argv[2])
+cypress_exit = int(sys.argv[3])
+
+shots = [
+    "step-01",
+    "step-02",
+    "step-03",
+    "step-04",
+    "step-05",
+    "step-06",
+    "step-07",
+    "step-07-action-bar",
+    "step-08",
+    "step-09",
+    "step-09-account-modal",
+    "step-10",
+    "step-11",
+]
+
+missing: list[str] = []
+for shot in shots:
+    matches = sorted(raw_dir.glob(f"**/{shot}.png"))
+    if not matches:
+        missing.append(shot)
+        continue
+    shutil.copy2(matches[-1], reference_dir / f"{shot}.png")
+
+if missing:
+    print("[FAIL] scripts/capture-onboarding-mockup-reference")
+    print(" - missing reference screenshots for:")
+    for shot in missing:
+        print(f"   - {shot}")
+    raise SystemExit(1)
+
+if cypress_exit != 0:
+    print("[FAIL] scripts/capture-onboarding-mockup-reference")
+    print(" - cypress reference spec failed")
+    raise SystemExit(1)
+
+print("[OK] scripts/capture-onboarding-mockup-reference (reference screenshots captured)")
+PY

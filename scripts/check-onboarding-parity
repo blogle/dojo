@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# NAME
+#     check-onboarding-parity - enforce Aspire onboarding screenshot parity gate
+# SYNOPSIS
+#     scripts/check-onboarding-parity [--root DIR] [-h|--help]
+# DESCRIPTION
+#     Validates that required mock reference screenshots, live implementation screenshots,
+#     and an approved parity report exist before additional onboarding UI work proceeds.
+
+set -euo pipefail
+
+readonly SCRIPT_NAME="check-onboarding-parity"
+ROOT_DIR="artifacts/onboarding-mockup"
+
+usage() {
+	cat <<EOF
+NAME
+	${SCRIPT_NAME} - enforce onboarding screenshot parity artifacts
+SYNOPSIS
+	scripts/${SCRIPT_NAME} [--root DIR] [-h|--help]
+DESCRIPTION
+	Checks that required screenshot files exist under:
+	- <root>/reference
+	- <root>/live
+	and that <root>/parity-report.md is approved with all required shots checked.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--root)
+			shift
+			[[ $# -gt 0 ]] || {
+				echo "--root requires a directory" >&2
+				exit 1
+			}
+			ROOT_DIR="$1"
+			shift
+			;;
+		--root=*)
+			ROOT_DIR="${1#*=}"
+			shift
+			;;
+		*)
+			echo "Unknown argument: $1" >&2
+			exit 1
+			;;
+	esac
+done
+
+python - "$ROOT_DIR" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+shots = [
+    "step-01",
+    "step-02",
+    "step-03",
+    "step-04",
+    "step-05",
+    "step-06",
+    "step-07",
+    "step-07-action-bar",
+    "step-08",
+    "step-09",
+    "step-09-account-modal",
+    "step-10",
+    "step-11",
+]
+
+errors: list[str] = []
+
+for bucket in ("reference", "live"):
+    for shot in shots:
+        path = root / bucket / f"{shot}.png"
+        if not path.exists():
+            errors.append(f"missing {bucket} screenshot: {path}")
+
+report = root / "parity-report.md"
+if not report.exists():
+    errors.append(f"missing parity report: {report}")
+else:
+    text = report.read_text(encoding="utf-8")
+    if not re.search(r"^Status:\s*APPROVED\s*$", text, flags=re.MULTILINE):
+        errors.append(
+            f"parity report not approved in {report} (expected line: 'Status: APPROVED')"
+        )
+    for shot in shots:
+        pattern = re.compile(rf"^\s*-\s*\[x\]\s*{re.escape(shot)}\s*$", re.IGNORECASE | re.MULTILINE)
+        if not pattern.search(text):
+            errors.append(f"parity report missing checked shot: {shot}")
+
+if errors:
+    print("[FAIL] scripts/check-onboarding-parity")
+    for err in errors:
+        print(f" - {err}")
+    print("\nTip: run scripts/capture-onboarding-mockup-reference and scripts/capture-onboarding-parity, then review side-by-side and update parity-report.md.")
+    raise SystemExit(1)
+
+print("[OK] scripts/check-onboarding-parity (artifacts complete and approved)")
+PY

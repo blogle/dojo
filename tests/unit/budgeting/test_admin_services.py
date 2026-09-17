@@ -211,6 +211,10 @@ def test_update_and_deactivate_account(in_memory_db: duckdb.DuckDBPyConnection) 
     # Retrieve the list of accounts and check if the account's active status is False.
     refreshed = service.list_accounts(in_memory_db)
     assert any(acc.account_id == "needs_update" and acc.is_active is False for acc in refreshed)
+    include_row = in_memory_db.execute(
+        "SELECT include_in_net_worth FROM accounts WHERE account_id = 'needs_update'",
+    ).fetchone()
+    assert include_row == (True,)
 
     # Attempting to update a non-existent account should raise an error.
     with pytest.raises(AccountNotFoundError):

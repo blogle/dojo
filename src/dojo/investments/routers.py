@@ -9,7 +9,13 @@ import duckdb
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
 from dojo.core.db import connection_dep, get_connection
-from dojo.investments.domain import PortfolioHistoryPoint, PortfolioState, ReconcilePortfolioRequest
+from dojo.investments.domain import (
+    LookupQuotesRequest,
+    PortfolioHistoryPoint,
+    PortfolioState,
+    ReconcilePortfolioRequest,
+    SecurityQuote,
+)
 from dojo.investments.service import InvestmentService
 
 router = APIRouter(tags=["investments"])
@@ -81,6 +87,15 @@ def reconcile_investment_account(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/investments/quotes", response_model=list[SecurityQuote])
+def lookup_investment_quotes(
+    payload: LookupQuotesRequest,
+    conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    service: InvestmentService = _INVESTMENT_SERVICE_DEP,
+) -> list[SecurityQuote]:
+    return service.lookup_quotes(conn, payload.tickers)
 
 
 def _run_market_update(db_path: Path, service: InvestmentService) -> None:

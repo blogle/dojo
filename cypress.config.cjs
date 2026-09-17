@@ -39,6 +39,8 @@ const log = (...args) => console.info("[cypress-config]", ...args);
 const SERVER_URL = "http://127.0.0.1:8765";
 const SERVER_PROBE_URL = `${SERVER_URL}/api/net-worth/current`;
 const E2E_DB_PATH = path.join(__dirname, "data", "e2e-ledger.duckdb");
+const SCREENSHOTS_FOLDER =
+	process.env.CYPRESS_SCREENSHOTS_FOLDER || "cypress/screenshots";
 
 let serverProcess = null;
 let serverPromise = null;
@@ -170,6 +172,7 @@ module.exports = defineConfig({
 		baseUrl: SERVER_URL,
 		specPattern: "cypress/e2e/**/*.cy.js",
 		supportFile: "cypress/support/e2e.js",
+		screenshotsFolder: SCREENSHOTS_FOLDER,
 		video: false,
 		defaultCommandTimeout: 10000,
 		setupNodeEvents(on, config) {

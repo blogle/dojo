@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# NAME
+#     capture-onboarding-parity - capture live onboarding screenshots for parity review
+# SYNOPSIS
+#     scripts/capture-onboarding-parity [--root DIR] [-h|--help]
+# DESCRIPTION
+#     Runs the parity Cypress spec, extracts named screenshots into <root>/live,
+#     and scaffolds parity-report.md from the template when missing.
+
+set -euo pipefail
+
+readonly SCRIPT_NAME="capture-onboarding-parity"
+ROOT_DIR="artifacts/onboarding-mockup"
+RAW_DIR=""
+LIVE_DIR=""
+TEMPLATE="docs/plans/aspire-onboarding-parity-report-template.md"
+SPEC_PATH="cypress/e2e/parity/aspire-onboarding-parity.cy.js"
+
+usage() {
+	cat <<EOF
+NAME
+	${SCRIPT_NAME} - capture live onboarding screenshots for parity checks
+SYNOPSIS
+	scripts/${SCRIPT_NAME} [--root DIR] [-h|--help]
+DESCRIPTION
+	Runs Cypress parity capture spec and writes normalized screenshots to:
+	<root>/live/<shot>.png
+	If <root>/parity-report.md is missing, copies the template from:
+	${TEMPLATE}
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--root)
+			shift
+			[[ $# -gt 0 ]] || {
+				echo "--root requires a directory" >&2
+				exit 1
+			}
+			ROOT_DIR="$1"
+			shift
+			;;
+		--root=*)
+			ROOT_DIR="${1#*=}"
+			shift
+			;;
+		*)
+			echo "Unknown argument: $1" >&2
+			exit 1
+			;;
+	esac
+done
+
+RAW_DIR="${ROOT_DIR}/live/raw"
+LIVE_DIR="${ROOT_DIR}/live"
+
+mkdir -p "$RAW_DIR"
+mkdir -p "$LIVE_DIR"
+rm -f "$LIVE_DIR"/*.png
+rm -rf "$RAW_DIR"/*
+
+if [[ ! -f "${ROOT_DIR}/parity-report.md" ]]; then
+	if [[ ! -f "$TEMPLATE" ]]; then
+		echo "[FAIL] missing template: $TEMPLATE" >&2
+		exit 1
+	fi
+	mkdir -p "$ROOT_DIR"
+	cp "$TEMPLATE" "${ROOT_DIR}/parity-report.md"
+	echo "[INFO] created ${ROOT_DIR}/parity-report.md from template"
+fi
+
+echo "[INFO] capturing live onboarding parity screenshots..."
+set +e
+env CYPRESS_SCREENSHOTS_FOLDER="$RAW_DIR" \
+	CYPRESS_ONBOARDING_PARITY=1 \
+	npx --prefix src/dojo/frontend/vite cypress run --e2e --browser chrome --spec "$SPEC_PATH"
+cypress_exit=$?
+set -e
+
+python - "$RAW_DIR" "$LIVE_DIR" "$cypress_exit" <<'PY'
+from __future__ import annotations
+
+import shutil
+import sys
+from pathlib import Path
+
+raw_dir = Path(sys.argv[1])
+live_dir = Path(sys.argv[2])
+cypress_exit = int(sys.argv[3])
+
+shots = [
+    "step-01",
+    "step-02",
+    "step-03",
+    "step-04",
+    "step-05",
+    "step-06",
+    "step-07",
+    "step-07-action-bar",
+    "step-08",
+    "step-09",
+    "step-09-account-modal",
+    "step-10",
+    "step-11",
+]
+
+missing: list[str] = []
+for shot in shots:
+    matches = sorted(raw_dir.glob(f"**/{shot}.png"))
+    if not matches:
+        missing.append(shot)
+        continue
+    src = matches[-1]
+    dest = live_dir / f"{shot}.png"
+    shutil.copy2(src, dest)
+
+if missing:
+    print("[FAIL] scripts/capture-onboarding-parity")
+    print(" - missing screenshots for:")
+    for shot in missing:
+        print(f"   - {shot}")
+    raise SystemExit(1)
+
+if cypress_exit != 0:
+    print("[FAIL] scripts/capture-onboarding-parity")
+    print(" - cypress parity spec failed before all screenshots were captured")
+    raise SystemExit(1)
+
+print("[OK] scripts/capture-onboarding-parity (live screenshots captured)")
+PY
+
+echo "[INFO] next: review reference vs live images and mark ${ROOT_DIR}/parity-report.md"

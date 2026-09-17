@@ -14,7 +14,13 @@ import pandas as pd
 
 from dojo.core import clock
 from dojo.investments.dao import InvestmentDAO
-from dojo.investments.domain import CreatePositionRequest, PortfolioHistoryPoint, PortfolioState, PositionView
+from dojo.investments.domain import (
+    CreatePositionRequest,
+    PortfolioHistoryPoint,
+    PortfolioState,
+    PositionView,
+    SecurityQuote,
+)
 from dojo.investments.market_client import MarketClient
 from dojo.investments.sql import load_sql as load_investments_sql
 
@@ -214,6 +220,79 @@ class InvestmentService:
                 tx.close_position(current.position_id, recorded_at=recorded_at)
 
         return self.get_portfolio_state(conn, account_id)
+
+    def lookup_quotes(self, conn: duckdb.DuckDBPyConnection, tickers: list[str]) -> list[SecurityQuote]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for ticker in tickers:
+            value = ticker.strip().upper()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+        if not normalized:
+            return []
+
+        placeholders = ", ".join(["?"] * len(normalized))
+        latest_rows = conn.execute(
+            f"""
+            SELECT
+                s.ticker,
+                s.name,
+                mp.close_minor,
+                mp.market_date
+            FROM securities s
+            LEFT JOIN market_prices mp ON mp.security_id = s.security_id
+            WHERE s.ticker IN ({placeholders})
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY s.ticker
+                ORDER BY mp.market_date DESC NULLS LAST, mp.recorded_at DESC NULLS LAST
+            ) = 1
+            """,
+            normalized,
+        ).fetchall()
+        stored_by_ticker = {
+            str(row[0]).upper(): SecurityQuote(
+                ticker=str(row[0]).upper(),
+                name=str(row[1]) if row[1] is not None else None,
+                price_minor=int(row[2]) if row[2] is not None else None,
+                as_of_date=row[3],
+                source="market_store" if row[2] is not None else "unavailable",
+            )
+            for row in latest_rows
+        }
+
+        missing = [
+            ticker
+            for ticker in normalized
+            if stored_by_ticker.get(ticker, None) is None or stored_by_ticker[ticker].price_minor is None
+        ]
+        if missing:
+            recent_frames = self._market_client.fetch_prices(missing, start_date=date.today() - timedelta(days=10))
+            for ticker in missing:
+                frame = recent_frames.get(ticker)
+                price_minor: int | None = None
+                as_of_date: date | None = None
+                if frame is not None and not frame.empty:
+                    closes = frame["Close"].dropna() if "Close" in frame else pd.Series(dtype="float64")
+                    if not closes.empty:
+                        as_of_date = cast(pd.Timestamp, closes.index[-1]).date()
+                        price_minor = _to_price_minor(closes.iloc[-1])
+                metadata = self._market_client.fetch_metadata(ticker)
+                existing = stored_by_ticker.get(ticker)
+                stored_by_ticker[ticker] = SecurityQuote(
+                    ticker=ticker,
+                    name=cast(str | None, metadata.get("name")) if metadata else (existing.name if existing else None),
+                    price_minor=price_minor
+                    if price_minor is not None
+                    else (existing.price_minor if existing else None),
+                    as_of_date=as_of_date if as_of_date is not None else (existing.as_of_date if existing else None),
+                    source="yahoo_finance"
+                    if price_minor is not None
+                    else (existing.source if existing else "unavailable"),
+                )
+
+        return [stored_by_ticker.get(ticker, SecurityQuote(ticker=ticker)) for ticker in normalized]
 
     def sync_market_data(self, conn: duckdb.DuckDBPyConnection) -> int:
         """Fetch and upsert OHLC data for all active tickers.

@@ -50,11 +50,14 @@ from dojo.aspire_migration.schemas import (
     AspireTransferExceptionRow,
     TransferResolutionKind,
     NetWorthDecision,
+    BudgetParityResponse,
+    BudgetParityRow,
     SeriesPoint,
 )
 from dojo.aspire_migration.sheets import parse_spreadsheet_id
 from dojo.core.cache_rebuild import rebuild_caches
 from dojo.investments.sql import load_sql as load_investments_sql
+from dojo.budgeting.sql import load_sql as load_budgeting_sql
 from dojo.budgeting.services import derive_payment_category_id
 from dojo.aspire_migration.legacy_marks import LegacyMark, aspire_bucket_series
 from dojo.core.clock import get_system_date
@@ -95,6 +98,7 @@ def _now_ts() -> datetime:
 
 
 _ASPIRE_IMPORT_NAMESPACE = uuid.UUID("e9a92b04-bfc7-4eaa-b6bd-75f0a8c8f1d6")
+_KNOWN_BUDGET_PARITY_DIFFERENCES = ("month_rollover_overspending",)
 
 
 def _uuid_for(dataset_fingerprint: str, kind: str, key: str) -> uuid.UUID:
@@ -143,6 +147,55 @@ def _json_loads_dict_str_str(raw: object) -> dict[str, str]:
     for k, v in parsed.items():
         if isinstance(k, str) and k.strip() and isinstance(v, str) and v.strip():
             out[k] = v
+    return out
+
+
+def _json_loads_dict_str_int(raw: object) -> dict[str, int]:
+    if raw is None:
+        return {}
+    try:
+        parsed = json.loads(str(raw))
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out: dict[str, int] = {}
+    for k, v in parsed.items():
+        if not isinstance(k, str) or not k.strip():
+            continue
+        try:
+            out[k] = int(v)
+        except Exception:
+            continue
+    return out
+
+
+def _json_loads_list_obj(raw: object) -> list[object]:
+    if raw is None:
+        return []
+    try:
+        parsed = json.loads(str(raw))
+    except Exception:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return list(parsed)
+
+
+def _json_loads_dict_str_obj(raw: object) -> dict[str, object]:
+    if raw is None:
+        return {}
+    try:
+        parsed = json.loads(str(raw))
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out: dict[str, object] = {}
+    for k, v in parsed.items():
+        if not isinstance(k, str) or not k.strip():
+            continue
+        out[k] = v
     return out
 
 
@@ -527,6 +580,11 @@ def extract_aspire(
                 extracted_at = CURRENT_TIMESTAMP,
                 special_labels_json = $special,
                 status_symbols_json = $symbols,
+                user_def_amounts_json = $user_def_amounts,
+                user_def_goals_json = $user_def_goals,
+                category_type_symbols_json = $category_type_symbols,
+                configuration_rows_json = $configuration_rows,
+                dashboard_category_proxy_json = $dashboard_proxy,
                 cfg_accounts_json = $cfg_accounts,
                 cfg_cards_json = $cfg_cards,
                 hidden_accounts_json = $hidden_accounts,
@@ -545,6 +603,32 @@ def extract_aspire(
                 "fingerprint": extracted.dataset.dataset_fingerprint,
                 "special": _json_dumps(extracted.special_labels),
                 "symbols": _json_dumps(extracted.status_symbols),
+                "user_def_amounts": _json_dumps(extracted.user_def_amounts_minor),
+                "user_def_goals": _json_dumps(extracted.user_def_goals_minor),
+                "category_type_symbols": _json_dumps(extracted.category_type_symbols),
+                "configuration_rows": _json_dumps(
+                    [
+                        {
+                            "row_type_symbol": row.row_type_symbol,
+                            "name": row.name,
+                            "monthly_target_minor": row.monthly_target_minor,
+                            "due_date": row.due_date.isoformat() if row.due_date else None,
+                            "goal_amount_minor": row.goal_amount_minor,
+                        }
+                        for row in extracted.configuration_rows
+                    ]
+                ),
+                "dashboard_proxy": _json_dumps(
+                    {
+                        name: {
+                            "configured_budget_minor": row.configured_budget_minor,
+                            "budgeted_minor": row.budgeted_minor,
+                            "activity_minor": row.activity_minor,
+                            "available_minor": row.available_minor,
+                        }
+                        for name, row in extracted.dashboard_category_proxy.items()
+                    }
+                ),
                 "cfg_accounts": _json_dumps(extracted.cfg_accounts),
                 "cfg_cards": _json_dumps(extracted.cfg_cards),
                 "hidden_accounts": _json_dumps(extracted.hidden_accounts),
@@ -687,6 +771,11 @@ def _get_extracted_session(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             net_worth_decisions_json,
             special_labels_json,
             status_symbols_json,
+            user_def_amounts_json,
+            user_def_goals_json,
+            category_type_symbols_json,
+            configuration_rows_json,
+            dashboard_category_proxy_json,
             cfg_accounts_json,
             cfg_cards_json,
             hidden_accounts_json,
@@ -714,6 +803,11 @@ def _get_extracted_session(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
         net_worth_decisions_json,
         special_labels_json,
         status_symbols_json,
+        user_def_amounts_json,
+        user_def_goals_json,
+        category_type_symbols_json,
+        configuration_rows_json,
+        dashboard_category_proxy_json,
         cfg_accounts_json,
         cfg_cards_json,
         hidden_accounts_json,
@@ -738,6 +832,11 @@ def _get_extracted_session(conn: duckdb.DuckDBPyConnection) -> dict[str, Any]:
         "net_worth_decisions_json": str(net_worth_decisions_json) if net_worth_decisions_json else None,
         "special_labels": _json_loads_dict_str_str(special_labels_json),
         "status_symbols": _json_loads_dict_str_str(status_symbols_json),
+        "user_def_amounts_minor": _json_loads_dict_str_int(user_def_amounts_json),
+        "user_def_goals_minor": _json_loads_dict_str_int(user_def_goals_json),
+        "category_type_symbols": _json_loads_dict_str_str(category_type_symbols_json),
+        "configuration_rows": _json_loads_list_obj(configuration_rows_json),
+        "dashboard_category_proxy": _json_loads_dict_str_obj(dashboard_category_proxy_json),
         "cfg_accounts": _json_loads_list(cfg_accounts_json),
         "cfg_cards": _json_loads_list(cfg_cards_json),
         "hidden_accounts": _json_loads_list(hidden_accounts_json),
@@ -791,6 +890,106 @@ def _mapping_candidates(conn: duckdb.DuckDBPyConnection, migration_session_id: s
     return (sorted(set(trx_accounts)), categories)
 
 
+def _staging_categories(conn: duckdb.DuckDBPyConnection, migration_session_id: str) -> list[str]:
+    categories_rows = conn.execute(
+        """
+        WITH cats AS (
+            SELECT category_name AS name
+            FROM aspire_staging_transactions
+            WHERE migration_session_id = $id
+            UNION ALL
+            SELECT from_category_name AS name
+            FROM aspire_staging_allocations
+            WHERE migration_session_id = $id
+            UNION ALL
+            SELECT to_category_name AS name
+            FROM aspire_staging_allocations
+            WHERE migration_session_id = $id
+        )
+        SELECT DISTINCT name
+        FROM cats
+        WHERE name IS NOT NULL AND TRIM(name) != ''
+        ORDER BY name
+        """,
+        {"id": migration_session_id},
+    ).fetchall()
+    return [str(r[0]) for r in categories_rows]
+
+
+def _configuration_categories(session: dict[str, Any]) -> list[dict[str, Any]]:
+    symbols = session.get("category_type_symbols") or {}
+    group_symbol = symbols.get("v_CategoryGroupSymbol")
+    debt_symbol = symbols.get("v_DebtAccountSymbol")
+    reportable_symbol = symbols.get("v_ReportableCategorySymbol")
+    non_reportable_symbol = symbols.get("v_NonReportableCategorySymbol")
+
+    rows = session.get("configuration_rows")
+    if not isinstance(rows, list):
+        return []
+
+    current_group = "Uncategorized"
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+
+        row_type = str(row.get("row_type_symbol") or "").strip() or None
+        name = str(row.get("name") or "").strip() or None
+        if not name:
+            continue
+
+        monthly_target_minor = 0
+        try:
+            monthly_target_minor = int(row.get("monthly_target_minor") or 0)
+        except Exception:
+            monthly_target_minor = 0
+
+        goal_amount_minor = 0
+        try:
+            goal_amount_minor = int(row.get("goal_amount_minor") or 0)
+        except Exception:
+            goal_amount_minor = 0
+
+        due_date: date | None = None
+        due_raw = row.get("due_date")
+        if isinstance(due_raw, str) and due_raw.strip():
+            try:
+                due_date = date.fromisoformat(due_raw)
+            except ValueError:
+                due_date = None
+
+        if group_symbol and row_type == group_symbol:
+            current_group = name
+            continue
+
+        if debt_symbol and row_type == debt_symbol:
+            continue
+
+        # Only treat explicit reportable/non-reportable rows as categories when symbols exist.
+        if (reportable_symbol or non_reportable_symbol) and row_type not in {reportable_symbol, non_reportable_symbol}:
+            continue
+
+        out.append(
+            {
+                "name": name,
+                "group_name": current_group,
+                "monthly_target_minor": monthly_target_minor,
+                "due_date": due_date,
+                "goal_amount_minor": goal_amount_minor,
+            }
+        )
+
+    return out
+
+
+def _goal_config_label(cat: AspireCategoryMapping) -> str:
+    if cat.goal_type == "target_date" and cat.goal_target_date:
+        return f"Target date ({cat.goal_target_date.isoformat()})"
+    if cat.goal_type == "recurring" and cat.goal_frequency and cat.goal_amount_minor is not None:
+        return f"Recurring ({cat.goal_frequency})"
+    return "-"
+
+
 def _default_mapping(
     *,
     accounts: list[str],
@@ -820,17 +1019,110 @@ def _default_mapping(
     return AspireBudgetMapping(accounts=accounts_out, categories=categories_out)
 
 
+def _default_mapping_from_configuration(
+    *,
+    accounts: list[str],
+    cfg_cards: set[str],
+    hidden_accounts: set[str],
+    hidden_categories: set[str],
+    configuration_categories: list[dict[str, Any]],
+    extra_historical_categories: list[str],
+) -> AspireBudgetMapping:
+    accounts_out: dict[str, AspireAccountMapping] = {}
+    for name in accounts:
+        account_class: Any = "credit" if name in cfg_cards else "cash"
+        accounts_out[name] = AspireAccountMapping(
+            dojo_name=name,
+            account_class=account_class,
+            account_role="on_budget",
+            is_active=name not in hidden_accounts,
+        )
+
+    categories_out: dict[str, AspireCategoryMapping] = {}
+    for row in configuration_categories:
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        group_name = str(row.get("group_name") or "Uncategorized").strip() or "Uncategorized"
+        target_minor = int(row.get("monthly_target_minor") or 0)
+        goal_minor = int(row.get("goal_amount_minor") or 0)
+        due_date = row.get("due_date")
+        due = due_date if isinstance(due_date, date) else None
+
+        goal_type: Any = None
+        goal_amount_minor: int | None = None
+        goal_target_date: date | None = None
+        goal_frequency: Any = None
+
+        if due and goal_minor > 0 and target_minor <= 0:
+            goal_type = "target_date"
+            goal_amount_minor = goal_minor
+            goal_target_date = due
+        elif target_minor > 0:
+            goal_type = "recurring"
+            goal_amount_minor = target_minor
+            goal_frequency = "monthly"
+
+        categories_out[name] = AspireCategoryMapping(
+            dojo_name=name,
+            group_name=group_name,
+            is_active=name not in hidden_categories,
+            goal_type=goal_type,
+            goal_amount_minor=goal_amount_minor,
+            goal_target_date=goal_target_date,
+            goal_frequency=goal_frequency,
+        )
+
+    for name in extra_historical_categories:
+        if name in categories_out:
+            continue
+        categories_out[name] = AspireCategoryMapping(
+            dojo_name=name,
+            group_name="Historical",
+            is_active=False,
+        )
+
+    return AspireBudgetMapping(accounts=accounts_out, categories=categories_out)
+
+
 @router.get("/onboarding/aspire/mapping", response_model=GetAspireMappingResponse)
 def get_mapping(
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
 ) -> GetAspireMappingResponse:
     session = _get_extracted_session(conn)
     migration_session_id = session["migration_session_id"]
 
-    accounts, categories = _mapping_candidates(conn, migration_session_id)
+    accounts, _ = _mapping_candidates(conn, migration_session_id)
     cfg_cards = set(session["cfg_cards"])
     hidden_accounts = set(session["hidden_accounts"])
     hidden_categories = set(session["hidden_categories"])
+
+    configured = _configuration_categories(session)
+    configured_names = {str(row.get("name") or "").strip() for row in configured if isinstance(row, dict)}
+    configured_names.discard("")
+
+    staging_categories = _staging_categories(conn, migration_session_id)
+    special = session["special_labels"]
+    excluded = {
+        special.get("v_AtoB"),
+        special.get("v_AccountTransfer"),
+        special.get("v_StartingBalance"),
+        special.get("v_BalanceAdjustment"),
+    }
+    excluded.discard(None)
+    excluded_names = {str(v) for v in excluded if isinstance(v, str)}
+
+    # Treat categories that match account labels as transfer-like, not envelopes.
+    account_name_set = set(accounts)
+
+    extra_historical = sorted(
+        {
+            name
+            for name in staging_categories
+            if name not in configured_names and name not in excluded_names and name not in account_name_set
+        }
+    )
 
     mapping_json = session["mapping_json"]
     if mapping_json:
@@ -842,13 +1134,225 @@ def get_mapping(
                 detail="Stored mapping is invalid; re-extract and try again.",
             ) from exc
     else:
-        mapping = _default_mapping(
-            accounts=accounts,
-            categories=categories,
-            cfg_cards=cfg_cards,
-            hidden_accounts=hidden_accounts,
-            hidden_categories=hidden_categories,
+        if configured:
+            mapping = _default_mapping_from_configuration(
+                accounts=accounts,
+                cfg_cards=cfg_cards,
+                hidden_accounts=hidden_accounts,
+                hidden_categories=hidden_categories,
+                configuration_categories=configured,
+                extra_historical_categories=extra_historical,
+            )
+        else:
+            mapping = _default_mapping(
+                accounts=accounts,
+                categories=staging_categories,
+                cfg_cards=cfg_cards,
+                hidden_accounts=hidden_accounts,
+                hidden_categories=hidden_categories,
+            )
+
+    # Populate preview-only account balances (as-of v_Today inclusive).
+    as_of_date = system_date
+    v_today = session["special_labels"].get("v_Today")
+    if v_today:
+        try:
+            as_of_date = date.fromisoformat(v_today)
+        except ValueError:
+            as_of_date = system_date
+
+    account_balances_rows = conn.execute(
+        """
+        SELECT
+            account_name,
+            COALESCE(SUM(CASE WHEN status = 'cleared' THEN amount_minor ELSE 0 END), 0) AS settled_minor,
+            COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_minor ELSE 0 END), 0) AS pending_minor
+        FROM aspire_staging_transactions
+        WHERE migration_session_id = $id
+          AND is_break = FALSE
+          AND (transaction_date IS NULL OR transaction_date <= $as_of)
+          AND account_name IS NOT NULL
+          AND TRIM(account_name) != ''
+        GROUP BY account_name
+        """,
+        {"id": migration_session_id, "as_of": as_of_date},
+    ).fetchall()
+    balances_by_account = {str(name): (int(settled), int(pending)) for name, settled, pending in account_balances_rows}
+
+    for aspire_name, acct in mapping.accounts.items():
+        settled, pending = balances_by_account.get(aspire_name, (0, 0))
+        acct.current_balance_minor = settled
+        acct.pending_balance_minor = pending
+        if acct.account_class == "credit":
+            acct.display_type = "Credit Card"
+        elif acct.account_class == "cash":
+            acct.display_type = "Cash"
+        else:
+            acct.display_type = acct.account_class
+
+    # Populate preview-only category envelope state (all computed from staged rows).
+    month_start = as_of_date.replace(day=1)
+    as_of_end = as_of_date
+
+    configured_by_category: dict[str, int] = {}
+    for cfg_row in configured:
+        if not isinstance(cfg_row, dict):
+            continue
+        name = str(cfg_row.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            configured_by_category[name] = int(cfg_row.get("monthly_target_minor") or 0)
+        except Exception:
+            configured_by_category[name] = 0
+    for name, amount_minor in (session.get("user_def_amounts_minor") or {}).items():
+        if not isinstance(name, str) or not name.strip():
+            continue
+        configured_by_category[name] = int(amount_minor)
+
+    dashboard_proxy = session.get("dashboard_category_proxy") or {}
+
+    def _proxy_value(row_obj: object, key: str) -> int | None:
+        if not isinstance(row_obj, dict):
+            return None
+        raw = row_obj.get(key)
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except Exception:
+            return None
+
+    trx_all_rows = conn.execute(
+        """
+        SELECT category_name, COALESCE(SUM(amount_minor), 0) AS total_minor
+        FROM aspire_staging_transactions
+        WHERE migration_session_id = $id
+          AND is_break = FALSE
+          AND (transaction_date IS NULL OR transaction_date <= $as_of)
+          AND category_name IS NOT NULL
+          AND TRIM(category_name) != ''
+        GROUP BY category_name
+        """,
+        {"id": migration_session_id, "as_of": as_of_end},
+    ).fetchall()
+    trx_all_by_cat = {str(name): int(total) for name, total in trx_all_rows}
+
+    trx_month_rows = conn.execute(
+        """
+        SELECT category_name, COALESCE(SUM(amount_minor), 0) AS total_minor
+        FROM aspire_staging_transactions
+        WHERE migration_session_id = $id
+          AND is_break = FALSE
+          AND transaction_date BETWEEN $start AND $end
+          AND category_name IS NOT NULL
+          AND TRIM(category_name) != ''
+        GROUP BY category_name
+        """,
+        {"id": migration_session_id, "start": month_start, "end": as_of_end},
+    ).fetchall()
+    trx_month_by_cat = {str(name): int(total) for name, total in trx_month_rows}
+
+    alloc_all_rows = conn.execute(
+        """
+        SELECT to_category_name AS name, COALESCE(SUM(amount_minor), 0) AS delta_minor
+        FROM aspire_staging_allocations
+        WHERE migration_session_id = $id
+          AND (allocation_date IS NULL OR allocation_date <= $as_of)
+          AND to_category_name IS NOT NULL
+          AND TRIM(to_category_name) != ''
+        GROUP BY to_category_name
+        UNION ALL
+        SELECT from_category_name AS name, -COALESCE(SUM(amount_minor), 0) AS delta_minor
+        FROM aspire_staging_allocations
+        WHERE migration_session_id = $id
+          AND (allocation_date IS NULL OR allocation_date <= $as_of)
+          AND from_category_name IS NOT NULL
+          AND TRIM(from_category_name) != ''
+        GROUP BY from_category_name
+        """,
+        {"id": migration_session_id, "as_of": as_of_end},
+    ).fetchall()
+    alloc_all_by_cat: dict[str, int] = {}
+    for name, delta in alloc_all_rows:
+        key = str(name)
+        alloc_all_by_cat[key] = int(alloc_all_by_cat.get(key, 0)) + int(delta)
+
+    alloc_month_rows = conn.execute(
+        """
+        SELECT to_category_name AS name, COALESCE(SUM(amount_minor), 0) AS delta_minor
+        FROM aspire_staging_allocations
+        WHERE migration_session_id = $id
+          AND allocation_date BETWEEN $start AND $end
+          AND to_category_name IS NOT NULL
+          AND TRIM(to_category_name) != ''
+        GROUP BY to_category_name
+        UNION ALL
+        SELECT from_category_name AS name, -COALESCE(SUM(amount_minor), 0) AS delta_minor
+        FROM aspire_staging_allocations
+        WHERE migration_session_id = $id
+          AND allocation_date BETWEEN $start AND $end
+          AND from_category_name IS NOT NULL
+          AND TRIM(from_category_name) != ''
+        GROUP BY from_category_name
+        """,
+        {"id": migration_session_id, "start": month_start, "end": as_of_end},
+    ).fetchall()
+    alloc_month_by_cat: dict[str, int] = {}
+    for name, delta in alloc_month_rows:
+        key = str(name)
+        alloc_month_by_cat[key] = int(alloc_month_by_cat.get(key, 0)) + int(delta)
+
+    proxy_coverage_count = 0
+    proxy_drift_count = 0
+    for aspire_name, cat in mapping.categories.items():
+        trx_all = int(trx_all_by_cat.get(aspire_name, 0))
+        trx_month = int(trx_month_by_cat.get(aspire_name, 0))
+        alloc_all = int(alloc_all_by_cat.get(aspire_name, 0))
+        alloc_month = int(alloc_month_by_cat.get(aspire_name, 0))
+
+        available_minor = trx_all + alloc_all
+        cat.available_minor = available_minor
+        cat.activity_minor = trx_month
+        cat.budgeted_minor = alloc_month
+        cat.configured_budget_minor = int(configured_by_category.get(aspire_name, 0))
+        cat.config_label = _goal_config_label(cat)
+        if cat.config_label == "-" and cat.configured_budget_minor:
+            cat.config_label = "Recurring (monthly)"
+
+        proxy_row = dashboard_proxy.get(aspire_name)
+        proxy_configured = _proxy_value(proxy_row, "configured_budget_minor")
+        proxy_budgeted = _proxy_value(proxy_row, "budgeted_minor")
+        proxy_activity = _proxy_value(proxy_row, "activity_minor")
+        proxy_available = _proxy_value(proxy_row, "available_minor")
+
+        if proxy_configured is None and aspire_name in configured_by_category:
+            proxy_configured = int(configured_by_category[aspire_name])
+
+        cat.proxy_configured_budget_minor = proxy_configured
+        cat.proxy_budgeted_minor = proxy_budgeted
+        cat.proxy_activity_minor = proxy_activity
+        cat.proxy_available_minor = proxy_available
+
+        cat.drift_configured_budget_minor = (
+            int(cat.configured_budget_minor) - int(proxy_configured) if proxy_configured is not None else None
         )
+        cat.drift_budgeted_minor = int(cat.budgeted_minor) - int(proxy_budgeted) if proxy_budgeted is not None else None
+        cat.drift_activity_minor = int(cat.activity_minor) - int(proxy_activity) if proxy_activity is not None else None
+        cat.drift_available_minor = (
+            int(cat.available_minor) - int(proxy_available) if proxy_available is not None else None
+        )
+
+        drift_values = [
+            cat.drift_configured_budget_minor,
+            cat.drift_budgeted_minor,
+            cat.drift_activity_minor,
+            cat.drift_available_minor,
+        ]
+        if any(value is not None for value in drift_values):
+            proxy_coverage_count += 1
+        if any((value is not None and value != 0) for value in drift_values):
+            proxy_drift_count += 1
 
     return GetAspireMappingResponse(
         mapping_status=cast(Any, session["mapping_status"]),
@@ -857,6 +1361,8 @@ def get_mapping(
         aspire_hidden_categories=session["hidden_categories"],
         aspire_special_labels=session["special_labels"],
         aspire_status_symbols=session["status_symbols"],
+        category_proxy_coverage_count=proxy_coverage_count,
+        category_proxy_drift_count=proxy_drift_count,
     )
 
 
@@ -969,6 +1475,382 @@ def _compute_transfer_candidates(
     return (result.pairs, exceptions)
 
 
+def _validate_transfer_resolutions(
+    *,
+    exceptions: list[AspireTransferExceptionRow],
+    resolutions: dict[int, TransferResolutionKind],
+) -> dict[int, TransferResolutionKind]:
+    exception_rows: dict[int, AspireTransferExceptionRow] = {int(row.row_index): row for row in exceptions}
+    exception_indices = set(exception_rows.keys())
+
+    normalized: dict[int, TransferResolutionKind] = {}
+    for idx, resolution in resolutions.items():
+        row_index = int(idx)
+        if row_index not in exception_indices:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Transfer resolution row {row_index} is not an active exception",
+            )
+        normalized[row_index] = resolution
+
+    for row_index, resolution in normalized.items():
+        if resolution.kind != "linked":
+            continue
+        linked_row_index = resolution.linked_row_index
+        if linked_row_index is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked resolution for row {row_index} requires linked_row_index",
+            )
+        linked_row_index = int(linked_row_index)
+        if linked_row_index == row_index:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked resolution for row {row_index} cannot reference itself",
+            )
+        if linked_row_index not in exception_indices:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked resolution for row {row_index} references non-exception row {linked_row_index}",
+            )
+
+        partner = normalized.get(linked_row_index)
+        if partner is None or partner.kind != "linked" or int(partner.linked_row_index or -1) != row_index:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked resolution for row {row_index} must be mirrored by row {linked_row_index}",
+            )
+
+        current_row = exception_rows[row_index]
+        partner_row = exception_rows[linked_row_index]
+        if (
+            current_row.account_name
+            and partner_row.account_name
+            and current_row.account_name == partner_row.account_name
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked rows {row_index} and {linked_row_index} must be in different accounts",
+            )
+
+        if int(current_row.amount_minor) != -int(partner_row.amount_minor):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Linked rows {row_index} and {linked_row_index} must have opposite signed amounts",
+            )
+
+    return normalized
+
+
+def _mapping_collision_blockers(mapping: AspireBudgetMapping) -> list[str]:
+    blockers: list[str] = []
+
+    account_names: dict[str, list[str]] = {}
+    for aspire_name, account in mapping.accounts.items():
+        key = normalize_label(account.dojo_name)
+        account_names.setdefault(key, []).append(aspire_name)
+    for key, names in sorted(account_names.items()):
+        if len(names) > 1:
+            blockers.append(f"duplicate_mapping_collision:account:{key}")
+
+    category_names: dict[str, list[str]] = {}
+    for aspire_name, category in mapping.categories.items():
+        key = normalize_label(category.dojo_name)
+        category_names.setdefault(key, []).append(aspire_name)
+    for key, names in sorted(category_names.items()):
+        if len(names) > 1:
+            blockers.append(f"duplicate_mapping_collision:category:{key}")
+
+    return blockers
+
+
+def _load_net_worth_decisions(raw: str | None) -> dict[str, NetWorthDecision]:
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+
+    out: dict[str, NetWorthDecision] = {}
+    for name, value in payload.items():
+        if not isinstance(name, str) or not name.strip():
+            continue
+        try:
+            out[name] = NetWorthDecision.model_validate(value)
+        except Exception:
+            continue
+    return out
+
+
+def _net_worth_classification_blockers(decisions: dict[str, NetWorthDecision]) -> list[str]:
+    blockers: list[str] = []
+    for name, decision in decisions.items():
+        if (
+            decision.decision in {"duplicate_derive_from_ledger", "track_forward"}
+            and decision.classification == "unknown"
+        ):
+            blockers.append(f"missing_net_worth_classification:{name}")
+        if decision.decision == "track_forward" and not decision.destinations:
+            blockers.append(f"missing_net_worth_destinations:{name}")
+    return blockers
+
+
+def _iter_month_starts(first_month: date, last_month: date) -> list[date]:
+    if first_month > last_month:
+        return []
+    out: list[date] = []
+    cur = first_month.replace(day=1)
+    end = last_month.replace(day=1)
+    while cur <= end:
+        out.append(cur)
+        if cur.month == 12:
+            cur = date(cur.year + 1, 1, 1)
+        else:
+            cur = date(cur.year, cur.month + 1, 1)
+    return out
+
+
+def _build_preview_category_ids(
+    conn: duckdb.DuckDBPyConnection,
+    mapping: AspireBudgetMapping,
+) -> dict[str, str]:
+    category_id_by_aspire_name: dict[str, str] = {}
+    used_category_ids: set[str] = set(
+        r[0] for r in conn.execute("SELECT category_id FROM budget_categories").fetchall() if r and r[0] is not None
+    )
+    for aspire_name in sorted(mapping.categories.keys()):
+        dojo_name = mapping.categories[aspire_name].dojo_name
+        base = _prefixed_id("aspire_", dojo_name)
+        category_id = base
+        suffix = 2
+        while category_id in used_category_ids:
+            category_id = f"{base}_{suffix}"
+            suffix += 1
+        used_category_ids.add(category_id)
+        category_id_by_aspire_name[aspire_name] = category_id
+    return category_id_by_aspire_name
+
+
+def _compute_budget_parity(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    migration_session_id: str,
+    mapping: AspireBudgetMapping,
+    special_labels: dict[str, str],
+    auto_pairs: list[tuple[int, int]],
+    exceptions: list[AspireTransferExceptionRow],
+    saved: dict[int, TransferResolutionKind],
+    month_start: date,
+) -> BudgetParityResponse:
+    first_month_row = conn.execute(
+        """
+        SELECT
+            LEAST(
+                COALESCE(MIN(transaction_date), DATE '9999-12-31'),
+                COALESCE((
+                    SELECT MIN(allocation_date)
+                    FROM aspire_staging_allocations
+                    WHERE migration_session_id = $id
+                ), DATE '9999-12-31')
+            ) AS min_date
+        FROM aspire_staging_transactions
+        WHERE migration_session_id = $id
+        """,
+        {"id": migration_session_id},
+    ).fetchone()
+    min_date = first_month_row[0] if first_month_row else None
+    first_month = (
+        month_start if min_date is None or min_date == date(9999, 12, 31) else cast(date, min_date).replace(day=1)
+    )
+    months = _iter_month_starts(first_month, month_start)
+
+    manual_pairs: list[tuple[int, int]] = []
+    seen_manual_pairs: set[tuple[int, int]] = set()
+    for idx, resolution in saved.items():
+        if resolution.kind != "linked" or resolution.linked_row_index is None:
+            continue
+        a, b = sorted((int(idx), int(resolution.linked_row_index)))
+        pair = (a, b)
+        if pair in seen_manual_pairs:
+            continue
+        seen_manual_pairs.add(pair)
+        manual_pairs.append(pair)
+    paired_indices: set[int] = set()
+    for a, b in [*auto_pairs, *manual_pairs]:
+        paired_indices.add(int(a))
+        paired_indices.add(int(b))
+
+    exception_indices: set[int] = {int(row.row_index) for row in exceptions}
+
+    trx_rows = conn.execute(
+        """
+        SELECT row_index, transaction_date, amount_minor, category_name
+        FROM aspire_staging_transactions
+        WHERE migration_session_id = $id
+          AND transaction_date IS NOT NULL
+          AND is_break = FALSE
+        """,
+        {"id": migration_session_id},
+    ).fetchall()
+
+    rta_label = special_labels.get("v_AtoB")
+    category_names = set(mapping.categories.keys())
+
+    trx_by_month_category: dict[tuple[date, str], int] = {}
+    trx_rta_by_month: dict[date, int] = {}
+    for row_index, trx_date, amount_minor, category_name in trx_rows:
+        idx = int(row_index)
+        if idx in paired_indices:
+            continue
+        if idx in exception_indices:
+            resolution = saved.get(idx)
+            if resolution is None:
+                continue
+            if resolution.kind in {"linked", "opening_balance", "balance_adjustment"}:
+                continue
+
+        if category_name is None:
+            continue
+        month_key = cast(date, trx_date).replace(day=1)
+        cat_name = str(category_name)
+        amount = int(amount_minor or 0)
+        if cat_name in category_names:
+            key = (month_key, cat_name)
+            trx_by_month_category[key] = int(trx_by_month_category.get(key, 0)) + amount
+        if rta_label and cat_name == rta_label:
+            trx_rta_by_month[month_key] = int(trx_rta_by_month.get(month_key, 0)) + amount
+
+    alloc_rows = conn.execute(
+        """
+        SELECT allocation_date, from_category_name, to_category_name, amount_minor
+        FROM aspire_staging_allocations
+        WHERE migration_session_id = $id
+          AND allocation_date IS NOT NULL
+        """,
+        {"id": migration_session_id},
+    ).fetchall()
+
+    alloc_available_by_month_category: dict[tuple[date, str], int] = {}
+    alloc_allocated_by_month_category: dict[tuple[date, str], int] = {}
+    rta_alloc_delta_by_month: dict[date, int] = {}
+
+    def _bump(bucket: dict[tuple[date, str], int], key: tuple[date, str], delta: int) -> None:
+        bucket[key] = int(bucket.get(key, 0)) + int(delta)
+
+    for alloc_date, from_name, to_name, amount_minor in alloc_rows:
+        month_key = cast(date, alloc_date).replace(day=1)
+        amount = int(amount_minor or 0)
+        to_value = str(to_name) if to_name is not None else ""
+        from_value = str(from_name) if from_name is not None else ""
+
+        if to_value in category_names:
+            _bump(alloc_available_by_month_category, (month_key, to_value), amount)
+            _bump(alloc_allocated_by_month_category, (month_key, to_value), amount)
+        if from_value and from_value in category_names:
+            _bump(alloc_available_by_month_category, (month_key, from_value), -amount)
+            if not rta_label or from_value != rta_label:
+                _bump(alloc_allocated_by_month_category, (month_key, from_value), -amount)
+
+        if rta_label:
+            if to_value == rta_label:
+                rta_alloc_delta_by_month[month_key] = int(rta_alloc_delta_by_month.get(month_key, 0)) + amount
+            if from_value == rta_label:
+                rta_alloc_delta_by_month[month_key] = int(rta_alloc_delta_by_month.get(month_key, 0)) - amount
+
+    category_ids = _build_preview_category_ids(conn, mapping)
+
+    rows: list[BudgetParityRow] = []
+    mismatches = 0
+    max_abs_diff = 0
+
+    for aspire_name in sorted(mapping.categories.keys(), key=lambda item: item.lower()):
+        available = 0
+        expected_allocated = 0
+        expected_activity = 0
+        projected_allocated = 0
+        projected_activity = 0
+        projected_available = 0
+
+        for month in months:
+            trx_amount = int(trx_by_month_category.get((month, aspire_name), 0))
+            alloc_available = int(alloc_available_by_month_category.get((month, aspire_name), 0))
+            alloc_allocated = int(alloc_allocated_by_month_category.get((month, aspire_name), 0))
+
+            available += trx_amount + alloc_available
+            projected_available += trx_amount + alloc_available
+
+            if month == month_start:
+                expected_activity = -trx_amount
+                expected_allocated = alloc_allocated
+                projected_activity = -trx_amount
+                projected_allocated = alloc_allocated
+
+        diff_allocated = projected_allocated - expected_allocated
+        diff_activity = projected_activity - expected_activity
+        diff_available = projected_available - available
+
+        if diff_allocated or diff_activity or diff_available:
+            mismatches += 1
+            max_abs_diff = max(
+                max_abs_diff,
+                abs(diff_allocated),
+                abs(diff_activity),
+                abs(diff_available),
+            )
+
+        rows.append(
+            BudgetParityRow(
+                category_id=category_ids[aspire_name],
+                category_name=mapping.categories[aspire_name].dojo_name,
+                expected_allocated_minor=expected_allocated,
+                actual_allocated_minor=projected_allocated,
+                diff_allocated_minor=diff_allocated,
+                expected_activity_minor=expected_activity,
+                actual_activity_minor=projected_activity,
+                diff_activity_minor=diff_activity,
+                expected_available_minor=available,
+                actual_available_minor=projected_available,
+                diff_available_minor=diff_available,
+            )
+        )
+
+    if rta_label:
+        expected_rta = 0
+        actual_rta = 0
+        for month in months:
+            expected_rta += int(rta_alloc_delta_by_month.get(month, 0)) + int(trx_rta_by_month.get(month, 0))
+            actual_rta += int(rta_alloc_delta_by_month.get(month, 0)) + int(trx_rta_by_month.get(month, 0))
+        diff_rta = actual_rta - expected_rta
+        if diff_rta:
+            mismatches += 1
+            max_abs_diff = max(max_abs_diff, abs(diff_rta))
+        rows.append(
+            BudgetParityRow(
+                category_id="available_to_budget",
+                category_name="Ready to Assign",
+                expected_allocated_minor=0,
+                actual_allocated_minor=0,
+                diff_allocated_minor=0,
+                expected_activity_minor=0,
+                actual_activity_minor=0,
+                diff_activity_minor=0,
+                expected_available_minor=expected_rta,
+                actual_available_minor=actual_rta,
+                diff_available_minor=diff_rta,
+            )
+        )
+
+    return BudgetParityResponse(
+        month_start=month_start,
+        mismatches=mismatches,
+        max_abs_diff_minor=max_abs_diff,
+        rows=rows,
+    )
+
+
 @router.get("/onboarding/aspire/transfers", response_model=GetAspireTransfersResponse)
 def get_transfers(
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
@@ -994,6 +1876,11 @@ def get_transfers(
         except Exception:
             continue
 
+    try:
+        saved = _validate_transfer_resolutions(exceptions=exceptions, resolutions=saved)
+    except HTTPException:
+        saved = {}
+
     return GetAspireTransfersResponse(auto_pairs=auto_pairs, exceptions=exceptions, saved_resolutions=saved)
 
 
@@ -1006,8 +1893,22 @@ def save_transfers(
     if session["mapping_status"] != "completed" or not session["mapping_json"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete mapping first")
 
+    mapping = AspireBudgetMapping.model_validate(json.loads(session["mapping_json"]))
+    auto_pairs, exceptions = _compute_transfer_candidates(
+        conn,
+        migration_session_id=session["migration_session_id"],
+        mapping=mapping,
+        special_labels=session["special_labels"],
+    )
+    _ = auto_pairs
+
+    normalized = _validate_transfer_resolutions(
+        exceptions=exceptions,
+        resolutions={int(k): v for k, v in payload.resolutions.items()},
+    )
+
     migration_session_id = session["migration_session_id"]
-    resolutions_json = _json_dumps({str(k): v.model_dump() for k, v in payload.resolutions.items()})
+    resolutions_json = _json_dumps({str(k): v.model_dump() for k, v in normalized.items()})
     conn.execute(
         """
         UPDATE aspire_migration_sessions
@@ -1080,7 +1981,38 @@ def get_net_worth_decisions(
         else:
             decisions[name] = NetWorthDecision(decision="legacy_only", classification=classification)
 
-    return GetNetWorthDecisionsResponse(decisions=decisions)
+    # Last-reported balances (per category) from the staged marks stream.
+    marks_rows = conn.execute(
+        """
+        SELECT category_name, mark_date, amount_minor
+        FROM aspire_staging_net_worth_marks
+        WHERE migration_session_id = $id
+          AND mark_date IS NOT NULL
+          AND category_name IS NOT NULL
+          AND TRIM(category_name) != ''
+        QUALIFY
+          ROW_NUMBER() OVER (
+            PARTITION BY category_name
+            ORDER BY mark_date DESC, row_index DESC
+          ) = 1
+        """,
+        {"id": migration_session_id},
+    ).fetchall()
+
+    last_reported_by_category_minor: dict[str, int] = {}
+    for category_name, _mark_date, amount_minor in marks_rows:
+        key = str(category_name)
+        magnitude = abs(int(amount_minor or 0))
+        decision = decisions.get(key)
+        if decision and decision.classification == "debt":
+            last_reported_by_category_minor[key] = -magnitude
+        else:
+            last_reported_by_category_minor[key] = magnitude
+
+    return GetNetWorthDecisionsResponse(
+        decisions=decisions,
+        last_reported_by_category_minor=last_reported_by_category_minor,
+    )
 
 
 @router.post("/onboarding/aspire/net-worth", status_code=status.HTTP_200_OK)
@@ -1091,7 +2023,7 @@ def save_net_worth_decisions(
     session = _get_extracted_session(conn)
     migration_session_id = session["migration_session_id"]
 
-    decisions_json = _json_dumps({k: v.model_dump() for k, v in payload.decisions.items()})
+    decisions_json = _json_dumps({k: v.model_dump(mode="json") for k, v in payload.decisions.items()})
     conn.execute(
         """
         UPDATE aspire_migration_sessions
@@ -1106,6 +2038,7 @@ def save_net_worth_decisions(
 @router.get("/onboarding/aspire/preview", response_model=MigrationPreviewResponse)
 def preview_migration(
     conn: duckdb.DuckDBPyConnection = _CONNECTION_DEP,
+    system_date: date = _SYSTEM_DATE_DEP,
 ) -> MigrationPreviewResponse:
     session = _get_extracted_session(conn)
 
@@ -1118,6 +2051,10 @@ def preview_migration(
         blockers.append("already_imported")
 
     mapping = AspireBudgetMapping.model_validate(json.loads(session["mapping_json"]))
+    blockers.extend(_mapping_collision_blockers(mapping))
+
+    decisions = _load_net_worth_decisions(session["net_worth_decisions_json"])
+    blockers.extend(_net_worth_classification_blockers(decisions))
 
     supported_account_classes = {"cash", "credit", "investment", "loan"}
     for acct_name, acct in mapping.accounts.items():
@@ -1139,13 +2076,36 @@ def preview_migration(
         except Exception:
             continue
 
+    try:
+        saved = _validate_transfer_resolutions(exceptions=exceptions, resolutions=saved)
+    except HTTPException as exc:
+        blockers.append(f"invalid_transfer_resolution:{exc.detail}")
+        saved = {}
+
     unresolved = [row.row_index for row in exceptions if row.row_index not in saved]
     if unresolved:
         blockers.append("unresolved_transfer_exceptions")
 
-    for idx, resolution in saved.items():
-        if resolution.kind == "external" and not resolution.category_id:
-            blockers.append(f"transfer_exception_missing_category:{idx}")
+    preview_month = system_date.replace(day=1)
+    v_today = session["special_labels"].get("v_Today")
+    if v_today:
+        try:
+            preview_month = date.fromisoformat(v_today).replace(day=1)
+        except ValueError:
+            preview_month = preview_month
+
+    budget_parity = _compute_budget_parity(
+        conn,
+        migration_session_id=session["migration_session_id"],
+        mapping=mapping,
+        special_labels=session["special_labels"],
+        auto_pairs=auto_pairs,
+        exceptions=exceptions,
+        saved=saved,
+        month_start=preview_month,
+    )
+    if budget_parity.mismatches > 0:
+        blockers.append("budget_parity_mismatch")
 
     # Legacy net worth series (Aspire parity).
     legacy_marks_rows = conn.execute(
@@ -1177,12 +2137,14 @@ def preview_migration(
     )
     legacy_series = [SeriesPoint(date=d.isoformat(), value_minor=v) for (d, v) in legacy_points]
 
+    blockers = sorted(set(blockers))
     can_apply = not blockers
     return MigrationPreviewResponse(
         legacy_net_worth_bucket=legacy_series,
         dojo_net_worth_month_end=[],
         duplicate_drift=[],
-        budget_parity=None,
+        budget_parity=budget_parity,
+        budget_parity_known_differences=list(_KNOWN_BUDGET_PARITY_DIFFERENCES),
         blockers=blockers,
         can_apply=can_apply,
     )
@@ -1207,6 +2169,21 @@ def apply_migration(
 
     mapping = AspireBudgetMapping.model_validate(json.loads(session["mapping_json"]))
 
+    mapping_collisions = _mapping_collision_blockers(mapping)
+    if mapping_collisions and not payload.force and not settings.aspire_migration_allow_partial_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Resolve duplicate mapping collisions first: {', '.join(mapping_collisions)}",
+        )
+
+    decisions = _load_net_worth_decisions(session["net_worth_decisions_json"])
+    net_worth_blockers = _net_worth_classification_blockers(decisions)
+    if net_worth_blockers and not payload.force and not settings.aspire_migration_allow_partial_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Resolve net worth blockers first: {', '.join(net_worth_blockers)}",
+        )
+
     supported_account_classes = {"cash", "credit", "investment", "loan"}
     for acct_name, acct in mapping.accounts.items():
         if acct.account_class not in supported_account_classes:
@@ -1230,12 +2207,51 @@ def apply_migration(
         except Exception:
             continue
 
+    saved = _validate_transfer_resolutions(exceptions=exceptions, resolutions=saved)
+
     unresolved = [row.row_index for row in exceptions if row.row_index not in saved]
     if unresolved and not payload.force and not settings.aspire_migration_allow_partial_mapping:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Resolve transfer exceptions first",
         )
+
+    apply_month = system_date.replace(day=1)
+    v_today = session["special_labels"].get("v_Today")
+    if v_today:
+        try:
+            apply_month = date.fromisoformat(v_today).replace(day=1)
+        except ValueError:
+            apply_month = apply_month
+    budget_parity = _compute_budget_parity(
+        conn,
+        migration_session_id=migration_session_id,
+        mapping=mapping,
+        special_labels=session["special_labels"],
+        auto_pairs=auto_pairs,
+        exceptions=exceptions,
+        saved=saved,
+        month_start=apply_month,
+    )
+    if budget_parity.mismatches > 0 and not settings.aspire_migration_allow_partial_mapping:
+        acknowledged = bool(payload.ack_budget_parity_mismatch)
+        semantic_difference = payload.budget_parity_semantic_difference
+        if not acknowledged:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Budget parity mismatch detected. Review preview and acknowledge a documented semantic "
+                    "difference before apply."
+                ),
+            )
+        if semantic_difference not in _KNOWN_BUDGET_PARITY_DIFFERENCES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Budget parity mismatch acknowledgment requires a documented semantic difference "
+                    f"({', '.join(_KNOWN_BUDGET_PARITY_DIFFERENCES)})."
+                ),
+            )
 
     # Build stable ID maps, de-duplicating dojo_name collisions.
     account_id_by_aspire_name: dict[str, str] = {}
@@ -1250,6 +2266,21 @@ def apply_migration(
             suffix += 1
         used_account_ids.add(account_id)
         account_id_by_aspire_name[aspire_name] = account_id
+
+    track_forward_destination_account_ids: dict[tuple[str, int], str] = {}
+    for source_name in sorted(decisions.keys(), key=str.lower):
+        decision = decisions[source_name]
+        if decision.decision != "track_forward":
+            continue
+        for destination_idx, destination in enumerate(decision.destinations):
+            base = _prefixed_id("aspire_nw_", f"{source_name}_{destination.name}")
+            account_id = base
+            suffix = 2
+            while account_id in used_account_ids:
+                account_id = f"{base}_{suffix}"
+                suffix += 1
+            used_account_ids.add(account_id)
+            track_forward_destination_account_ids[(source_name, destination_idx)] = account_id
 
     group_id_by_name: dict[str, str] = {}
     for group_name in sorted({m.group_name for m in mapping.categories.values()}):
@@ -1324,8 +2355,21 @@ def apply_migration(
         {"id": migration_session_id},
     ).fetchall()
 
+    manual_pairs: list[tuple[int, int]] = []
+    seen_manual_pairs: set[tuple[int, int]] = set()
+    for idx, resolution in saved.items():
+        if resolution.kind != "linked" or resolution.linked_row_index is None:
+            continue
+        a, b = sorted((int(idx), int(resolution.linked_row_index)))
+        pair = (a, b)
+        if pair in seen_manual_pairs:
+            continue
+        seen_manual_pairs.add(pair)
+        manual_pairs.append(pair)
+
     transfer_pair_indices: set[int] = set()
-    for a, b in auto_pairs:
+    all_pairs = [*auto_pairs, *manual_pairs]
+    for a, b in all_pairs:
         transfer_pair_indices.add(int(a))
         transfer_pair_indices.add(int(b))
     exception_indices: set[int] = {row.row_index for row in exceptions}
@@ -1334,6 +2378,9 @@ def apply_migration(
     for a, b in auto_pairs:
         lo, hi = (int(a), int(b)) if int(a) <= int(b) else (int(b), int(a))
         transfer_concept_by_pair[(lo, hi)] = _uuid_for(dataset_fingerprint, "transfer", f"{lo}:{hi}")
+    for a, b in manual_pairs:
+        lo, hi = (int(a), int(b)) if int(a) <= int(b) else (int(b), int(a))
+        transfer_concept_by_pair[(lo, hi)] = _uuid_for(dataset_fingerprint, "manual_transfer", f"{lo}:{hi}")
 
     accounts_created = 0
     category_groups_created = 0
@@ -1358,11 +2405,11 @@ def apply_migration(
             """
             INSERT INTO budget_category_groups (group_id, name, sort_order, is_active)
             VALUES ('credit_card_payments', 'Credit Card Payments', -1000, TRUE)
-            ON CONFLICT (group_id) DO UPDATE
-                SET name = excluded.name,
-                    sort_order = excluded.sort_order,
-                    is_active = TRUE,
-                    updated_at = CURRENT_TIMESTAMP
+                ON CONFLICT (group_id) DO UPDATE
+                    SET name = excluded.name,
+                        sort_order = excluded.sort_order,
+                        is_active = TRUE,
+                        updated_at = NOW()
             """
         )
 
@@ -1377,7 +2424,7 @@ def apply_migration(
                 ON CONFLICT (group_id) DO UPDATE
                     SET name = excluded.name,
                         is_active = excluded.is_active,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = NOW()
                 """,
                 {"group_id": group_id, "name": group_name},
             )
@@ -1401,6 +2448,10 @@ def apply_migration(
                     allow_allocations,
                     is_envelope,
                     is_payment,
+                    goal_type,
+                    goal_amount_minor,
+                    goal_target_date,
+                    goal_frequency,
                     created_at,
                     updated_at
                 ) VALUES (
@@ -1413,6 +2464,10 @@ def apply_migration(
                     TRUE,
                     TRUE,
                     FALSE,
+                    $goal_type,
+                    $goal_amount_minor,
+                    $goal_target_date,
+                    $goal_frequency,
                     CURRENT_TIMESTAMP,
                     CURRENT_TIMESTAMP
                 )
@@ -1420,13 +2475,21 @@ def apply_migration(
                     SET name = excluded.name,
                         group_id = excluded.group_id,
                         is_active = excluded.is_active,
-                        updated_at = CURRENT_TIMESTAMP
+                        goal_type = excluded.goal_type,
+                        goal_amount_minor = excluded.goal_amount_minor,
+                        goal_target_date = excluded.goal_target_date,
+                        goal_frequency = excluded.goal_frequency,
+                        updated_at = NOW()
                 """,
                 {
                     "category_id": category_id,
                     "name": cat.dojo_name,
                     "group_id": group_id,
                     "is_active": bool(cat.is_active),
+                    "goal_type": cat.goal_type,
+                    "goal_amount_minor": int(cat.goal_amount_minor) if cat.goal_amount_minor is not None else None,
+                    "goal_target_date": cat.goal_target_date,
+                    "goal_frequency": cat.goal_frequency,
                 },
             )
             categories_created += 1
@@ -1471,7 +2534,7 @@ def apply_migration(
                         account_role = excluded.account_role,
                         is_active = excluded.is_active,
                         include_in_net_worth = excluded.include_in_net_worth,
-                        updated_at = CURRENT_TIMESTAMP
+                        updated_at = NOW()
                 """,
                 {
                     "account_id": account_id,
@@ -1522,10 +2585,429 @@ def apply_migration(
                             allow_allocations = excluded.allow_allocations,
                             is_envelope = excluded.is_envelope,
                             is_payment = excluded.is_payment,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = NOW()
                     """,
                     {"category_id": payment_category_id, "name": acct.dojo_name},
                 )
+
+        # Track-forward net worth destinations.
+        for source_name in sorted(decisions.keys(), key=str.lower):
+            decision = decisions[source_name]
+            if decision.decision != "track_forward":
+                continue
+            cutover_date = decision.cutover_date or system_date
+
+            for destination_idx, destination in enumerate(decision.destinations):
+                account_id = track_forward_destination_account_ids.get((source_name, destination_idx))
+                if not account_id:
+                    continue
+
+                if destination.account_type == "liability" or destination.account_class in {"loan", "credit"}:
+                    account_type = "liability"
+                else:
+                    account_type = "asset"
+
+                conn.execute(
+                    """
+                    INSERT INTO accounts (
+                        account_id,
+                        name,
+                        institution_name,
+                        account_type,
+                        account_class,
+                        account_role,
+                        current_balance_minor,
+                        currency,
+                        is_active,
+                        include_in_net_worth,
+                        created_at,
+                        updated_at
+                    ) VALUES (
+                        $account_id,
+                        $name,
+                        $institution_name,
+                        $account_type,
+                        $account_class,
+                        'tracking',
+                        0,
+                        'USD',
+                        TRUE,
+                        TRUE,
+                        CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP
+                    )
+                    ON CONFLICT (account_id) DO UPDATE
+                        SET name = excluded.name,
+                            institution_name = excluded.institution_name,
+                            account_type = excluded.account_type,
+                            account_class = excluded.account_class,
+                            account_role = excluded.account_role,
+                            is_active = TRUE,
+                            include_in_net_worth = TRUE,
+                            updated_at = NOW()
+                    """,
+                    {
+                        "account_id": account_id,
+                        "name": destination.name,
+                        "institution_name": destination.institution_name,
+                        "account_type": account_type,
+                        "account_class": destination.account_class,
+                    },
+                )
+                accounts_created += 1
+
+                starting_value_minor = int(destination.starting_value_minor or 0)
+
+                if destination.account_class == "investment" and starting_value_minor == 0:
+                    computed_holdings_minor = 0
+                    for holding in destination.holdings:
+                        ticker = holding.ticker.strip().upper()
+                        if not ticker:
+                            continue
+                        price_minor = int(getattr(holding, "current_price_minor", 0) or 0)
+                        if price_minor <= 0:
+                            price_minor = int(holding.avg_cost_minor or 0)
+                        if price_minor <= 0:
+                            continue
+                        try:
+                            qty = float(holding.quantity)
+                        except Exception:
+                            qty = 0.0
+                        computed_holdings_minor += int(round(qty * price_minor))
+
+                    computed_start_minor = int(destination.statement_cash_minor or 0) + computed_holdings_minor
+                    if computed_start_minor != 0:
+                        starting_value_minor = computed_start_minor
+
+                if (
+                    destination.account_class in {"cash", "accessible", "credit", "investment", "loan"}
+                    and starting_value_minor != 0
+                ):
+                    concept_id = _uuid_for(
+                        dataset_fingerprint,
+                        "track_forward_opening",
+                        f"{source_name}:{destination_idx}",
+                    )
+                    version_id = _uuid_for(
+                        dataset_fingerprint,
+                        "track_forward_opening_version",
+                        f"{source_name}:{destination_idx}",
+                    )
+                    conn.execute(
+                        """
+                        INSERT INTO transactions (
+                            transaction_version_id,
+                            concept_id,
+                            account_id,
+                            category_id,
+                            transaction_date,
+                            amount_minor,
+                            memo,
+                            status,
+                            recorded_at,
+                            valid_from,
+                            valid_to,
+                            is_active,
+                            source
+                        ) VALUES (
+                            $transaction_version_id,
+                            $concept_id,
+                            $account_id,
+                            'opening_balance',
+                            $transaction_date,
+                            $amount_minor,
+                            $memo,
+                            'cleared',
+                            $recorded_at,
+                            $recorded_at,
+                            TIMESTAMP '9999-12-31 00:00:00',
+                            TRUE,
+                            'aspire_import'
+                        )
+                        ON CONFLICT (transaction_version_id) DO NOTHING
+                        """,
+                        {
+                            "transaction_version_id": str(version_id),
+                            "concept_id": str(concept_id),
+                            "account_id": account_id,
+                            "transaction_date": cutover_date,
+                            "amount_minor": starting_value_minor,
+                            "memo": f"Aspire cutover opening balance: {source_name}",
+                            "recorded_at": now,
+                        },
+                    )
+                    transactions_imported += 1
+
+                if destination.account_class == "cash":
+                    detail_id = _uuid_for(dataset_fingerprint, "track_forward_cash_detail", account_id)
+                    conn.execute(
+                        load_budgeting_sql("insert_cash_account_detail.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "interest_rate_apy": None,
+                        },
+                    )
+
+                elif destination.account_class == "accessible":
+                    detail_id = _uuid_for(dataset_fingerprint, "track_forward_accessible_detail", account_id)
+                    conn.execute(
+                        load_budgeting_sql("insert_accessible_asset_detail.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "term_end_date": None,
+                            "interest_rate_apy": None,
+                            "early_withdrawal_penalty": None,
+                        },
+                    )
+
+                elif destination.account_class == "credit":
+                    detail_id = _uuid_for(dataset_fingerprint, "track_forward_credit_detail", account_id)
+                    conn.execute(
+                        load_budgeting_sql("insert_credit_account_detail.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "apr": None,
+                            "card_type": None,
+                            "cash_advance_apr": None,
+                        },
+                    )
+
+                elif destination.account_class == "investment":
+                    detail_id = _uuid_for(
+                        dataset_fingerprint,
+                        "track_forward_investment_detail",
+                        account_id,
+                    )
+                    conn.execute(
+                        load_investments_sql("insert_investment_account_detail_version.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "risk_free_sweep_rate": 0.0,
+                            "manager": None,
+                            "is_self_directed": destination.is_self_directed,
+                            "tax_classification": destination.tax_classification,
+                            "uninvested_cash_minor": int(destination.statement_cash_minor or 0),
+                            "ledger_baseline_minor": starting_value_minor,
+                            "valid_from": now,
+                            "valid_to": "9999-12-31 00:00:00",
+                            "created_at": now,
+                            "updated_at": now,
+                        },
+                    )
+
+                    for holding_idx, holding in enumerate(destination.holdings):
+                        ticker = holding.ticker.strip().upper()
+                        if not ticker:
+                            continue
+
+                        # Starting-price seed for NAV / net worth reporting.
+                        # Prefer explicit current price, fall back to legacy avg_cost input.
+                        price_minor = int(getattr(holding, "current_price_minor", 0) or 0)
+                        if price_minor <= 0:
+                            price_minor = int(holding.avg_cost_minor or 0)
+
+                        # Positions store per-share avg cost basis.
+                        cost_basis_total_minor = getattr(holding, "cost_basis_total_minor", None)
+                        avg_cost_minor = int(holding.avg_cost_minor or 0)
+                        if cost_basis_total_minor is not None:
+                            try:
+                                quantity = float(holding.quantity)
+                            except Exception:
+                                quantity = 0.0
+                            if quantity > 0:
+                                avg_cost_minor = int(round(int(cost_basis_total_minor) / quantity))
+                            else:
+                                avg_cost_minor = 0
+
+                        security_row = conn.execute(
+                            "SELECT security_id FROM securities WHERE ticker = $ticker",
+                            {"ticker": ticker},
+                        ).fetchone()
+                        if security_row:
+                            security_id = str(security_row[0])
+                        else:
+                            security_id = str(_uuid_for(dataset_fingerprint, "track_forward_security", ticker))
+                            conn.execute(
+                                """
+                                INSERT INTO securities (
+                                    security_id,
+                                    ticker,
+                                    name,
+                                    type,
+                                    currency,
+                                    created_at,
+                                    updated_at
+                                ) VALUES (
+                                    $security_id,
+                                    $ticker,
+                                    $name,
+                                    'STOCK',
+                                    'USD',
+                                    $recorded_at,
+                                    $recorded_at
+                                )
+                                ON CONFLICT (ticker) DO NOTHING
+                                """,
+                                {
+                                    "security_id": security_id,
+                                    "ticker": ticker,
+                                    "name": ticker,
+                                    "recorded_at": now,
+                                },
+                            )
+
+                        position_key = f"{account_id}:{ticker}:{holding_idx}"
+                        position_id = _uuid_for(dataset_fingerprint, "track_forward_position", position_key)
+                        position_concept_id = _uuid_for(
+                            dataset_fingerprint,
+                            "track_forward_position_concept",
+                            position_key,
+                        )
+                        conn.execute(
+                            """
+                            INSERT INTO positions (
+                                position_id,
+                                concept_id,
+                                account_id,
+                                security_id,
+                                quantity,
+                                avg_cost_minor,
+                                valid_from,
+                                valid_to,
+                                is_active,
+                                recorded_at
+                            ) VALUES (
+                                $position_id,
+                                $concept_id,
+                                $account_id,
+                                $security_id,
+                                $quantity,
+                                $avg_cost_minor,
+                                $recorded_at,
+                                TIMESTAMP '9999-12-31 00:00:00',
+                                TRUE,
+                                $recorded_at
+                            )
+                            ON CONFLICT (position_id) DO NOTHING
+                            """,
+                            {
+                                "position_id": str(position_id),
+                                "concept_id": str(position_concept_id),
+                                "account_id": account_id,
+                                "security_id": security_id,
+                                "quantity": float(holding.quantity),
+                                "avg_cost_minor": avg_cost_minor,
+                                "recorded_at": now,
+                            },
+                        )
+
+                        conn.execute(
+                            """
+                            INSERT INTO market_prices (
+                                security_id,
+                                market_date,
+                                open_minor,
+                                high_minor,
+                                low_minor,
+                                close_minor,
+                                adj_close_minor,
+                                volume,
+                                recorded_at
+                            ) VALUES (
+                                $security_id,
+                                $market_date,
+                                $price_minor,
+                                $price_minor,
+                                $price_minor,
+                                $price_minor,
+                                $price_minor,
+                                NULL,
+                                $recorded_at
+                            )
+                            ON CONFLICT (security_id, market_date) DO NOTHING
+                            """,
+                            {
+                                "security_id": security_id,
+                                "market_date": cutover_date,
+                                "price_minor": price_minor,
+                                "recorded_at": now,
+                            },
+                        )
+
+                elif destination.account_class == "loan":
+                    detail_id = _uuid_for(dataset_fingerprint, "track_forward_loan_detail", account_id)
+                    conn.execute(
+                        load_budgeting_sql("insert_loan_account_detail.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "initial_principal_minor": int(
+                                abs(
+                                    destination.original_principal_minor
+                                    if destination.original_principal_minor is not None
+                                    else starting_value_minor
+                                )
+                            ),
+                            "interest_rate_apy": float(destination.interest_rate_apy or 0.0),
+                            "mortgage_escrow_details": destination.note,
+                        },
+                    )
+
+                elif destination.account_class == "tangible":
+                    detail_id = _uuid_for(dataset_fingerprint, "track_forward_tangible_detail", account_id)
+                    conn.execute(
+                        load_budgeting_sql("insert_tangible_asset_detail.sql"),
+                        {
+                            "detail_id": str(detail_id),
+                            "account_id": account_id,
+                            "asset_name": destination.name,
+                            "acquisition_cost_minor": int(abs(starting_value_minor)),
+                        },
+                    )
+
+                    tangible_id = _uuid_for(dataset_fingerprint, "track_forward_tangible_value", account_id)
+                    conn.execute(
+                        """
+                        INSERT INTO tangible_assets (
+                            tangible_id,
+                            account_id,
+                            asset_name,
+                            acquisition_cost_minor,
+                            current_fair_value_minor,
+                            valid_from,
+                            valid_to,
+                            is_active,
+                            recorded_at,
+                            created_at,
+                            updated_at
+                        ) VALUES (
+                            $tangible_id,
+                            $account_id,
+                            $asset_name,
+                            $acquisition_cost_minor,
+                            $current_fair_value_minor,
+                            $recorded_at,
+                            TIMESTAMP '9999-12-31 00:00:00',
+                            TRUE,
+                            $recorded_at,
+                            $recorded_at,
+                            $recorded_at
+                        )
+                        ON CONFLICT (tangible_id) DO NOTHING
+                        """,
+                        {
+                            "tangible_id": str(tangible_id),
+                            "account_id": account_id,
+                            "asset_name": destination.name,
+                            "acquisition_cost_minor": int(abs(starting_value_minor)),
+                            "current_fair_value_minor": starting_value_minor,
+                            "recorded_at": now,
+                        },
+                    )
 
         # Allocations.
         for row_index, alloc_date, amount_minor, from_name, to_name in alloc_rows:
@@ -1621,20 +3103,13 @@ def apply_migration(
                     category_id = "opening_balance"
                 elif resolution.kind == "balance_adjustment":
                     category_id = "balance_adjustment"
+                elif resolution.kind == "linked":
+                    continue
                 else:
-                    if not resolution.category_id:
-                        if payload.force or settings.aspire_migration_allow_partial_mapping:
-                            continue
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Missing category for transfer exception {idx}",
-                        )
-                    category_id = _map_category_name(resolution.category_id)
-                    if not category_id:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Unknown category for transfer exception {idx}",
-                        )
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Unknown transfer resolution kind for row {idx}: {resolution.kind}",
+                    )
             else:
                 raw_cat = str(category_name).strip() if category_name is not None else None
                 if raw_cat and (raw_cat == transfer_label or raw_cat in mapping.accounts):
@@ -1711,7 +3186,7 @@ def apply_migration(
             transactions_imported += 1
 
         # Transfer pairs (neutral; account_transfer on both legs).
-        for a, b in auto_pairs:
+        for a, b in all_pairs:
             lo, hi = (int(a), int(b)) if int(a) <= int(b) else (int(b), int(a))
             concept_id = transfer_concept_by_pair[(lo, hi)]
 

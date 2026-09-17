@@ -296,6 +296,14 @@ Post-onboarding expectation:
 
 - Dashboard includes a follow-up tasks section (for example, reconcile reminders and retired-category cleanup).
 
+## Temporary accepted implementation variances (2026-02-12)
+
+Accepted by reviewer as "decent enough for now"; not considered release blockers for the current pass:
+
+1. Step 9 account-type modal: iconography and exact internal scroll composition still differ slightly from the mockup.
+2. Step 2 copy/details: implementation keeps production-focused OAuth wording and a single CTA-centered card.
+3. Step 3 validation detail: implementation retains visible named-range details and optional verify control for transparency.
+
 ## Required blockers before apply
 
 These are the minimum sufficient/necessary gating checks before final apply:
